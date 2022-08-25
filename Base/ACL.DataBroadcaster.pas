@@ -16,10 +16,12 @@ unit ACL.DataBroadcaster;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  System.Classes,
-  System.Generics.Collections,
+  // Winapi
+  Windows,
+  Messages,
+  // System
+  Classes,
+  Generics.Collections,
   // ACL
   ACL.Classes.Collections,
   ACL.Threading,
@@ -71,7 +73,7 @@ function SendDataToHandle(AHandle: HWND; const AData: UnicodeString; ID: Cardina
 implementation
 
 uses
-  System.SysUtils;
+  SysUtils;
 
 const
   SendDataID = 753;
@@ -275,12 +277,14 @@ end;
 procedure TACLDataBroadcaster.CreateHandle;
 var
   AClientHandle: HWND;
+  AClassName: UnicodeString;
 begin
-  FHandle := WndCreate(WndProc, ClassName);
+  AClassName := ClassName;
+  FHandle := WndCreate(WndProc, AClassName);
 
   AClientHandle := 0;
   repeat
-    AClientHandle := FindWindowExW(0, AClientHandle, PWideChar(ClassName), nil);
+    AClientHandle := FindWindowExW(0, AClientHandle, PWideChar(AClassName), nil);
     if (AClientHandle <> 0) and (FHandle <> AClientHandle) then
     begin
       FClients.Add(AClientHandle);

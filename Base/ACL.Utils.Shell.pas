@@ -16,19 +16,28 @@ unit ACL.Utils.Shell;
 interface
 
 uses
-  Winapi.ActiveX,
-  Winapi.ShellApi,
-  Winapi.ShlObj,
-  Winapi.Windows,
+  // Winapi
+  ActiveX,
+  ShellApi,
+  ShlObj,
+  Windows,
   // System
-  System.Classes,
-  System.Generics.Collections,
+  Classes,
+  Generics.Collections,
   // ACL
-  ACL.Classes,
   ACL.Classes.StringList,
-  ACL.Geometry,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
+
+{$IFDEF FPC}
+const
+  QUNS_NOT_PRESENT             = 1;  // The user is not present.  Heuristic check for modes like: screen saver, locked machine, non-active FUS session
+  QUNS_BUSY                    = 2;  // The user is busy.  Heuristic check for modes like: full-screen app
+  QUNS_RUNNING_D3D_FULL_SCREEN = 3;  // full-screen (exlusive-mode) D3D app
+  QUNS_PRESENTATION_MODE       = 4;  // Windows presentation mode (laptop feature) is turned on
+  QUNS_ACCEPTS_NOTIFICATIONS   = 5;  // notifications can be freely sent
+  QUNS_QUIET_TIME              = 6;   // We are in OOBE quiet period
+{$ENDIF}
 
 type
   TShellOperation = (soMove, soCopy, soDelete, soRename);
@@ -211,13 +220,47 @@ procedure UpdateShellCache;
 implementation
 
 uses
-  System.SysUtils,
-  System.Math,
-  System.Win.ComObj,
+  // System
+  Math,
+  ComObj,
+  SysUtils,
   // ACL
   ACL.Utils.Strings,
   ACL.Utils.Stream,
   ACL.Utils.Registry;
+
+{$IFDEF FPC}
+type
+  TFolderTypeID = TGUID;
+  IShellLibrary = interface(IUnknown)
+    ['{11A66EFA-382E-451A-9234-1E0E12EF3085}']
+    function LoadLibraryFromItem(const psiLibrary: IShellItem;
+      grfMode: DWORD): HRESULT; stdcall;
+    function LoadLibraryFromKnownFolder(const kfidLibrary: TIID;
+      grfMode: DWORD): HRESULT; stdcall;
+    function AddFolder(const psiLocation: IShellItem): HRESULT; stdcall;
+    function RemoveFolder(const psiLocation: IShellItem): HRESULT; stdcall;
+    function GetFolders(lff: Integer; const riid: TIID;
+      out ppv): HRESULT; stdcall;
+    function ResolveFolder(const psiFolderToResolve: IShellItem; dwTimeout: DWORD;
+      const riid: TIID; out ppv): HRESULT; stdcall;
+    function GetDefaultSaveFolder(dsft: Integer; const riid: TIID;
+      out ppv): HRESULT; stdcall;
+    function SetDefaultSaveFolder(dsft: Integer;
+      var psi: IShellItem): HRESULT; stdcall;
+    function GetOptions(var plofOptions: Integer): HRESULT; stdcall;
+    function SetOptions(lofMask, lofOptions: Integer): HRESULT; stdcall;
+    function GetFolderType(var pftid: TFolderTypeID): HRESULT; stdcall;
+    function SetFolderType(const ftid: TFolderTypeID): HRESULT; stdcall;
+    function GetIcon(var ppszIcon: LPWSTR): HRESULT; stdcall;
+    function SetIcon(pszIcon: LPCWSTR): HRESULT; stdcall;
+    function Commit: HRESULT; stdcall;
+    function Save(const psiFolderToSaveIn: IShellItem; pszLibraryName: LPCWSTR;
+      lsf: Integer; out ppsiSavedTo: IShellItem): HRESULT; stdcall;
+    function SaveInKnownFolder(const kfidToSaveIn: TIID; pszLibraryName: LPCWSTR;
+      lsf: Integer; out ppsiSavedTo: IShellItem): HRESULT; stdcall;
+  end;
+{$ENDIF}
 
 var
   FDesktopFolder: TACLShellFolder = nil;
@@ -242,7 +285,7 @@ begin
     AStruct.pFrom := PWideChar(acStringReplace(ASourceList + #0, #13#10, #0));
   if ADestList <> '' then
     AStruct.pTo := PWideChar(acStringReplace(ADestList + #0, #13#10, #0));
-  FShellLastErrorCode := SHFileOperationW(AStruct);
+  FShellLastErrorCode := SHFileOperationW({$IFDEF FPC}@{$ENDIF}AStruct);
   Result := (FShellLastErrorCode = 0) and not AStruct.fAnyOperationsAborted;
 end;
 
@@ -252,6 +295,30 @@ begin
   Sleep(1000);
 end;
 
+//----------------------------------------------------------------------------------------------------------------------
+// FreePascal Adapters
+//----------------------------------------------------------------------------------------------------------------------
+{$IFDEF FPC}
+const
+  CLSID_ShellLibrary: TGUID = '{d9b3211d-e57f-4426-aaef-30a806add397}';
+
+  LFF_FORCEFILESYSTEM = 1;
+  LFF_STORAGEITEMS    = 2;
+  LFF_ALLITEMS        = 3;
+
+function SHCreateItemFromParsingName(pszPath: LPCWSTR; const pbc: IBindCtx;
+  const riid: TIID; out ppv): HResult; stdcall; external shell32;
+
+function SHQueryUserNotificationState(var pquns: Integer): HResult; stdcall; external shell32;
+
+function SHCreateLibrary(const riid: TIID; out ppv): HResult;
+begin
+  Result := CoCreateInstance(CLSID_ShellLibrary, nil, CLSCTX_INPROC_SERVER, riid, ppv);
+end;
+
+function SetSystemPowerState(fSuspend, fForce: BOOL): BOOL; stdcall; external kernel32;
+
+{$ENDIF}
 //----------------------------------------------------------------------------------------------------------------------
 // Shell - Copying
 //----------------------------------------------------------------------------------------------------------------------
@@ -319,7 +386,7 @@ begin
   if ALink = '' then
     Result := False
   else
-    if (Pos(UnicodeString('//'), ALink) = 0) and not acDirectoryExists(ALink) then
+    if (acPos('//', ALink) = 0) and not acDirectoryExists(ALink) then
       Result := ShellExecute('http://' + ALink)
     else
       Result := ShellExecute(ALink);
@@ -339,7 +406,7 @@ begin
       IL := ILCreateFromPathW(PWideChar(AFileName));
       if IL <> nil then
       try
-        SHOpenFolderAndSelectItems(IL, 0, nil, 0);
+        SHOpenFolderAndSelectItems(IL, 0, {$IFDEF FPC}LPPCITEMIDLIST{$ENDIF}(nil), 0);
         Result := True;
       finally
         ILFree(IL);
@@ -496,10 +563,10 @@ var
   I: Integer;
 begin
   Result :=
-    Succeeded(SHCreateLibrary(IID_IShellLibrary, Pointer(ALibrary))) and
-    Succeeded(SHCreateItemFromParsingName(PWideChar(APathForParsing), nil, IID_IShellItem, AShellItem)) and
+    Succeeded(SHCreateLibrary(IShellLibrary, Pointer(ALibrary))) and
+    Succeeded(SHCreateItemFromParsingName(PWideChar(APathForParsing), nil, IShellItem, AShellItem)) and
     Succeeded(ALibrary.LoadLibraryFromItem(AShellItem, STGM_READ)) and
-    Succeeded(ALibrary.GetFolders(LFF_FORCEFILESYSTEM, IID_IShellItemArray, AShellItems)) and
+    Succeeded(ALibrary.GetFolders(LFF_FORCEFILESYSTEM, IShellItemArray, AShellItems)) and
     Succeeded(AShellItems.GetCount(ACount));
 
   if Result then
@@ -572,7 +639,7 @@ begin
         if Result then
         begin
           acClearFileLongPath(ABuffer);
-          Result := Succeeded(AObject.GetPath(@ABuffer[0], Length(ABuffer), AData, 0));
+          Result := Succeeded(AObject.GetPath(@ABuffer[0], Length(ABuffer), {$IFDEF FPC}@{$ENDIF}AData, 0));
           if Result then
             AFileName := ABuffer;
         end;
@@ -775,7 +842,7 @@ begin
   Result := False;
   if fcCanRename in Capabilities then
   begin
-    Result := ParentShellFolder.SetNameOf(0, FPIDL, PWideChar(NewName), SHGDN_NORMAL, ANewPIDL) = S_OK;
+    Result := ParentShellFolder.SetNameOf(0, FPIDL, PWideChar(NewName), {$IFDEF FPC}Ord{$ENDIF}(SHGDN_NORMAL), ANewPIDL) = S_OK;
     if Result then
     begin
       FPIDL := ANewPIDL;
@@ -849,7 +916,7 @@ end;
 
 function TACLShellFolder.GetDisplayName: UnicodeString;
 begin
-  Result := TPIDLHelper.GetDisplayName(ParentShellFolder, ID, SHGDN_INFOLDER);
+  Result := TPIDLHelper.GetDisplayName(ParentShellFolder, ID, {$IFDEF FPC}Ord{$ENDIF}(SHGDN_INFOLDER));
 end;
 
 function TACLShellFolder.GetImageIndex: Integer;
@@ -891,7 +958,7 @@ end;
 
 function TACLShellFolder.GetPathForParsing: UnicodeString;
 begin
-  Result := TPIDLHelper.GetDisplayName(Root.ShellFolder, AbsoluteID, SHGDN_FORPARSING);
+  Result := TPIDLHelper.GetDisplayName(Root.ShellFolder, AbsoluteID, {$IFDEF FPC}Ord{$ENDIF}(SHGDN_FORPARSING));
 end;
 
 function TACLShellFolder.GetStorageCapabilities: TACLShellFolderStorageCapabilities;
@@ -981,16 +1048,18 @@ begin
         Result := AStrRet.pOleStr;
   end;
   { This is a hack bug fix to get around Windows Shell Controls returning spurious "?"s in date/time detail fields }
-  if (Length(Result) > 1) and (Ord(Result[1]) = Ord('?')) and (Ord(Result[2]) in [Ord('0')..Ord('9')]) then
+  if (acStringLength(Result) > 1) and (Ord(Result[1]) = Ord('?')) and (Ord(Result[2]) in [Ord('0')..Ord('9')]) then
     Result := acStringReplace(Result, '?', '');
 end;
 
 class function TPIDLHelper.FilesToShellListStream(AFiles: TACLStringList; out AStream: TMemoryStream): Boolean;
 
-  function GetCommonFilePath(AFiles: TACLStringList): string;
+  function GetCommonFilePath(AFiles: TACLStringList): UnicodeString;
+  var
+    I: Integer;
   begin
     Result := acExtractFilePath(AFiles[0]);
-    for var I := 1 to AFiles.Count - 1 do
+    for I := 1 to AFiles.Count - 1 do
     begin
       if not acGetMinimalCommonPath(Result, AFiles[I]) then
         Exit(EmptyStr);
@@ -1089,7 +1158,7 @@ begin
   AFiles := nil;
   for I := 1 to ACount do
   begin
-    AFileName := GetDisplayName(ARootPath, PItemIDList(PByte(AStream.Memory) + AOffsets[I]), SHGDN_FORPARSING);
+    AFileName := GetDisplayName(ARootPath, PItemIDList(PByte(AStream.Memory) + AOffsets[I]), {$IFDEF FPC}Ord{$ENDIF}(SHGDN_FORPARSING));
     if AFileName <> '' then
     begin
       if AFiles = nil then

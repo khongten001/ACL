@@ -17,7 +17,7 @@ unit ACL.FastCode;
 interface
 
 type
-  TACLMoveMethod = procedure (const Source; var Dest; Count: NativeInt);
+  TACLMoveMethod = procedure (const Source; var Dest; Count: {$IFDEF FPC}SizeInt{$ELSE}NativeInt{$ENDIF});
 
 type
   TCPUInstruction = (cpuMMX, cpuSSE, cpuSSE2, ci3DNow, ci3DNowExt);
@@ -38,6 +38,11 @@ function GetCPUInstructions: TCPUInstructions;
 implementation
 
 function GetCPUFeatures: Integer;
+{$IFDEF FPC}
+begin
+  Result := 0;
+end;
+{$ELSE}
 asm
 {$IFDEF CPUX64}
   PUSH      RBX
@@ -53,6 +58,7 @@ asm
   MOV       EAX,EDX
 {$ENDIF}
 end;
+{$ENDIF}
 
 function GetCPUInstructions: TCPUInstructions;
 var

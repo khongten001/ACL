@@ -16,23 +16,33 @@ unit ACL.Classes.Collections;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Classes,
-  System.Contnrs,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.SysUtils,
-  System.Types,
+  Classes,
+  Contnrs,
+  Generics.Collections,
+  Generics.Defaults,
+  SyncObjs,
+  SysUtils,
+{$IFNDEF FPC}
+  RTLConsts,
+{$ENDIF}
+  Types,
   // ACL
   ACL.Classes,
   ACL.FastCode,
-  ACL.Threading,
+  ACL.Hashes,
+  ACL.Utils.Common,
   ACL.Utils.Strings;
 
 const
   sErrorValuesAreAlreadyInMap = 'These values are already exists in map';
   sErrorValueWasNotFoundInMap = 'This value was not found in map';
+{$IFDEF FPC}
+  SArgumentOutOfRange = 'Argument is out of range';
+  SGenericItemNotFound = 'Item was not found in collection';
+  SGenericDuplicateItem = 'Collection does not allow duplicates';
+{$ENDIF}
 
 type
   // Стандартные IEnumerable<T> зачем-то наследуются от IEnumerable,
@@ -104,6 +114,8 @@ type
     FFirst: TACLLinkedListItem<T>;
     FLast: TACLLinkedListItem<T>;
     FOwnValues: Boolean;
+
+    procedure DoAdd(const AItem: TACLLinkedListItem<T>);
   public
     constructor Create(AOwnValues: Boolean = False);
     function Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>; overload;
@@ -164,7 +176,7 @@ type
       FProc: TACLListCompareProc<T>;
     public
       constructor Create(AProc: TACLListCompareProc<T>);
-      function Compare(const Left, Right: T): Integer; override;
+      function Compare({$IFDEF FPC}constref{$ELSE}const{$ENDIF} Left, Right: T): Integer; override;
     end;
   {$ENDREGION}
   strict private
@@ -273,12 +285,12 @@ type
   strict private
     FData: TACLInterfaceList;
     FEnumerable: IUnknown;
-    FLock: TACLCriticalSection;
+    FLock: TCriticalSection;
 
     FOnChange: TNotifyEvent;
 
     procedure Changed;
-    procedure ChangeHandler(Sender: TObject; const Item: IUnknown; Action: TCollectionNotification);
+    procedure ChangeHandler(Sender: TObject; {$IFDEF FPC}constref{$ELSE}const{$ENDIF} Item: IUnknown; Action: TCollectionNotification);
     function GetCount: Integer;
   public
     constructor Create(AInitialCapacity: Integer = 0);
@@ -287,12 +299,11 @@ type
     procedure Add(const AListener: IUnknown);
     procedure Clear;
     function Contains(const IID: TGUID): Boolean;
-    procedure Enum(AProc: TACLListenerListEnumProc<IUnknown>); overload;
-    procedure Enum<T: IUnknown>(AProc: TACLListenerListEnumProc<T>); overload;
+    procedure Enum<T: IUnknown>(AProc: TACLListenerListEnumProc<T>);
     procedure Remove(const AListener: IUnknown);
     //
     property Count: Integer read GetCount;
-    property Lock: TACLCriticalSection read FLock;
+    property Lock: TCriticalSection read FLock;
     //
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
@@ -448,6 +459,10 @@ type
     property OnValueNotify: TCollectionNotifyEvent<TValue> read FOnValueNotify write FOnValueNotify;
   end;
 
+  { TACLObjectDictionary }
+
+  TACLObjectDictionary = class(TACLDictionary<TObject, TObject>);
+
   { TACLStringsDictionary }
 
   TACLStringsDictionary = class(TACLDictionary<string, string>);
@@ -562,7 +577,7 @@ type
       HashCode: Integer;
       Item: T;
     end;
-    TItemArray = array of TItem;
+    TItemArray = TArray<TItem>;
   {$ENDREGION}
   strict private
     FComparer: IEqualityComparer<T>;
@@ -593,7 +608,7 @@ type
 
   { TACLStringSet }
 
-  TACLStringSet = class(TACLHashSet<string>)
+  TACLStringSet = class(TACLHashSet<UnicodeString>)
   public
     constructor Create(const IgnoreCase: Boolean; InitialCapacity: Integer = 0); reintroduce;
     function Contains(const Item: PWideChar; const ItemLength: Integer): Boolean; reintroduce; overload;
@@ -601,51 +616,33 @@ type
     function Include(const Item: PWideChar; const ItemLength: Integer): Boolean; reintroduce; overload;
   end;
 
-//  { TACLStringSet }
-//
-//  TACLStringSet = class(TACLCustomHashSet<string>)
-//  strict private
-//    FData: TACLList<string>;
-//    FIgnoreCase: Boolean;
-//
-//    function FindCore(const Item: PWideChar; const ItemLength: Integer; out Index: Integer): Boolean;
-//    function IncludeCore(const Item: PWideChar; const ItemLength: Integer; B: PUnicodeString): Boolean;
-//  protected
-//    function DoGetEnumerator: TEnumerator<string>; override;
-//    function GetCount: Integer; override;
-//  public
-//    constructor Create(const IgnoreCase: Boolean; InitialCapacity: Integer = 0);
-//    destructor Destroy; override;
-//    procedure Clear; override;
-//    function Contains(const Item: string): Boolean; overload; override;
-//    function Contains(const Item: PWideChar; const ItemLength: Integer): Boolean; reintroduce; overload;
-//    function Exclude(const Item: string): Boolean; overload; override;
-//    function Exclude(const Item: PWideChar; const ItemLength: Integer): Boolean; reintroduce; overload;
-//    function Include(const Item: string): Boolean; overload; override;
-//    function Include(const Item: PWideChar; const ItemLength: Integer): Boolean; reintroduce; overload;
-//    function Include(const Items: TACLStringSet; AAutoFree: Boolean): Boolean; reintroduce; overload;
-//    function ToArray: TArray<string>; override;
-//  end;
-
   { TACLStringComparer }
 
   TACLStringComparer = class(TInterfacedObject,
-    IComparer<string>,
-    IEqualityComparer<string>)
+    IComparer<UnicodeString>,
+    IEqualityComparer<UnicodeString>)
   strict private
     FIgnoreCase: Boolean;
   public
     constructor Create(IgnoreCase: Boolean = True);
+  {$IFDEF FPC}
     // IComparer<string>
-    function Compare(const Left, Right: string): Integer;
+    function Compare(constref Left, Right: UnicodeString): Integer;
     // IEqualityComparer<string>
-    function Equals(const Left, Right: string): Boolean; reintroduce;
-    function GetHashCode(const Value: string): Integer; reintroduce;
+    function Equals(constref Left, Right: UnicodeString): Boolean; reintroduce;
+    function GetHashCode(constref Value: UnicodeString): Cardinal; reintroduce;
+  {$ELSE}
+    // IComparer<string>
+    function Compare(const Left, Right: UnicodeString): Integer;
+    // IEqualityComparer<string>
+    function Equals(const Left, Right: UnicodeString): Boolean; reintroduce;
+    function GetHashCode(const Value: UnicodeString): Integer; reintroduce;
+  {$ENDIF}
   end;
 
   { TACLStringsMap }
 
-  TACLStringsMap = class(TACLMap<string, string>);
+  TACLStringsMap = class(TACLMap<UnicodeString, UnicodeString>);
 
   { TACLStringSharedTable }
 
@@ -740,7 +737,8 @@ type
 
     FOnRemove: TRemoveEvent;
 
-    procedure ValueHandler(Sender: TObject; const Item: TValue; Action: TCollectionNotification);
+    procedure ValueHandler(Sender: TObject;
+      {$IFDEF FPC}constref{$ELSE}const{$ENDIF} Item: TValue; Action: TCollectionNotification);
   protected
     procedure DoRemove(const Item: TValue); virtual;
   public
@@ -757,10 +755,6 @@ type
     property OnRemove: TRemoveEvent read FOnRemove write FOnRemove;
   end;
 
-  { TACLObjectDictionary }
-
-  TACLObjectDictionary = class(TACLDictionary<TObject, TObject>);
-
   { TACLFloatList }
 
   TACLFloatList = class(TACLList<Single>)
@@ -769,16 +763,33 @@ type
     function IndexOf(const Value, Tolerance: Single): Integer; reintroduce; overload;
   end;
 
+{$IFDEF FPC}
+function GrowCollection(OldCapacity, NewCount: Integer): Integer;
+{$ENDIF}
 implementation
 
 uses
-  System.Math,
-  System.RTLConsts,
-  System.SysConst,
-  System.TypInfo,
-  // ACL
-  ACL.Utils.Common,
-  ACL.Hashes;
+  Math,
+  SysConst,
+  TypInfo;
+
+{$IFDEF FPC}
+function GrowCollection(OldCapacity, NewCount: Integer): Integer;
+begin
+  Result := OldCapacity;
+  repeat
+    if Result > 64 then
+      Result := (Result * 3) div 2
+    else
+      if Result > 8 then
+        Result := Result + 16
+      else
+        Result := Result + 4;
+    if Result < 0 then
+      OutOfMemoryError;
+  until Result >= NewCount;
+end;
+{$ENDIF}
 
 { TACLEnumerable<T> }
 
@@ -786,11 +797,12 @@ function TACLEnumerable<T>.ToArray: TArray<T>;
 var
   ACapacity: Integer;
   AIndex: Integer;
+  AValue: T;
 begin
   Result := nil;
   AIndex := 0;
   ACapacity := 0;
-  for var AValue in Self do
+  for AValue in Self do
   begin
     if AIndex >= ACapacity then
     begin
@@ -869,20 +881,25 @@ end;
 function TACLLinkedList<T>.Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
 begin
   Result := AItem;
-  if Last <> nil then
-    InsertAfter(Result, Last)
-  else
-  begin
-    FLast := Result;
-    FFirst := Result;
-  end;
+  DoAdd(Result);
 end;
 
 function TACLLinkedList<T>.Add(const AValue: T): TACLLinkedListItem<T>;
 begin
   Result := TACLLinkedListItem<T>.Create;
   Result.Value := AValue;
-  Result := Add(Result);
+  DoAdd(Result);
+end;
+
+procedure TACLLinkedList<T>.DoAdd(const AItem: TACLLinkedListItem<T>);
+begin
+  if Last <> nil then
+    InsertAfter(AItem, Last)
+  else
+  begin
+    FLast := AItem;
+    FFirst := AItem;
+  end;
 end;
 
 procedure TACLLinkedList<T>.Clear;
@@ -1096,7 +1113,7 @@ end;
 procedure TACLList<T>.Insert(Index: Integer; const Value: T);
 begin
   if (Index < 0) or (Index > Count) then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
 
   GrowCheck(Count + 1);
   if Index <> Count then
@@ -1122,7 +1139,7 @@ var
   I: Integer;
 begin
   if (Index < 0) or (Index > Count) or (ValueCount < 0) or (ValueCount > Length(Values)) then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
 
   GrowCheck(Count + ValueCount);
   if Index <> Count then
@@ -1168,7 +1185,7 @@ begin
   if CurIndex = NewIndex then
     Exit;
   if not IsValid(NewIndex) then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
 
   ATemp := FItems[CurIndex];
   FItems[CurIndex] := Default(T);
@@ -1182,8 +1199,17 @@ begin
 end;
 
 function TACLList<T>.BinarySearch(const Value: T; out Index: Integer): Boolean;
+{$IFDEF FPC}
+var
+  TempIndex: Int64;
+{$ENDIF}
 begin
+{$IFDEF FPC}
+  Result := TArrayHelper<T>.BinarySearch(FItems, Value, TempIndex, FComparer, 0, Count);
+  Index := TempIndex;
+{$ELSE}
   Result := TArray.BinarySearch<T>(FItems, Value, Index, FComparer, 0, Count);
+{$ENDIF}
 end;
 
 function TACLList<T>.Contains(const Value: T): Boolean;
@@ -1299,7 +1325,11 @@ end;
 
 procedure TACLList<T>.Sort(AComparer: IComparer<T>);
 begin
+{$IFDEF FPC}
+  TArrayHelper<T>.Sort(FItems, AComparer, 0, Count);
+{$ELSE}
   TArray.Sort<T>(FItems, AComparer, 0, Count);
+{$ENDIF}
 end;
 
 procedure TACLList<T>.Sort(AProc: TACLListCompareProc<T>);
@@ -1311,6 +1341,9 @@ function TACLList<T>.ToArray: TArray<T>;
 var
   I: Integer;
 begin
+{$IFDEF FPC}
+  Result := nil;
+{$ENDIF}
   SetLength(Result, Count);
   for I := 0 to Count - 1 do
     Result[I] := List[I];
@@ -1322,12 +1355,15 @@ var
   ATailCount, I: Integer;
 begin
   if (AIndex < 0) or (ACount < 0) or (AIndex + ACount > Count) or (AIndex + ACount < 0) then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
   if ACount = 0 then
     Exit;
 
   if FNotifications then
   begin
+  {$IFDEF FPC}
+    AOldItems := nil;
+  {$ENDIF}
     SetLength(AOldItems, ACount);
     FItemsManager.Move(FItems, AOldItems, AIndex, 0, ACount);
   end;
@@ -1368,7 +1404,7 @@ end;
 function TACLList<T>.GetItem(Index: Integer): T;
 begin
   if (Index < 0) or (Index >= Count) then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
   Result := FItems[Index];
 end;
 
@@ -1387,7 +1423,7 @@ end;
 procedure TACLList<T>.SetCount(Value: Integer);
 begin
   if Value < 0 then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
   if Value > Capacity then
     SetCapacity(Value);
   if Value < Count then
@@ -1400,7 +1436,7 @@ var
   AOldItem: T;
 begin
   if (Index < 0) or (Index >= Count) then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
 
   if FNotifications then
   begin
@@ -1475,7 +1511,7 @@ begin
   FProc := AProc;
 end;
 
-function TACLList<T>.TCompareProcWrapper.Compare(const Left, Right: T): Integer;
+function TACLList<T>.TCompareProcWrapper.Compare({$IFDEF FPC}constref{$ELSE}const{$ENDIF}Left, Right: T): Integer;
 begin
   Result := FProc(Left, Right);
 end;
@@ -1536,7 +1572,7 @@ end;
 constructor TACLDictionary<TKey, TValue>.Create(ACapacity: Integer; const AComparer: IEqualityComparer<TKey>);
 begin
   if ACapacity < 0 then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
 
   FComparer := AComparer;
   if FComparer = nil then
@@ -1718,7 +1754,7 @@ begin
   if Assigned(FOnKeyNotify) then
     FOnKeyNotify(Self, Key, Action);
   if (Action = cnRemoved) and (doOwnsKeys in FOwnerships) then
-    PObject(@Key)^.DisposeOf;
+    PObject(@Key)^.Free;
 end;
 
 procedure TACLDictionary<TKey, TValue>.ValueNotify(const Value: TValue; Action: TCollectionNotification);
@@ -1726,7 +1762,7 @@ begin
   if Assigned(FOnValueNotify) then
     FOnValueNotify(Self, Value, Action);
   if (Action = cnRemoved) and (doOwnsValues in FOwnerships) then
-    PObject(@Value)^.DisposeOf;
+    PObject(@Value)^.Free;
 end;
 
 procedure TACLDictionary<TKey, TValue>.DoAddCore(HashCode, Index: Integer; const Key: TKey; const Value: TValue);
@@ -1747,7 +1783,7 @@ var
   AIndex: Integer;
 begin
   if ABucketIndex < 0 then
-    raise EListError.CreateRes(@SGenericItemNotFound);
+    raise EListError.Create(SGenericItemNotFound);
 
   // Removing item from linear probe hash table is moderately
   // tricky. We need to fill in gaps, which will involve moving items
@@ -1845,7 +1881,7 @@ var
 begin
   AIndex := GetBucketIndex(Key, Hash(Key));
   if AIndex < 0 then
-    raise EListError.CreateRes(@SGenericItemNotFound);
+    raise EListError.Create(SGenericItemNotFound);
   Result := FItems[AIndex].Value;
 end;
 
@@ -1885,6 +1921,9 @@ begin
   if ACapacity < 0 then
     OutOfMemoryError;
 
+{$IFDEF FPC}
+  ANewItems := nil;
+{$ENDIF}
   AOldItems := FItems;
   SetLength(ANewItems, ACapacity);
   for I := 0 to Length(ANewItems) - 1 do
@@ -1930,7 +1969,7 @@ begin
       dupIgnore:
         Exit(False);
     else
-      raise EListError.CreateRes(@SGenericDuplicateItem);
+      raise EListError.Create(SGenericDuplicateItem);
     end;
 end;
 
@@ -1944,7 +1983,7 @@ var
   ANewCapacity: Integer;
 begin
   if ACapacity < Count then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
 
   if ACapacity = 0 then
     Rehash(0)
@@ -1964,7 +2003,7 @@ var
 begin
   AIndex := GetBucketIndex(Key, Hash(Key));
   if AIndex < 0 then
-    raise EListError.CreateRes(@SGenericItemNotFound);
+    raise EListError.Create(SGenericItemNotFound);
 
   AOldValue := FItems[AIndex].Value;
   FItems[AIndex].Value := Value;
@@ -2107,7 +2146,6 @@ end;
 function TACLThreadList<T>.Read(AIndex: Integer; out AValue: T): Boolean;
 var
   AList: TACLList<T>;
-  I: Integer;
 begin
   AList := BeginRead;
   try
@@ -2172,7 +2210,7 @@ begin
   FData.OnNotify := ChangeHandler;
   if AInitialCapacity > 0 then
     FData.Capacity := AInitialCapacity;
-  FLock := TACLCriticalSection.Create(Self);
+  FLock := TCriticalSection.Create;
 end;
 
 destructor TACLListenerList.Destroy;
@@ -2226,12 +2264,7 @@ begin
   end;
 end;
 
-procedure TACLListenerList.Enum(AProc: TACLListenerListEnumProc<IUnknown>);
-begin
-  Enum<IUnknown>(AProc);
-end;
-
-procedure TACLListenerList.Enum<T>(AProc: TACLListenerListEnumProc<T>);
+procedure TACLListenerList.Enum<T>;
 var
   AEnumerable: IUnknown;
   AGuid: TGUID;
@@ -2244,8 +2277,8 @@ begin
     AEnumerable := FEnumerable; // recursive call
     try
       AIndex := 0;
-      AGuid := TACLInterfaceHelper<T>.GetGUID;
-      AGuidAssigned := AGuid <> IUnknown;
+      AGuid := GetTypeData(TypeInfo(T))^.GUID;
+      AGuidAssigned := not IsEqualGUID(AGuid, IUnknown);
       while AIndex < FData.Count do
       begin
         FEnumerable := FData.List[AIndex];
@@ -2255,7 +2288,7 @@ begin
             AProc(AIntf);
         end
         else
-          AProc(FEnumerable);
+          AProc(T(FEnumerable));
 
         if FEnumerable <> nil then
           Inc(AIndex);
@@ -2293,7 +2326,7 @@ begin
   CallNotifyEvent(Self, OnChange);
 end;
 
-procedure TACLListenerList.ChangeHandler(Sender: TObject; const Item: IInterface; Action: TCollectionNotification);
+procedure TACLListenerList.ChangeHandler;
 begin
   Changed;
 end;
@@ -2586,6 +2619,9 @@ var
   AValue: T;
 begin
   AIndex := 0;
+{$IFDEF FPC}
+  Result := nil;
+{$ENDIF}
   SetLength(Result, Count);
   for AValue in Self do
   begin
@@ -2662,7 +2698,7 @@ var
   ANewCapacity: Integer;
 begin
   if AValue < Count then
-    raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
+    raise EArgumentOutOfRangeException.Create(SArgumentOutOfRange);
 
   ANewCapacity := 0;
   if AValue > 0 then
@@ -2697,6 +2733,9 @@ begin
   if ACapacity < 0 then
     OutOfMemoryError;
 
+{$IFDEF FPC}
+  ANewItems := nil;
+{$ENDIF}
   AOldItems := FItems;
   SetLength(ANewItems, ACapacity);
   for I := 0 to Length(ANewItems) - 1 do
@@ -2728,7 +2767,7 @@ var
   AIndex: Integer;
 begin
   if ABucketIndex < 0 then
-    raise EListError.CreateRes(@SGenericItemNotFound);
+    raise EListError.Create(SGenericItemNotFound);
 
   AIndex := ABucketIndex;
   FItems[AIndex].HashCode := EMPTY_HASH;
@@ -2824,151 +2863,11 @@ begin
   until False;
 end;
 
-//{ TACLStringSet }
-//
-//constructor TACLStringSet.Create(const IgnoreCase: Boolean; InitialCapacity: Integer = 0);
-//begin
-//  inherited Create;
-//  FIgnoreCase := IgnoreCase;
-//  FData := TACLList<string>.Create;
-//  FData.Capacity := InitialCapacity;
-//end;
-//
-//destructor TACLStringSet.Destroy;
-//begin
-//  FreeAndNil(FData);
-//  inherited;
-//end;
-//
-//function TACLStringSet.DoGetEnumerator: TEnumerator<string>;
-//begin
-//  Result := FData.GetEnumerator;
-//end;
-//
-//function TACLStringSet.Contains(const Item: string): Boolean;
-//begin
-//  Result := Contains(PWideChar(Item), Length(Item));
-//end;
-//
-//procedure TACLStringSet.Clear;
-//begin
-//  FData.Clear;
-//end;
-//
-//function TACLStringSet.Contains(const Item: PWideChar; const ItemLength: Integer): Boolean;
-//var
-//  AIndex: Integer;
-//begin
-//  Result := FindCore(Item, ItemLength, AIndex);
-//end;
-//
-//function TACLStringSet.Exclude(const Item: PWideChar; const ItemLength: Integer): Boolean;
-//var
-//  AIndex: Integer;
-//begin
-//  Result := FindCore(Item, ItemLength, AIndex);
-//  if Result then
-//    FData.Delete(AIndex);
-//end;
-//
-//function TACLStringSet.Exclude(const Item: string): Boolean;
-//begin
-//  Result := Exclude(PWideChar(Item), Length(Item));
-//end;
-//
-//function TACLStringSet.Include(const Item: string): Boolean;
-//begin
-//  Result := IncludeCore(PWideChar(Item), Length(Item), @Item);
-//end;
-//
-//function TACLStringSet.Include(const Item: PWideChar; const ItemLength: Integer): Boolean;
-//begin
-//  Result := IncludeCore(Item, ItemLength, nil);
-//end;
-//
-//function TACLStringSet.Include(const Items: TACLStringSet; AAutoFree: Boolean): Boolean;
-//var
-//  I: Integer;
-//begin
-//  Result := False;
-//  if Items <> nil then
-//  try
-//    for I := 0 to Items.FData.Count - 1 do
-//      Result := Include(Items.FData.List[I]) or Result;
-//  finally
-//    if AAutoFree then
-//      Items.Free;
-//  end;
-//end;
-//
-//function TACLStringSet.ToArray: TArray<string>;
-//begin
-//  Result := FData.ToArray;
-//end;
-//
-//function TACLStringSet.FindCore(const Item: PWideChar; const ItemLength: Integer; out Index: Integer): Boolean;
-//var
-//  L, H, I, C: Integer;
-//  S: UnicodeString;
-//begin
-//  Result := False;
-//  L := 0;
-//  H := FData.Count - 1;
-//  while L <= H do
-//  begin
-//    I := (L + H) shr 1;
-//    S := FData.List[I];
-//    C := Length(S) - ItemLength;
-//    if C = 0 then
-//    begin
-//      if FIgnoreCase then
-//        C := acCompareStrings(PWideChar(S), Item, ItemLength, ItemLength)
-//      else
-//        C := BinaryCompare(PWideChar(S), Item, ItemLength * SizeOf(WideChar));
-//    end;
-//    if C < 0 then
-//      L := I + 1
-//    else
-//    begin
-//      H := I - 1;
-//      if C = 0 then
-//      begin
-//        Result := True;
-//        L := I;
-//        Break;
-//      end;
-//    end;
-//  end;
-//  Index := L;
-//end;
-//
-//function TACLStringSet.GetCount: Integer;
-//begin
-//  Result := FData.Count;
-//end;
-//
-//function TACLStringSet.IncludeCore(const Item: PWideChar; const ItemLength: Integer; B: PUnicodeString): Boolean;
-//var
-//  AIndex: Integer;
-//begin
-//  Result := not FindCore(Item, ItemLength, AIndex);
-//  if Result then
-//  begin
-//    if B <> nil then
-//      FData.Insert(AIndex, B^)
-//    else
-//      FData.Insert(AIndex, acMakeString(Item, ItemLength));
-//  end;
-//end;
-
 { TACLStringSet }
 
 constructor TACLStringSet.Create(const IgnoreCase: Boolean; InitialCapacity: Integer);
 begin
-  if IgnoreCase then
-    inherited Create(TACLStringComparer.Create, InitialCapacity)
-  else
-    inherited Create(TStringComparer.Ordinal, InitialCapacity);
+  inherited Create(TACLStringComparer.Create(IgnoreCase), InitialCapacity);
 end;
 
 function TACLStringSet.Contains(const Item: PWideChar; const ItemLength: Integer): Boolean;
@@ -2994,12 +2893,12 @@ begin
   FIgnoreCase := IgnoreCase;
 end;
 
-function TACLStringComparer.Compare(const Left, Right: string): Integer;
+function TACLStringComparer.Compare;
 begin
   Result := acCompareStrings(Left, Right, FIgnoreCase)
 end;
 
-function TACLStringComparer.Equals(const Left, Right: string): Boolean;
+function TACLStringComparer.Equals;
 var
   L1, L2: Integer;
 begin
@@ -3009,12 +2908,12 @@ begin
     Result := False
   else
     if FIgnoreCase then
-      Result := acCompareStrings(PChar(Left), PChar(Right), L1, L2, True) = 0
+      Result := acCompareStrings(PWideChar(Left), PWideChar(Right), L1, L2, True) = 0
     else
-      Result := CompareMem(PChar(Left), PChar(Right), L1 * SizeOf(Char));
+      Result := CompareMem(PWideChar(Left), PWideChar(Right), L1 * SizeOf(WideChar));
 end;
 
-function TACLStringComparer.GetHashCode(const Value: string): Integer;
+function TACLStringComparer.GetHashCode;
 begin
   if FIgnoreCase then
     Result := TACLHashBobJenkins.Calculate(acUpperCase(Value), nil)
@@ -3305,8 +3204,7 @@ begin
     OnRemove(Self, Item);
 end;
 
-procedure TACLValueCacheManager<TKey, TValue>.ValueHandler(
-  Sender: TObject; const Item: TValue; Action: TCollectionNotification);
+procedure TACLValueCacheManager<TKey, TValue>.ValueHandler;
 begin
   if Action = cnRemoved then
     DoRemove(Item);

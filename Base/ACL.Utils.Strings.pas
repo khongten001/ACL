@@ -16,16 +16,17 @@ unit ACL.Utils.Strings;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Types,
-  System.Math,
-  System.SysUtils,
-  System.Character,
-  System.Classes,
-  System.Generics.Collections,
+  Types,
+  Math,
+  Character,
+  Classes,
+  Generics.Collections,
+  SyncObjs,
+  SysUtils,
   // ACL
-  ACL.Threading;
+  ACL.Utils.Common;
 
 const
   acCRLF = UnicodeString(#13#10);
@@ -82,7 +83,7 @@ type
   strict private
     FEmpty: Boolean;
     FIgnoreCase: Boolean;
-    FLock: TACLCriticalSection;
+    FLock: TCriticalSection;
     FMask: TStringDynArray;
     FMaskResult: array of Boolean;
     FSeparator: Char;
@@ -121,23 +122,31 @@ type
     TDiffCompareProc = reference to function (ASourceIndex, ATargetIndex: Integer): Boolean;
     TDiffResultProc = reference to procedure (AIndex: Integer; AState: TDiffState);
 
-    TStringDiff = TPair<Char, TDiffState>;
+    TStringDiff = TPair<WideChar, TDiffState>;
   public
     // Compliance
-    class function Compliance(const ASource, ATarget: string): Single; overload;
+    class function Compliance(const ASource, ATarget: UnicodeString): Single; overload;
     class function Compliance(const ASource, ATarget: TStrings): Single; overload;
     // Difference
-    class function Difference(const ASource, ATarget: string): TList<TStringDiff>; overload;
+    class function Difference(const ASource, ATarget: UnicodeString): TList<TStringDiff>; overload;
     class procedure Difference(const ASourceLength, ATargetLength: Integer;
       const ACompareProc: TDiffCompareProc; const AResultProc: TDiffResultProc;
       const AEqualsNearbyTokens: Integer = 1); overload;
   end;
 
+  { TACLStringBuilder }
+
+{$IFDEF FPC}
+  TACLStringBuilder = TUnicodeStringBuilder;
+{$ELSE}
+  TACLStringBuilder = TStringBuilder;
+{$ENDIF}
+
   { TACLStringBuilderHelper }
 
-  TACLStringBuilderHelper = class helper for TStringBuilder
+  TACLStringBuilderHelper = class helper for TACLStringBuilder
   public
-    function Append(const AValue: PWideChar; ALength: Integer): TStringBuilder; overload;
+    function Append(const AValue: PWideChar; ALength: Integer): TACLStringBuilder; overload;
   end;
 
   { TACLStringBuilderManager }
@@ -147,11 +156,11 @@ type
     CacheSize = 4;
     HugeCapacityThreshold = 1048576;
   strict private
-    class var Cache: array[0..Pred(CacheSize)] of TStringBuilder;
+    class var Cache: array[0..Pred(CacheSize)] of TACLStringBuilder;
   public
     class destructor Finalize;
-    class function Get(ACapacity: Integer = 0): TStringBuilder;
-    class procedure Release(var ABuilder: TStringBuilder);
+    class function Get(ACapacity: Integer = 0): TACLStringBuilder;
+    class procedure Release(var ABuilder: TACLStringBuilder);
   end;
 
   { TACLAppVersion }
@@ -179,17 +188,33 @@ type
 
   TACLEncodings = class
   strict private
+    class var FCodePages: TObject;
     class var FMap: TObject;
+    class var FMapLock: TCriticalSection;
+
+    class function CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall; static;
   public
     class constructor Create;
     class destructor Destroy;
     class function Default: TEncoding;
+    class procedure EnumAnsiCodePages(const AProc: TProc<Integer, string>);
     class function Get(const CodePage: Integer): TEncoding; overload;
     class function Get(const Name: string): TEncoding; overload;
   end;
 
+{$IFDEF FPC}
+  TACLCharHelper = record helper for WideChar
+  public
+    function IsDigit: Boolean;
+    function ToLower: WideChar;
+    function ToUpper: WideChar;
+  end;
+{$ENDIF}
+
 var
   DefaultCodePage: Integer = CP_ACP;
+  EmptyStrA: AnsiString = '';
+  EmptyStrU: UnicodeString = '';
 
 function StrToIntDefA(const S: AnsiString; ADefault: Integer): Integer;
 
@@ -255,7 +280,8 @@ function acCompareStrings(const S1, S2: UnicodeString; AIgnoreCase: Boolean = Tr
 function acCompareStrings(P1, P2: PWideChar; L1, L2: Integer; AIgnoreCase: Boolean = True): Integer; overload;
 function acLogicalCompare(const S1, S2: UnicodeString; AIgnoreCase: Boolean = True): Integer; overload;
 function acLogicalCompare(P1, P2: PWideChar; P1Len, P2Len: Integer; AIgnoreCase: Boolean = True): Integer; overload;
-function acSameText(const S1, S2: UnicodeString): Boolean;
+function acSameText(const S1, S2: AnsiString): Boolean; overload;
+function acSameText(const S1, S2: UnicodeString): Boolean; overload;
 function acSameTextEx(const S: UnicodeString; const AStrs: array of UnicodeString): Boolean;
 
 // Encoding
@@ -266,7 +292,7 @@ function acDetectEncoding(AStream: TStream; ADefaultEncoding: TEncoding = nil): 
 // Replacing
 function acReplaceChar(const S: UnicodeString; const ACharToReplace, AReplaceBy: WideChar): UnicodeString;
 function acReplaceChars(const S: UnicodeString; const ACharsToReplace: UnicodeString; const AReplaceBy: WideChar = '_'): UnicodeString;
-function acStringReplace(const S, OldPattern, NewPattern: string; AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
+function acStringReplace(const S, OldPattern, NewPattern: UnicodeString; AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): UnicodeString;
 
 // Integer <-> PWideChar;
 function acPWideCharToIntDef(AChars: PWideChar; ACount: Integer; const ADefaultValue: Int64): Int64; inline;
@@ -282,6 +308,8 @@ function acReplaceLineBreaks(const S, ReplaceBy: UnicodeString): UnicodeString;
 function IfThenW(AValue: Boolean; const ATrue: UnicodeString; const AFalse: UnicodeString = ''): UnicodeString; overload; inline;
 function IfThenW(const A, B: UnicodeString): UnicodeString; overload; inline;
 function acDupeString(const AText: UnicodeString; ACount: Integer): UnicodeString;
+function acStringLength(const S: AnsiString): Integer; overload; inline;
+function acStringLength(const S: UnicodeString): Integer; overload; inline;
 function acTrim(const S: UnicodeString): UnicodeString;
 function WStrLength(S: PWideChar; AMaxScanCount: Integer): Integer;
 function WStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar; overload;
@@ -291,20 +319,30 @@ procedure acCryptStringXOR(var S: UnicodeString; const AKey: UnicodeString);
 implementation
 
 uses
+  // System
+{$IFNDEF FPC}
+  System.AnsiStrings,
+{$ENDIF}
+  // ACL
   ACL.Classes.Collections,
+  ACL.Classes.StringList,
   ACL.FastCode,
-  ACL.Parsers,
-  ACL.Utils.Common;
+  ACL.Parsers;
 
 const
   MaxPreambleLength = 3;
+{$IFDEF FPC}
+  CSTR_EQUAL = 2;
+{$ENDIF}
 
+{$IFDEF DELPHI103RIO}
 type
-  TStringBuilderAccess = class(TStringBuilder);
+  TACLStringBuilderAccess = class(TACLStringBuilder);
+{$ENDIF}
 
 function StrToIntDefA(const S: AnsiString; ADefault: Integer): Integer;
 begin
-  Result := System.SysUtils.StrToIntDef(string(S), ADefault);
+  Result := SysUtils.StrToIntDef(string(S), ADefault);
 end;
 
 //==============================================================================
@@ -322,9 +360,9 @@ var
   ATemp: PWideChar;
 begin
   ATemp := PWideChar(S);
-  ALen := WideCharToMultiByte(CodePage, 0, ATemp, Length(S), nil, 0, nil, nil);
+  ALen := WideCharToMultiByte(CodePage, 0, ATemp, acStringLength(S), nil, 0, nil, nil);
   SetLength(Result, ALen);
-  WideCharToMultiByte(CodePage, 0, ATemp, Length(S), PAnsiChar(Result), ALen, nil, nil);
+  WideCharToMultiByte(CodePage, 0, ATemp, acStringLength(S), PAnsiChar(Result), ALen, nil, nil);
 end;
 
 function acBytesFromUnicode(W: PWideChar; ACount: Integer): RawByteString;
@@ -366,7 +404,7 @@ end;
 
 function acStringFromAnsi(const S: AnsiString; CodePage: Integer): UnicodeString;
 begin
-  Result := acStringFromAnsi(PAnsiChar(S), Length(S), CodePage);
+  Result := acStringFromAnsi(PAnsiChar(S), acStringLength(S), CodePage);
 end;
 
 function acStringFromBytes(const ABytes: TBytes): UnicodeString;
@@ -398,7 +436,7 @@ var
   L: Integer;
   P: PWideChar;
 begin
-  L := Length(S);
+  L := acStringLength(S);
   P := PWideChar(S);
   for I := 1 to L do
   begin
@@ -440,12 +478,12 @@ end;
 
 function acFindStringInMemoryA(const S: AnsiString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 begin
-  Result := FindDataInMemory(PByte(@S[1]), AMem, Length(S), AMemSize, AMemOffset, AOffset);
+  Result := FindDataInMemory(PByte(@S[1]), AMem, acStringLength(S), AMemSize, AMemOffset, AOffset);
 end;
 
 function acFindStringInMemoryW(const S: UnicodeString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 begin
-  Result := FindDataInMemory(PByte(@S[1]), AMem, Length(S) * SizeOf(WideChar), AMemSize, AMemOffset, AOffset);
+  Result := FindDataInMemory(PByte(@S[1]), AMem, acStringLength(S) * SizeOf(WideChar), AMemSize, AMemOffset, AOffset);
 end;
 
 //==============================================================================
@@ -461,7 +499,7 @@ end;
 
 function acAllocStr(const S: UnicodeString; out ALength: Integer): PWideChar;
 begin
-  ALength := Length(S);
+  ALength := acStringLength(S);
   Result := AllocMem((ALength + 1) * SizeOf(WideChar));
   FastMove(S[1], Result^, ALength * SizeOf(WideChar));
 end;
@@ -503,7 +541,7 @@ var
   P, R: PWideChar;
 begin
   P := PWideChar(AString);
-  R := WStrScan(P, Length(AString), ACharToSearch);
+  R := WStrScan(P, acStringLength(AString), ACharToSearch);
   if R <> nil then
     Result := 1 + (NativeUInt(R) - NativeUInt(P)) div SizeOf(WideChar)
   else
@@ -525,8 +563,8 @@ var
 begin
   if AWholeWords then
   begin
-    AStrLen := Length(AString);
-    ASubStrLen := Length(ASubStr);
+    AStrLen := acStringLength(AString);
+    ASubStrLen := acStringLength(ASubStr);
     Result := AOffset;
     repeat
       Result := acPos(ASubStr, AString, AIgnoreCase, Result);
@@ -644,7 +682,7 @@ function acDecodeUTF8(const Source: AnsiString): UnicodeString;
 var
   L: Integer;
 begin
-  L := Length(Source);
+  L := acStringLength(Source);
   if L > 0 then
   begin
     SetLength(Result, L);
@@ -661,11 +699,11 @@ var
   L: Integer;
 begin
   Result := '';
-  L := Length(Source);
+  L := acStringLength(Source);
   if L > 0 then
   begin
     SetLength(Result, L * 3); // SetLength includes space for null terminator
-    L := UnicodeToUtf8(PAnsiChar(Result), Length(Result) + 1, PWideChar(Source), L);
+    L := UnicodeToUtf8(PAnsiChar(Result), acStringLength(Result) + 1, PWideChar(Source), L);
     if L > 0 then
       SetLength(Result, L - 1)
   end;
@@ -708,7 +746,7 @@ var
   AScanCount: Integer;
 begin
   AScan := PWideChar(S);
-  AScanCount := Length(S);
+  AScanCount := acStringLength(S);
 
   Result := acGetCharacterCount(AScan, AScanCount, ADelimiters) + 1;
   SetLength(AParts, Result);
@@ -729,7 +767,7 @@ end;
 
 function acExplodeString(const S, ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer;
 begin
-  Result := acExplodeString(PWideChar(S), Length(S), ADelimiters, AReceiveProc);
+  Result := acExplodeString(PWideChar(S), acStringLength(S), ADelimiters, AReceiveProc);
 end;
 
 function acExplodeString(AScan: PWideChar; AScanCount: Integer;
@@ -747,7 +785,7 @@ begin
     ACursor := AScan;
     ACanContinue := True;
 
-    AIsFastWay := Length(ADelimiters) = 1;
+    AIsFastWay := acStringLength(ADelimiters) = 1;
     if AIsFastWay then
       ADelimiterCode := Ord(ADelimiters[1])
     else
@@ -792,7 +830,7 @@ end;
 
 function acGetCharacterCount(const S, ACharacters: UnicodeString): Integer;
 begin
-  Result := acGetCharacterCount(PWideChar(S), Length(S), ACharacters);
+  Result := acGetCharacterCount(PWideChar(S), acStringLength(S), ACharacters);
 end;
 
 function acGetCharacterCount(P: PWideChar; ALength: Integer; const ACharacters: UnicodeString): Integer;
@@ -817,7 +855,7 @@ var
   Ch1, Ch2: WideChar;
 begin
   Result := acLowerCase(S);
-  ALen := Length(Result);
+  ALen := acStringLength(Result);
   APos := 0;
   if ALen > 0 then
   repeat
@@ -843,7 +881,7 @@ var
   APos, ALen: Cardinal;
 begin
   APos := 1;
-  ALen := Length(S);
+  ALen := acStringLength(S);
   if IgnoreSourceCase then
     Result := S
   else
@@ -862,22 +900,22 @@ end;
 
 function acLowerCase(const S: UnicodeString): UnicodeString;
 begin
-  Result := S.ToLower;
+  Result := {$IFDEF FPC}TCharacter.ToLower(S){$ELSE}S.ToLower{$ENDIF};
 end;
 
 function acLowerCase(const S: WideChar): WideChar;
 begin
-  Result := S.ToLower
+  Result := {$IFDEF FPC}TCharacter.ToLower(S){$ELSE}S.ToLower{$ENDIF};
 end;
 
 function acUpperCase(const S: UnicodeString): UnicodeString;
 begin
-  Result := S.ToUpper;
+  Result := {$IFDEF FPC}TCharacter.ToUpper(S){$ELSE}S.ToUpper{$ENDIF};
 end;
 
 function acUpperCase(const S: WideChar): WideChar;
 begin
-  Result := S.ToUpper;
+  Result := {$IFDEF FPC}TCharacter.ToUpper(S){$ELSE}S.ToUpper{$ENDIF};
 end;
 
 //==============================================================================
@@ -888,8 +926,8 @@ function acBeginsWith(const S, ATestPrefix: UnicodeString; AIgnoreCase: Boolean 
 var
   L: Integer;
 begin
-  L := Length(ATestPrefix);
-  Result := (Length(S) >= L) and (acCompareStrings(PWideChar(S), PWideChar(ATestPrefix), L, L, AIgnoreCase) = 0);
+  L := acStringLength(ATestPrefix);
+  Result := (acStringLength(S) >= L) and (acCompareStrings(PWideChar(S), PWideChar(ATestPrefix), L, L, AIgnoreCase) = 0);
 end;
 
 function acEndsWith(const S, ATestSuffix: UnicodeString; AIgnoreCase: Boolean = True): Boolean;
@@ -897,8 +935,8 @@ var
   LS: Integer;
   LT: Integer;
 begin
-  LS := Length(S);
-  LT := Length(ATestSuffix);
+  LS := acStringLength(S);
+  LT := acStringLength(ATestSuffix);
   Result := (LS >= LT) and (acCompareStrings(PWideChar(S) + LS - LT, PWideChar(ATestSuffix), LT, LT, AIgnoreCase) = 0);
 end;
 
@@ -914,7 +952,7 @@ end;
 
 function acCompareStrings(const S1, S2: UnicodeString; AIgnoreCase: Boolean = True): Integer;
 begin
-  Result := acCompareStrings(PWideChar(S1), PWideChar(S2), Length(S1), Length(S2), AIgnoreCase);
+  Result := acCompareStrings(PWideChar(S1), PWideChar(S2), acStringLength(S1), acStringLength(S2), AIgnoreCase);
 end;
 
 function acCompareStrings(P1, P2: PWideChar; L1, L2: Integer; AIgnoreCase: Boolean = True): Integer;
@@ -926,7 +964,7 @@ end;
 
 function acLogicalCompare(const S1, S2: UnicodeString; AIgnoreCase: Boolean = True): Integer;
 begin
-  Result := acLogicalCompare(PWideChar(S1), PWideChar(S2), Length(S1), Length(S2), AIgnoreCase);
+  Result := acLogicalCompare(PWideChar(S1), PWideChar(S2), acStringLength(S1), acStringLength(S2), AIgnoreCase);
 end;
 
 function acLogicalCompare(P1, P2: PWideChar; P1Len, P2Len: Integer; AIgnoreCase: Boolean = True): Integer;
@@ -988,12 +1026,21 @@ begin
     Result := -1;
 end;
 
+function acSameText(const S1, S2: AnsiString): Boolean;
+var
+  L1, L2: Integer;
+begin
+  L1 := acStringLength(S1);
+  L2 := acStringLength(S2);
+  Result := (L1 = L2) and SameText(S1, S2);
+end;
+
 function acSameText(const S1, S2: UnicodeString): Boolean;
 var
   L1, L2: Integer;
 begin
-  L1 := Length(S1);
-  L2 := Length(S2);
+  L1 := acStringLength(S1);
+  L2 := acStringLength(S2);
   Result := (L1 = L2) and (acCompareStrings(PWideChar(S1), PWideChar(S2), L1, L2) = 0);
 end;
 
@@ -1046,13 +1093,13 @@ end;
 // Replacing
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acStringReplace(const S, OldPattern, NewPattern: string; AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
+function acStringReplace(const S, OldPattern, NewPattern: UnicodeString; AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): UnicodeString;
 var
  ALength: Integer;
  AOffset: Integer;
  AOffsetNew: Integer;
- APattern: string;
- ASearchStr: string;
+ APattern: UnicodeString;
+ ASearchStr: UnicodeString;
 begin
   if AIgnoreCase then
   begin
@@ -1067,7 +1114,7 @@ begin
 
   Result := '';
   AOffset := 1;
-  ALength := Length(S);
+  ALength := acStringLength(S);
   while AOffset <= ALength do
   begin
     AOffsetNew := acPos(APattern, ASearchStr, False, AWholeWords, AOffset);
@@ -1077,7 +1124,7 @@ begin
       Break;
     end;
     Result := Result + Copy(S, AOffset, AOffsetNew - AOffset) + NewPattern;
-    AOffset := AOffsetNew + Length(APattern);
+    AOffset := AOffsetNew + acStringLength(APattern);
   end;
 end;
 
@@ -1106,7 +1153,7 @@ var
   I: Integer;
 begin
   Result := S;
-  for I := 1 to Length(S) do
+  for I := 1 to acStringLength(S) do
   begin
     if acPos(Result[I], ACharsToReplace) > 0 then
       Result[I] := AReplaceBy;
@@ -1202,10 +1249,10 @@ end;
 
 function acDupeString(const AText: UnicodeString; ACount: Integer): UnicodeString;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   ACapacity: Integer;
 begin
-  ACapacity := Length(AText) * ACount;
+  ACapacity := acStringLength(AText) * ACount;
   if ACapacity <= 0 then
     Exit('');
 
@@ -1222,12 +1269,26 @@ begin
   end;
 end;
 
+function acStringLength(const S: AnsiString): Integer;
+begin
+  Result := Length(S);
+end;
+
+function acStringLength(const S: UnicodeString): Integer;
+begin
+{$IFDEF FPC}
+  Result := Length(S) div SizeOf(UnicodeChar);
+{$ELSE}
+  Result := Length(S);
+{$ENDIF}
+end;
+
 function acTrim(const S: UnicodeString): UnicodeString;
 var
   I, L: Integer;
 begin
   I := 1;
-  L := Length(S);
+  L := acStringLength(S);
   while (I <= L) and (S[I] <= ' ') do Inc(I);
   while (L >= I) and (S[L] <= ' ') do Dec(L);
   Result := Copy(S, I, L - I + 1);
@@ -1236,7 +1297,7 @@ end;
 procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
 begin
   ZeroMemory(ADest, AMax * SizeOf(WideChar));
-  FastMove(PWideChar(ASource)^, ADest^, SizeOf(WideChar) * Min(AMax, Length(ASource)));
+  FastMove(PWideChar(ASource)^, ADest^, SizeOf(WideChar) * Min(AMax, acStringLength(ASource)));
 end;
 
 function WStrLength(S: PWideChar; AMaxScanCount: Integer): Integer;
@@ -1279,8 +1340,8 @@ procedure acCryptStringXOR(var S: UnicodeString; const AKey: UnicodeString);
 var
   I, L: Integer;
 begin
-  L := Length(AKey);
-  for I := 1 to Length(S) do
+  L := acStringLength(AKey);
+  for I := 1 to acStringLength(S) do
     S[I] := WideChar(Word(S[I]) xor Word(AKey[I mod L + 1]));
 end;
 
@@ -1289,16 +1350,33 @@ end;
 class constructor TACLEncodings.Create;
 begin
   FMap := TACLDictionary<Integer, TEncoding>.Create([doOwnsValues]);
+  FMapLock := TCriticalSection.Create;
 end;
 
 class destructor TACLEncodings.Destroy;
 begin
+  FreeAndNil(FMapLock);
   FreeAndNil(FMap);
 end;
 
 class function TACLEncodings.Default: TEncoding;
 begin
   Result := Get(DefaultCodePage);
+end;
+
+class procedure TACLEncodings.EnumAnsiCodePages(const AProc: TProc<Integer, string>);
+var
+  I: Integer;
+begin
+  if FCodePages = nil then
+  begin
+    FCodePages := TACLStringList.Create;
+    EnumSystemCodePagesW(@CodePageEnumProc, CP_INSTALLED);
+    TACLStringList(FCodePages).SortLogical;
+    TACLStringList(FCodePages).Insert(0, 'Default', TObject(CP_ACP));
+  end;
+  for I := 0 to TACLStringList(FCodePages).Count - 1 do
+    AProc(Integer(TACLStringList(FCodePages).Objects[I]), TACLStringList(FCodePages).Strings[I]);
 end;
 
 class function TACLEncodings.Get(const CodePage: Integer): TEncoding;
@@ -1311,7 +1389,7 @@ begin
   AMap := TACLDictionary<Integer, TEncoding>(FMap);
   if not AMap.TryGetValue(CodePage, Result) then
   begin
-    TMonitor.Enter(FMap);
+    FMapLock.Enter;
     try
       if not AMap.TryGetValue(CodePage, Result) then
       begin
@@ -1319,7 +1397,7 @@ begin
         AMap.Add(CodePage, Result)
       end;
     finally
-      TMonitor.Exit(FMap);
+      FMapLock.Leave;
     end;
   end;
 end;
@@ -1342,6 +1420,20 @@ begin
   end;
 end;
 
+class function TACLEncodings.CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall;
+var
+  ACodePage: Integer;
+  ACodePageInfo: TCPInfoEx;
+begin
+  ACodePage := StrToIntDef(lpCodePageString, -1);
+  if ACodePage > 0 then
+  begin
+    if GetCPInfoEx(ACodePage, 0, ACodePageInfo) and (ACodePageInfo.MaxCharSize = 1) then
+      TACLStringList(FCodePages).Add(ACodePageInfo.CodePageName, ACodePage);
+  end;
+  Result := 1;
+end;
+
 { TACLTimeFormat }
 
 class function TACLTimeFormat.Format(const ATimeInMilliSeconds: Int64;
@@ -1359,7 +1451,7 @@ end;
 class function TACLTimeFormat.FormatEx(ATimeInSeconds: Single; AParts: TACLFormatTimeParts;
   const APartDelimiter: UnicodeString = ':'; ASuppressZeroValues: Boolean = False): UnicodeString;
 
-  procedure AppendResult(ABuffer: TStringBuilder; const APartDelimiter, AValue: UnicodeString); inline;
+  procedure AppendResult(ABuffer: TACLStringBuilder; const APartDelimiter, AValue: UnicodeString); inline;
   begin
     if ABuffer.Length > 0 then
       ABuffer.Append(APartDelimiter);
@@ -1390,7 +1482,7 @@ class function TACLTimeFormat.FormatEx(ATimeInSeconds: Single; AParts: TACLForma
 const
   Factors: array[TACLFormatTimePart] of Integer = (1, 1, SecsPerMin, SecsPerHour, SecsPerDay);
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   AHasSign: Boolean;
   APart: TACLFormatTimePart;
 begin
@@ -1515,7 +1607,7 @@ begin
   FEmpty := True;
   FIgnoreCase := True;
   FSeparator := ' ';
-  FLock := TACLCriticalSection.Create;
+  FLock := TCriticalSection.Create;
 end;
 
 constructor TACLSearchString.Create(const AMask: UnicodeString; AIgnoreCase: Boolean = True);
@@ -1558,7 +1650,7 @@ begin
   S := PrepareString(S);
   UniqueString(S);
   AScan := PByte(@S[1]);
-  ASize := Length(S) * SizeOf(WideChar);
+  ASize := acStringLength(S) * SizeOf(WideChar);
   for I := 0 to Length(FMask) - 1 do
   begin
     if not FMaskResult[I] then
@@ -1566,7 +1658,7 @@ begin
       AMask := FMask[I];
       if acFindStringInMemoryW(AMask, AScan, ASize, 0, ACur) then
       begin
-        ZeroMemory(AScan + ACur, Length(AMask) * SizeOf(WideChar));
+        ZeroMemory(AScan + ACur, acStringLength(AMask) * SizeOf(WideChar));
         FMaskResult[I] := True;
       end
       else
@@ -1632,13 +1724,13 @@ end;
 
 { TACLLCSCalculator }
 
-class function TACLLCSCalculator.Compliance(const ASource, ATarget: string): Single;
+class function TACLLCSCalculator.Compliance(const ASource, ATarget: UnicodeString): Single;
 var
   AEqualsCount: Integer;
   ASourceLength, ATargetLength: Integer;
 begin
-  ASourceLength := Length(ASource);
-  ATargetLength := Length(ATarget);
+  ASourceLength := acStringLength(ASource);
+  ATargetLength := acStringLength(ATarget);
   if (ASourceLength = 0) and (ATargetLength = 0) then
     Exit(1);
 
@@ -1684,15 +1776,15 @@ begin
   Result := AEqualsCount / Max(ASourceLength, ATargetLength);
 end;
 
-class function TACLLCSCalculator.Difference(const ASource, ATarget: string): TList<TStringDiff>;
+class function TACLLCSCalculator.Difference(const ASource, ATarget: UnicodeString): TList<TStringDiff>;
 var
   ADifferences: TList<TStringDiff>;
   ASourceLength, ATargetLength: Integer;
 begin
-  ASourceLength := Length(ASource);
-  ATargetLength := Length(ATarget);
+  ASourceLength := acStringLength(ASource);
+  ATargetLength := acStringLength(ATarget);
 
-  ADifferences := TList<TPair<Char, TDiffState>>.Create;
+  ADifferences := TList<TStringDiff>.Create;
   ADifferences.Capacity := Max(ASourceLength, ATargetLength);
 
   Difference(ASourceLength, ATargetLength,
@@ -1794,7 +1886,7 @@ end;
 
 { TACLStringBuilderHelper }
 
-function TACLStringBuilderHelper.Append(const AValue: PWideChar; ALength: Integer): TStringBuilder;
+function TACLStringBuilderHelper.Append(const AValue: PWideChar; ALength: Integer): TACLStringBuilder;
 var
   APosition: Integer;
 begin
@@ -1817,7 +1909,7 @@ begin
     FreeAndNil(Cache[I]);
 end;
 
-class function TACLStringBuilderManager.Get(ACapacity: Integer): TStringBuilder;
+class function TACLStringBuilderManager.Get(ACapacity: Integer): TACLStringBuilder;
 var
   AIndex: Integer;
 begin
@@ -1837,14 +1929,14 @@ begin
       Result.Capacity := ACapacity
   {$IFDEF DELPHI103RIO}
     else
-      UniqueString(TStringBuilderAccess(Result).FData);
+      UniqueString(TACLStringBuilderAccess(Result).FData);
   {$ENDIF}
   end
   else
-    Result := TStringBuilder.Create(ACapacity);
+    Result := TACLStringBuilder.Create(ACapacity);
 end;
 
-class procedure TACLStringBuilderManager.Release(var ABuilder: TStringBuilder);
+class procedure TACLStringBuilderManager.Release(var ABuilder: TACLStringBuilder);
 var
   AIndex: Integer;
 begin
@@ -1885,7 +1977,7 @@ end;
 
 function TACLAppVersion.ToDisplayString: string;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
 begin
   ABuffer := TACLStringBuilderManager.Get;
   try
@@ -1908,7 +2000,7 @@ end;
 
 function TACLAppVersion.ToScriptString: string;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
 begin
   ABuffer := TACLStringBuilderManager.Get;
   try
@@ -1927,7 +2019,7 @@ end;
 
 function TACLAppVersion.ToString: string;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
 begin
   ABuffer := TACLStringBuilderManager.Get;
   try
@@ -1945,4 +2037,23 @@ begin
   end;
 end;
 
+{$IFDEF FPC}
+
+{ TACLCharHelper }
+
+function TACLCharHelper.IsDigit: Boolean;
+begin
+  Result := TCharacter.IsDigit(Self);
+end;
+
+function TACLCharHelper.ToLower: WideChar;
+begin
+  Result := TCharacter.ToLower(Self);
+end;
+
+function TACLCharHelper.ToUpper: WideChar;
+begin
+  Result := TCharacter.ToUpper(Self);
+end;
+{$ENDIF}
 end.

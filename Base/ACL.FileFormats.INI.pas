@@ -16,15 +16,15 @@ unit ACL.FileFormats.INI;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Graphics,
 {$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  Classes,
+  Generics.Collections,
+  SysUtils,
+  Types,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -269,16 +269,14 @@ end;
 function TACLIniFileSection.ReadFloat(const AKey: UnicodeString; const ADefault: Double): Double;
 var
   AData: UnicodeString;
-  AValue: Extended;
 begin
   try
     AData := ReadString(AKey);
-    if not TextToFloat(AData, AValue, InvariantFormatSettings) then
+    if not TryStrToFloat(AData, Result, InvariantFormatSettings) then
     begin
-      if not TextToFloat(AData, AValue) then // Backward compatibility
-        AValue := ADefault;
+      if not TryStrToFloat(AData, Result) then // Backward compatibility
+        Result := ADefault;
     end;
-    Result := AValue;
   except
     Result := ADefault;
   end;
@@ -1122,7 +1120,7 @@ end;
 
 procedure TACLIniFile.LoadFromString(const AString: UnicodeString);
 begin
-  LoadFromString(PWideChar(AString), Length(AString));
+  LoadFromString(PWideChar(AString), acStringLength(AString));
 end;
 
 function TACLIniFile.SaveToFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;

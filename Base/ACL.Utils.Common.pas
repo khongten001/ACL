@@ -17,18 +17,17 @@ unit ACL.Utils.Common;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  Winapi.PsAPI,
+  Windows,
+  Messages,
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Graphics,
+  Graphics,
 {$ENDIF}
   // System
   System.UITypes,
-  System.Types,
-  System.SysUtils,
-  System.Classes,
-  System.Math;
+  Types,
+  SysUtils,
+  Classes,
+  Math;
 
 const
   SIZE_ONE_KILOBYTE = 1024;
@@ -55,6 +54,22 @@ const
 type
   TObjectMethod = procedure of object;
   TProcedureRef = reference to procedure;
+
+{$IFDEF FPC}
+  TProc = reference to procedure;
+  TProc<T> = reference to procedure (Arg1: T);
+  TProc<T1,T2> = reference to procedure (Arg1: T1; Arg2: T2);
+  TProc<T1,T2,T3> = reference to procedure (Arg1: T1; Arg2: T2; Arg3: T3);
+  TProc<T1,T2,T3,T4> = reference to procedure (Arg1: T1; Arg2: T2; Arg3: T3; Arg4: T4);
+
+  TFunc<TResult> = reference to function: TResult;
+  TFunc<T,TResult> = reference to function (Arg1: T): TResult;
+  TFunc<T1,T2,TResult> = reference to function (Arg1: T1; Arg2: T2): TResult;
+  TFunc<T1,T2,T3,TResult> = reference to function (Arg1: T1; Arg2: T2; Arg3: T3): TResult;
+  TFunc<T1,T2,T3,T4,TResult> = reference to function (Arg1: T1; Arg2: T2; Arg3: T3; Arg4: T4): TResult;
+
+  TPredicate<T> = reference to function (Arg1: T): Boolean;
+{$ENDIF}
 
   { IObject }
 
@@ -153,7 +168,7 @@ function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; const
 
 // HMODULE
 function acGetProcessFileName(const AWindowHandle: HWND; out AFileName: UnicodeString): Boolean;
-function acGetProcAddress(ALibHandle: HMODULE; AProcName: PWideChar; var AResult: Boolean): Pointer;
+function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
 function acLoadLibrary(const AFileName: UnicodeString; AFlags: Cardinal = 0): HMODULE;
 function acModuleFileName(AModule: HMODULE): UnicodeString; inline;
 function acModuleHandle(const AFileName: UnicodeString): HMODULE;
@@ -188,29 +203,30 @@ function acObjectUID(AObject: TObject): string;
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
 procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLBoolean; overload;
+
+{$IFDEF FPC}
+function InterlockedExchangePointer(var ATarget: Pointer; const ASource: Pointer): Pointer;
+{$ENDIF}
 implementation
 
 uses
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Forms,
 {$ENDIF}
-{$IFDEF DEBUG}
-  ACL.Utils.Shell,
-{$ENDIF}
-  System.TypInfo,
+  TypInfo,
   // ACL
   ACL.Math,
-  ACL.Utils.Strings,
-  ACL.Utils.Stream,
   ACL.Utils.FileSystem,
-  ACL.Threading;
+  ACL.Utils.Strings;
 
 type
   TGetThreadErrorMode = function: DWORD; stdcall;
   TSetThreadErrorMode = function (NewMode: DWORD; out OldMode: DWORD): LongBool; stdcall;
+  TGetModuleFileNameExW = function (hProcess: THandle; hModule: HMODULE; lpFilename: LPCWSTR; nSize: DWORD): DWORD; stdcall;
 
 var
   FPerformanceCounterFrequency: Int64 = 0;
+  FGetModuleFileNameEx: TGetModuleFileNameExW = nil;
   FGetThreadErrorMode: TGetThreadErrorMode = nil;
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
 
@@ -236,6 +252,17 @@ begin
  else
    Result := SetErrorMode(Mode);
 end;
+
+{$IFDEF FPC}
+function InterlockedExchangePointer(var ATarget: Pointer; const ASource: Pointer): Pointer;
+begin
+{$IFDEF CPUX64}
+  Result := Pointer(InterlockedExchange64(QWORD(ATarget), QWORD(ASource)));
+{$ELSE}
+  Result := Pointer(InterlockedExchange(DWORD(ATarget), DWORD(ASource)));
+{$ENDIF}
+end;
+{$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Conversion
@@ -401,21 +428,24 @@ var
   AProcessID: Cardinal;
 begin
   Result := False;
-  if (AWindowHandle <> 0) and (GetWindowThreadProcessId(AWindowHandle, AProcessID) > 0) then
+  if (AWindowHandle <> 0) and Assigned(FGetModuleFileNameEx) then
   begin
-    AProcess := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, True, AProcessID);
-    if AProcess <> 0 then
-    try
-      SetLength(AFileName, MAX_PATH);
-      SetLength(AFileName, GetModuleFileNameEx(AProcess, 0, PWideChar(AFileName), Length(AFileName)));
-      Result := True;
-    finally
-      CloseHandle(AProcess);
+    if GetWindowThreadProcessId(AWindowHandle, AProcessID) > 0 then
+    begin
+      AProcess := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, True, AProcessID);
+      if AProcess <> 0 then
+      try
+        SetLength(AFileName, MAX_PATH);
+        SetLength(AFileName, FGetModuleFileNameEx(AProcess, 0, PWideChar(AFileName), Length(AFileName)));
+        Result := True;
+      finally
+        CloseHandle(AProcess);
+      end;
     end;
   end;
 end;
 
-function acGetProcAddress(ALibHandle: HMODULE; AProcName: PWideChar; var AResult: Boolean): Pointer;
+function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
 begin
   Result := GetProcAddress(ALibHandle, AProcName);
   AResult := AResult and (Result <> nil);
@@ -628,7 +658,7 @@ var
   AInput: TInput;
 begin
   ZeroMemory(@AInput, SizeOf(AInput));
-  SendInput(INPUT_KEYBOARD, AInput, SizeOf(AInput));
+  SendInput(INPUT_KEYBOARD, {$IFDEF FPC}@{$ENDIF}AInput, SizeOf(AInput));
   SetForegroundWindow(AHandle);
   SetFocus(AHandle);
 end;
@@ -649,7 +679,7 @@ class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
   AOptions: TExecuteOptions = [eoShowGUI]; AOutputData: TStream = nil; AErrorData: TStream = nil;
   AProcessInfo: PProcessInformation = nil; AExitCode: PCardinal = nil): LongBool;
 
-  function CreateProcess(var PI: TProcessInformation; var SI: TStartupInfo): LongBool;
+  function CreateProcess(var PI: TProcessInformation; var SI: TStartupInfoW): LongBool;
   var
     ATempCmdLine: WideString; // must be WideString!
   begin
@@ -668,7 +698,7 @@ class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
       AAvailable := 0;
       if PeekNamedPipe(AInputStream.Handle, nil, 0, nil, @AAvailable, nil) and (AAvailable > 0) then
       begin
-	      if AAvailable > Cardinal(Length(ATempData)) then
+        if AAvailable > Cardinal(Length(ATempData)) then
           SetLength(ATempData, AAvailable);
         AInputStream.ReadBuffer(ATempData[0], AAvailable);
         AOutputStream.WriteBuffer(ATempData[0], AAvailable);
@@ -679,7 +709,7 @@ class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
 var
   AProcessInformation: TProcessInformation;
   ASecurityAttrs: TSecurityAttributes;
-  AStartupInfo: TStartupInfo;
+  AStartupInfo: TStartupInfoW;
   AStdErrorRead, AStdErrorWrite: THandle;
   AStdErrorStream: THandleStream;
   AStdOutputRead, AStdOutputWrite: THandle;
@@ -858,6 +888,11 @@ end;
 initialization
   FGetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'GetThreadErrorMode');
   FSetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'SetThreadErrorMode');
+  FGetModuleFileNameEx := GetProcAddress(LoadLibrary('PSAPI.dll'), 'GetModuleFileNameExW');
+{$IFDEF FPC}
+  GetLocaleFormatSettings(LOCALE_INVARIANT, InvariantFormatSettings);
+{$ELSE}
   InvariantFormatSettings := TFormatSettings.Invariant;
+{$ENDIF}
   CheckWindowsVersion;
 end.

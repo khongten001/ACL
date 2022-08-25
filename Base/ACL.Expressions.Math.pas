@@ -4,7 +4,7 @@
 {*        Math Expressions Processor         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,10 +16,9 @@ unit ACL.Expressions.Math;
 interface
 
 uses
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Variants,
+  Classes,
+  SysUtils,
+  Variants,
   // ACL
   ACL.Expressions,
   ACL.Parsers,
@@ -86,7 +85,7 @@ type
 implementation
 
 uses
-  System.Math;
+  Math;
 
 { TACLMathExpressionFactory }
 
@@ -191,12 +190,16 @@ end;
 
 class function TACLMathExpressionFactory.FunctionMax(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
-  Result := Max(AParams[0].Evaluate(AContext), AParams[1].Evaluate(AContext));
+  Result := Max(
+     {$IFDEF FPC}Double{$ENDIF}(AParams[0].Evaluate(AContext)),
+     {$IFDEF FPC}Double{$ENDIF}(AParams[1].Evaluate(AContext)));
 end;
 
 class function TACLMathExpressionFactory.FunctionMin(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
-  Result := Min(AParams[0].Evaluate(AContext), AParams[1].Evaluate(AContext));
+  Result := Min(
+     {$IFDEF FPC}Double{$ENDIF}(AParams[0].Evaluate(AContext)),
+     {$IFDEF FPC}Double{$ENDIF}(AParams[1].Evaluate(AContext)));
 end;
 
 class function TACLMathExpressionFactory.FunctionPower(AContext: TObject; AParams: TACLExpressionElements): Variant;
@@ -211,7 +214,7 @@ end;
 
 class function TACLMathExpressionFactory.FunctionRound(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
-  Result := Round(AParams[0].Evaluate(AContext));
+  Result := Round({$IFDEF FPC}Double{$ENDIF}(AParams[0].Evaluate(AContext)));
 end;
 
 class function TACLMathExpressionFactory.FunctionSin(AContext: TObject; AParams: TACLExpressionElements): Variant;
@@ -221,7 +224,7 @@ end;
 
 class function TACLMathExpressionFactory.FunctionTrunc(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
-  Result := Trunc(AParams[0].Evaluate(AContext));
+  Result := Trunc({$IFDEF FPC}Double{$ENDIF}(AParams[0].Evaluate(AContext)));
 end;
 
 class function TACLMathExpressionFactory.OperatorAnd(AContext: TObject; AParams: TACLExpressionElements): Variant;

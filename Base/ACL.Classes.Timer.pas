@@ -16,10 +16,11 @@ unit ACL.Classes.Timer;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  Windows,
+  Messages,
   // System
-  System.Classes,
+  Classes,
+  SyncObjs,
   // ACL
   ACL.Classes.Collections;
 
@@ -83,13 +84,11 @@ type
 implementation
 
 uses
-  System.Math,
-  System.SysUtils,
+  Math,
+  SysUtils,
   // ACL
   ACL.Classes,
   ACL.Utils.Messaging,
-  ACL.Classes.StringList,
-  ACL.Math,
   ACL.Threading,
   ACL.Utils.Common;
 
@@ -102,6 +101,7 @@ type
 
   TACLTimerManager = class
   strict private
+    FLock: TCriticalSection;
     FSystemTimerResolution: Integer;
 
     function AlignToSystemTimerResolution(AInterval: Cardinal): Cardinal;
@@ -298,23 +298,25 @@ end;
 
 constructor TACLTimerManager.Create;
 begin
-  FHandle := WndCreate(HandleMessage, ClassName, True);
+  FLock := TCriticalSection.Create;
   FTimers := TACLList<TACLTimer>.Create;
   FHighResolutionTimers := TACLThreadList<TACLTimer>.Create;
+  FHandle := WndCreate(HandleMessage, ClassName, True);
 end;
 
 destructor TACLTimerManager.Destroy;
 begin
+  WndFree(FHandle);
   FreeAndNil(FHighResolutionThread);
   FreeAndNil(FHighResolutionTimers);
   FreeAndNil(FTimers);
-  WndFree(FHandle);
+  FreeAndNil(FLock);
   inherited Destroy;
 end;
 
 procedure TACLTimerManager.RegisterTimer(ATimer: TACLTimer);
 begin
-  TMonitor.Enter(Self);
+  FLock.Enter;
   try;
     FTimers.Add(ATimer);
     if ATimer.HighResolution and (ATimer.Interval < 1000) then
@@ -325,13 +327,13 @@ begin
     else
       SetTimer(FHandle, NativeUInt(ATimer), AlignToSystemTimerResolution(ATimer.Interval), nil);
   finally
-    TMonitor.Exit(Self);
+    FLock.Leave;
   end;
 end;
 
 procedure TACLTimerManager.UnregisterTimer(ATimer: TACLTimer);
 begin
-  TMonitor.Enter(Self);
+  FLock.Enter;
   try
     if FTimers.Remove(ATimer) >= 0 then
       KillTimer(FHandle, NativeUInt(ATimer));
@@ -344,7 +346,7 @@ begin
       FHighResolutionTimers.UnlockList;
     end;
   finally
-    TMonitor.Exit(Self);
+    FLock.Leave;
   end;
 end;
 
@@ -398,12 +400,12 @@ end;
 
 procedure TACLTimerManager.SafeCallTimerProc(ATimer: TACLTimer);
 begin
-//  TMonitor.Enter(Self);
+//  FLock.Enter;
 //  try
   if FTimers.Contains(ATimer) then
     ATimer.Timer;
 //  finally
-//    TMonitor.Exit(Self);
+//    FLock.Leave;
 //  end;
 end;
 

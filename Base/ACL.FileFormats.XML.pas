@@ -16,20 +16,16 @@ unit ACL.FileFormats.XML;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Classes,
-  System.SysUtils,
-  System.AnsiStrings,
-  System.Variants,
+  Classes,
+  SysUtils,
+  Variants,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
-  ACL.Hashes,
   ACL.Utils.Common,
   ACL.Utils.Date,
-  ACL.Utils.FileSystem,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
 
@@ -229,7 +225,7 @@ type
     // Load
     procedure LoadFromFile(const AFileName: UnicodeString); overload;
     procedure LoadFromFile(const AFileName: UnicodeString; const ADefaultEncoding: TACLXMLEncoding); overload;
-    procedure LoadFromResource(AInst: HINST; const AName, AType: UnicodeString);
+    procedure LoadFromResource(AInst: HINST; const AName, AType: string);
     procedure LoadFromStream(AStream: TStream); overload;
     procedure LoadFromStream(AStream: TStream; const ADefaultEncoding: TACLXMLEncoding); overload; virtual;
     procedure LoadFromString(const AString: AnsiString); virtual;
@@ -287,9 +283,10 @@ type
 implementation
 
 uses
-  System.Types,
-  System.Math,
-  System.StrUtils,
+  // System
+  Types,
+  Math,
+  StrUtils,
   // ACL
   ACL.Parsers;
 
@@ -466,7 +463,7 @@ constructor TACLXMLDateTime.Create(const ASource: UnicodeString);
   var
     I: Integer;
   begin
-    for I := AIndex to Length(ASource) do
+    for I := AIndex to acStringLength(ASource) do
     begin
       ADelimiter := ASource[I];
       if not CharInSet(ADelimiter, ['0'..'9']) then
@@ -477,7 +474,7 @@ constructor TACLXMLDateTime.Create(const ASource: UnicodeString);
       end;
     end;
     Result := Copy(ASource, AIndex, MaxInt);
-    AIndex := Length(ASource) + 1;
+    AIndex := acStringLength(ASource) + 1;
     ADelimiter := #0;
   end;
 
@@ -513,7 +510,7 @@ begin
     if ADelim = '.' then
     begin
       AValue := GetNextPart(ADelim, AIndex);
-      Millisecond := Round(1000 * StrToIntDef(AValue, 0) / IntPower(10, Length(AValue)));
+      Millisecond := Round(1000 * StrToIntDef(AValue, 0) / IntPower(10, acStringLength(AValue)));
     end;
   end;
 
@@ -639,7 +636,7 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
-    if System.AnsiStrings.SameText(TACLXMLAttribute(List[I]).Name, AName) then
+    if acSameText(TACLXMLAttribute(List[I]).Name, AName) then
     begin
       AAttr := Items[I];
       Exit(True);
@@ -720,7 +717,7 @@ end;
 
 function TACLXMLAttributes.GetValueAsBoolean(const AName: AnsiString; ADefault: Boolean = False): Boolean;
 var
-  AValue: string;
+  AValue: UnicodeString;
 begin
   if GetValue(AName, AValue) then
     Result := TACLXMLHelper.DecodeBoolean(AValue)
@@ -730,7 +727,7 @@ end;
 
 function TACLXMLAttributes.GetValueAsBooleanEx(const AName: AnsiString): TACLBoolean;
 var
-  AValue: string;
+  AValue: UnicodeString;
 begin
   if GetValue(AName, AValue) then
     Result := TACLBoolean.From(TACLXMLHelper.DecodeBoolean(AValue))
@@ -1009,7 +1006,7 @@ begin
   Result := False;
   for I := 0 to Count - 1 do
   begin
-    Result := SameText(Nodes[I].NodeName, ANodeName);
+    Result := acSameText(Nodes[I].NodeName, ANodeName);
     if Result then
     begin
       ANode := Nodes[I];
@@ -1277,11 +1274,11 @@ begin
     Clear;
 end;
 
-procedure TACLXMLDocument.LoadFromResource(AInst: HINST; const AName, AType: UnicodeString);
+procedure TACLXMLDocument.LoadFromResource(AInst: HINST; const AName, AType: string);
 var
   AStream: TStream;
 begin
-  AStream := TResourceStream.Create(AInst, AName, PWideChar(AType));
+  AStream := TResourceStream.Create(AInst, AName, PChar(AType));
   try
     LoadFromStream(AStream);
   finally
@@ -1332,7 +1329,7 @@ procedure TACLXMLDocument.LoadFromString(const AString: AnsiString);
 begin
   with TACLTextXMLParser.Create(Self) do
   try
-    Parse(PAnsiChar(AString), Length(AString));
+    Parse(PAnsiChar(AString), acStringLength(AString));
   finally
     Free;
   end;
@@ -1555,7 +1552,7 @@ procedure TACLTextXMLParser.ParseEncoding;
       Result := TACLXMLEncoding.Create(mxeUTF8)
     else
       if acBeginsWith(AData, sWindows) then
-        Result := TACLXMLEncoding.Create(mxeWindows, StrToIntDef(Copy(AData, Length(sWindows) + 1, MaxInt), 0))
+        Result := TACLXMLEncoding.Create(mxeWindows, StrToIntDef(Copy(AData, acStringLength(sWindows) + 1, MaxInt), 0))
       else
         Result := TACLXMLEncoding.Create(mxeNone);
   end;
@@ -1739,8 +1736,8 @@ function TACLTextXMLParser.NextToken(var P: PAnsiChar; var C: Integer; out AToke
     LS, LF: Integer;
   begin
     Result := False;
-    LS := Length(AStartID);
-    LF := Length(AFinishID);
+    LS := acStringLength(AStartID);
+    LF := acStringLength(AFinishID);
     if (C > LS + LF) and CompareMem(P, @AStartID[1], LS) then
     begin
       Result := acFindStringInMemoryA(AFinishID, PByte(P), C, LS, ALength);
@@ -1761,9 +1758,9 @@ function TACLTextXMLParser.NextToken(var P: PAnsiChar; var C: Integer; out AToke
           if (C > 1) and (PAnsiChar(P + 1)^ = '!') then
           begin
             if CheckBounds(CommentBegin, CommentEnd, ALength) then
-              PutSpecialToken(ttComment, ALength, Length(CommentBegin), Length(CommentEnd))
+              PutSpecialToken(ttComment, ALength, acStringLength(CommentBegin), acStringLength(CommentEnd))
             else if CheckBounds(CDataBegin, CDataEnd, ALength) then
-              PutSpecialToken(ttCDATA, ALength, Length(CDataBegin), Length(CDataEnd))
+              PutSpecialToken(ttCDATA, ALength, acStringLength(CDataBegin), acStringLength(CDataEnd))
             else
               PutSpecialToken(ttTagHeaderBegin, 1);
           end
@@ -1856,7 +1853,7 @@ begin
           else
           begin
             ParseNodeValue(ANode, ATagHeaderEndCursor, FData - AToken.BufferLengthInChars, AIsPreserveSpacesMode);
-            ANextNode := ANode.Add(EmptyAnsiStr);
+            ANextNode := ANode.Add(EmptyStrA);
             ANode := ParseNodeHeader(ANextNode);
             if ANextNode.Attributes.Find(sXMLSpaceModeAttr, AAttr) then
             try
@@ -2087,7 +2084,7 @@ procedure TACLBinaryXMLBuilder.WriteString(const S: UnicodeString);
 var
   ALength: Cardinal;
 begin
-  ALength := Length(S);
+  ALength := acStringLength(S);
   WriteValue(ALength);
   if ALength > 0 then
     Stream.WriteString(S);
@@ -2112,7 +2109,7 @@ begin
   for I := 0 to L - 1 do
   begin
     S := AList[I];
-    L := Length(S);
+    L := acStringLength(S);
     WriteValue(L);
     if L > 0 then
       Stream.WriteStringA(S);
@@ -2301,13 +2298,13 @@ end;
 
 class function TACLXMLHelper.DecodeString(const S: UnicodeString): UnicodeString;
 var
-  B: TStringBuilder;
+  B: TACLStringBuilder;
   L, LS: Integer;
   P, PS: PWideChar;
   V: UnicodeString;
 begin
   P := PWideChar(S);
-  L := Length(S);
+  L := acStringLength(S);
   B := TACLStringBuilderManager.Get(L);
   try
     while L > 0 do
@@ -2344,13 +2341,13 @@ end;
 
 class function TACLXMLHelper.EncodeString(const S: UnicodeString): UnicodeString;
 var
-  B: TStringBuilder;
+  B: TACLStringBuilder;
   L, LS: Integer;
   P, PS: PWideChar;
   V: UnicodeString;
 begin
   P := PWideChar(S);
-  L := Length(S);
+  L := acStringLength(S);
   B := TACLStringBuilderManager.Get(L);
   try
     while L > 0 do
@@ -2401,12 +2398,12 @@ var
   I, L: Integer;
 begin
   Result := False;
-  L := Length(S);
+  L := acStringLength(S);
   if L > 0 then
   begin
     Result := CharInSet(S[1], [#9, #10, #13, ' ']) or CharInSet(S[L], [#9, #10, #13, ' ']);
     if not Result then
-      for I := 1 to Length(S) do
+      for I := 1 to acStringLength(S) do
       begin
         if CharInSet(S[I], [#13, #10]) then
           Exit(True);

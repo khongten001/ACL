@@ -16,14 +16,14 @@ unit ACL.Classes.ByteBuffer;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Classes,
-  System.SysUtils,
+  Classes,
+  SyncObjs,
+  SysUtils,
   // ACL
   ACL.Math,
-  ACL.Utils.Common,
-  ACL.Threading;
+  ACL.Utils.Common;
 
 type
 
@@ -80,7 +80,7 @@ type
   strict private
     FData: PByte;
     FDataSize: Integer;
-    FLock: TACLCriticalSection;
+    FLock: TCriticalSection;
     FReadOutstrip: Boolean;
     FReadPosition: Integer;
     FWriteChunkSize: Integer;
@@ -123,7 +123,7 @@ type
   TACLDataContainer = class(TInterfacedObject, IACLDataContainer)
   protected
     FData: TMemoryStream;
-    FDataLock: TACLCriticalSection;
+    FDataLock: TCriticalSection;
   public
     constructor Create; overload;
     constructor Create(AStream: TStream); overload;
@@ -169,8 +169,8 @@ function acCompare(const AContainer1, AContainer2: IACLDataContainer): Boolean;
 implementation
 
 uses
-  System.Math,
-  System.RTLConsts,
+  Math,
+  RTLConsts,
   // ACL
   ACL.FastCode,
   ACL.Utils.FileSystem,
@@ -312,7 +312,7 @@ begin
   FDataSize := ASize;
   FData := AllocMem(FDataSize);
   FWriteChunkSize := MulDiv(FDataSize, 1, 4);
-  FLock := TACLCriticalSection.Create(Self);
+  FLock := TCriticalSection.Create;
 end;
 
 destructor TACLCircularByteBuffer.Destroy;
@@ -456,7 +456,7 @@ constructor TACLDataContainer.Create;
 begin
   inherited Create;
   FData := TMemoryStream.Create;
-  FDataLock := TACLCriticalSection.Create(Self, ClassName + '.Lock');
+  FDataLock := TCriticalSection.Create;
 end;
 
 constructor TACLDataContainer.Create(AStream: TStream);

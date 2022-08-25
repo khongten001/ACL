@@ -18,19 +18,16 @@ unit ACL.Utils.Shell.FileTypeRegistrar;
 interface
 
 uses
-  Winapi.ActiveX,
-  Winapi.Windows,
-  Winapi.ShellAPI,
-  Winapi.ShlObj,
+  // Winapi
+  ActiveX,
+  Windows,
+  ShellAPI,
+  ShlObj,
   // System
-  System.SysUtils,
+  SysUtils,
   // ACL
-  ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
-  ACL.FileFormats.INI,
   ACL.FileFormats.XML,
-  ACL.Parsers,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Registry,
@@ -49,8 +46,8 @@ type
 
   TACLFileTypeIconLibraryItem = class
   strict private
-    FExtentions: string;
-    FGroupName: string;
+    FExtentions: UnicodeString;
+    FGroupName: UnicodeString;
     FIconIndex: Integer;
   public
     constructor Create(ANode: TACLXMLNode);
@@ -156,8 +153,27 @@ type
 
 implementation
 
-uses
-  System.AnsiStrings;
+{$IFDEF FPC}
+const
+  CLSID_ApplicationAssociationRegistration: TGUID     = '{591209c7-767b-42b2-9fba-44ee4615f2c7}';
+  CLSID_ApplicationAssociationRegistrationUI: TGUID   = '{1968106d-f3b5-44cf-890e-116fcb9ecef1}';
+
+type
+  IApplicationAssociationRegistrationUI = interface(IUnknown)
+  ['{1F76A169-F994-40AC-8FC8-0959E8874710}']
+    function LaunchAdvancedAssociationUI(pszAppRegistryName: LPCWSTR): HRESULT; stdcall;
+  end;
+
+  IApplicationAssociationRegistration = interface(IUnknown)
+  ['{4E530B0A-E611-4C77-A3AC-9031D022281B}']
+    function QueryCurrentDefault(pszQuery: LPCWSTR; atQueryType: Integer; alQueryLevel: Integer; var ppszAssociation: LPWSTR): HRESULT; stdcall;
+    function QueryAppIsDefault(pszQuery: LPCWSTR; atQueryType: Integer; alQueryLevel: Integer; pszAppRegistryName: LPCWSTR; var pfDefault: BOOL): HRESULT; stdcall;
+    function QueryAppIsDefaultAll(alQueryLevel: Integer; pszAppRegistryName: LPCWSTR; var pfDefault: BOOL): HRESULT; stdcall;
+    function SetAppAsDefault(pszAppRegistryName: LPCWSTR; pszSet: LPCWSTR; atSetType: Integer): HRESULT; stdcall;
+    function SetAppAsDefaultAll(pszAppRegistryName: LPCWSTR): HRESULT; stdcall;
+    function ClearUserAssociations: HRESULT; stdcall;
+  end;
+{$ENDIF}
 
 { TACLFileTypeIconLibraryItem }
 
@@ -262,11 +278,11 @@ begin
         AXmlDoc[0].Enum(
           procedure (ANode: TACLXMLNode)
           begin
-            if System.AnsiStrings.SameText(ANode.NodeName, 'author') then
+            if acSameText(ANode.NodeName, AnsiString('author')) then
               FAuthor := ANode.NodeValue
-            else if System.AnsiStrings.SameText(ANode.NodeName, 'name') then
+            else if acSameText(ANode.NodeName, AnsiString('name')) then
               FName := ANode.NodeValue
-            else if System.AnsiStrings.SameText(ANode.NodeName, 'icon') then
+            else if acSameText(ANode.NodeName, AnsiString('icon')) then
               FItems.Add(TACLFileTypeIconLibraryItem.Create(ANode));
           end);
       end;
@@ -359,7 +375,7 @@ begin
   //# Note: the SetAppAsDefaultAll method not intended for use in Windows 8, see:
   //# http://msdn.microsoft.com/en-us/library/windows/desktop/bb776338(v=vs.85).aspx
   if CreateComObject(CLSID_ApplicationAssociationRegistration, IApplicationAssociationRegistration, AIntf) then
-    AIntf.SetAppAsDefaultAll(PChar(AppName));
+    AIntf.SetAppAsDefaultAll(PWideChar(AppName));
 end;
 
 class procedure TACLFileTypeRegistrar.ShowRegistrationUI;
@@ -371,7 +387,7 @@ begin
   if not IsWin10OrLater then
   begin
     if CreateComObject(CLSID_ApplicationAssociationRegistrationUI, IApplicationAssociationRegistrationUI, AIntf) then
-      AResult := Succeeded(AIntf.LaunchAdvancedAssociationUI(PChar(AppName)))
+      AResult := Succeeded(AIntf.LaunchAdvancedAssociationUI(PWideChar(AppName)))
   end;
 
   if not AResult then

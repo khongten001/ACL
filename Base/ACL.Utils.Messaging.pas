@@ -16,10 +16,11 @@ unit ACL.Utils.Messaging;
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
+  Windows,
+  Messages,
   // System
-  System.Classes;
+  Classes,
+  SyncObjs;
 
 type
 
@@ -42,6 +43,7 @@ type
     class var FCustomMessages: TObject;
     class var FHandle: HWND;
     class var FHandlers: TObject;
+    class var FLock: TCriticalSection;
 
     class procedure WndProc(var AMessage: TMessage);
   public
@@ -58,49 +60,58 @@ type
     class property Handle: HWND read FHandle;
   end;
 
-function WndCreate(Method: TWndMethod; const ClassName: string;
-  IsMessageOnly: Boolean = False; const Name: string = ''): HWND;
+function WndCreate(Method: TWndMethod; const ClassName: UnicodeString;
+  IsMessageOnly: Boolean = False; const Name: UnicodeString = ''): HWND;
 procedure WndDefaultProc(W: HWND; var Message: TMessage);
 procedure WndFree(W: HWND);
 implementation
 
 uses
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  Math,
+  SysUtils,
+  Types,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Threading;
 
+{$IFDEF FPC}
+const
+  HWND_MESSAGE = HWND(-3);
+{$ENDIF}
+
 var
-  UtilWindowClass: TWndClass = (Style: 0; lpfnWndProc: @DefWindowProc;
+  UtilWindowClass: TWndClassW = (Style: 0; lpfnWndProc: @DefWindowProc;
     cbClsExtra: 0; cbWndExtra: 0; hInstance: 0; hIcon: 0; hCursor: 0;
     hbrBackground: 0; lpszMenuName: nil; lpszClassName: 'TPUtilWindow');
-  UtilWindowClassName: string;
+  UtilWindowClassName: UnicodeString;
 
-function WndCreate(Method: TWndMethod; const ClassName: string;
-  IsMessageOnly: Boolean = False; const Name: string = ''): HWND;
+function WndCreate(Method: TWndMethod; const ClassName: UnicodeString;
+  IsMessageOnly: Boolean = False; const Name: UnicodeString = ''): HWND;
 var
   ClassRegistered: Boolean;
-  TempClass: TWndClass;
+  TempClass: TWndClassW;
+  ParentWnd: HWND;
 begin
   if not IsMainThread then
     raise EInvalidOperation.Create('Cannot create window in non-main thread');
   UtilWindowClassName := ClassName;
   UtilWindowClass.hInstance := HInstance;
-  UtilWindowClass.lpszClassName := PChar(UtilWindowClassName);
-  ClassRegistered := GetClassInfo(HInstance, UtilWindowClass.lpszClassName, TempClass);
-  if not ClassRegistered or (TempClass.lpfnWndProc <> @DefWindowProc) then
+  UtilWindowClass.lpszClassName := PWideChar(UtilWindowClassName);
+  ClassRegistered := GetClassInfoW(HInstance, UtilWindowClass.lpszClassName, {$IFDEF FPC}@{$ENDIF}TempClass);
+  if not ClassRegistered or (@TempClass.lpfnWndProc <> @DefWindowProc) then
   begin
     if ClassRegistered then
-      Winapi.Windows.UnregisterClass(UtilWindowClass.lpszClassName, HInstance);
-    Winapi.Windows.RegisterClass(UtilWindowClass);
+      Windows.UnregisterClassW(UtilWindowClass.lpszClassName, HInstance);
+    Windows.RegisterClassW(UtilWindowClass);
   end;
-  Result := CreateWindowEx(WS_EX_TOOLWINDOW, UtilWindowClass.lpszClassName, PChar(Name),
-    WS_POPUP {!0}, 0, 0, 0, 0, IfThen(IsMessageOnly, HWND_MESSAGE), 0, HInstance, nil);
+  ParentWnd := 0;
+  if IsMessageOnly then
+    ParentWnd := HWND_MESSAGE;
+  Result := CreateWindowExW(WS_EX_TOOLWINDOW, UtilWindowClass.lpszClassName,
+    PWideChar(Name), WS_POPUP {!0}, 0, 0, 0, 0, ParentWnd, 0, HInstance, nil);
   if Assigned(Method) then
-    SetWindowLong(Result, GWL_WNDPROC, NativeUInt(System.Classes.MakeObjectInstance(Method)));
+    SetWindowLong(Result, GWL_WNDPROC, NativeUInt(Classes.MakeObjectInstance(Method)));
 end;
 
 procedure WndDefaultProc(W: HWND; var Message: TMessage);
@@ -117,7 +128,7 @@ begin
     AInstance := Pointer(GetWindowLong(W, GWL_WNDPROC));
     DestroyWindow(W);
     if AInstance <> @DefWindowProc then
-      System.Classes.FreeObjectInstance(AInstance);
+      Classes.FreeObjectInstance(AInstance);
   end;
 end;
 
@@ -157,6 +168,7 @@ end;
 
 class constructor TACLMessaging.Create;
 begin
+  FLock := TCriticalSection.Create;
   FCustomMessages := TACLStringList.Create;
   FHandlers := TACLList<TACLMessageHandler>.Create;
   FHandle := WndCreate(WndProc, ClassName, True);
@@ -167,50 +179,51 @@ begin
   WndFree(FHandle);
   FreeAndNil(FCustomMessages);
   FreeAndNil(FHandlers);
+  FreeAndNil(FLock);
 end;
 
 class procedure TACLMessaging.HandlerAdd(AHandler: TACLMessageHandler);
 begin
-  TMonitor.Enter(FHandlers);
+  FLock.Enter;
   try
     TACLList<TACLMessageHandler>(FHandlers).Add(AHandler);
   finally
-    TMonitor.Exit(FHandlers);
+    FLock.Leave;
   end;
 end;
 
 class procedure TACLMessaging.HandlerRemove(AHandler: TACLMessageHandler);
 begin
-  TMonitor.Enter(FHandlers);
+  FLock.Enter;
   try
     TACLList<TACLMessageHandler>(FHandlers).Remove(AHandler);
   finally
-    TMonitor.Exit(FHandlers);
+    FLock.Leave;
   end;
 end;
 
 class procedure TACLMessaging.PostMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
 begin
-  Winapi.Windows.PostMessage(FHandle, AMessage, AParamW, AParamL);
+  Windows.PostMessage(FHandle, AMessage, AParamW, AParamL);
 end;
 
 class procedure TACLMessaging.SendMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
 begin
-  Winapi.Windows.SendMessage(FHandle, AMessage, AParamW, AParamL);
+  Windows.SendMessage(FHandle, AMessage, AParamW, AParamL);
 end;
 
 class function TACLMessaging.RegisterMessage(const AName: UnicodeString): Cardinal;
 var
   AIndex: Integer;
 begin
-  TMonitor.Enter(FHandlers);
+  FLock.Enter;
   try
     AIndex := TACLStringList(FCustomMessages).IndexOf(AName);
     if AIndex < 0 then
       AIndex := TACLStringList(FCustomMessages).Add(AName);
     Result := WM_USER + AIndex + 1;
   finally
-    TMonitor.Exit(FHandlers);
+    FLock.Leave;
   end;
 end;
 
@@ -220,7 +233,7 @@ var
   AHandlers: TACLList<TACLMessageHandler>;
   I: Integer;
 begin
-  TMonitor.Enter(FHandlers);
+  FLock.Enter;
   try
     AHandlers := TACLList<TACLMessageHandler>(FHandlers);
     for I := AHandlers.Count - 1 downto 0 do
@@ -231,7 +244,7 @@ begin
     end;
     WndDefaultProc(FHandle, AMessage);
   finally
-    TMonitor.Exit(FHandlers);
+    FLock.Leave;
   end;
 end;
 

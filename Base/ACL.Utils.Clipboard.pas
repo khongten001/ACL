@@ -16,15 +16,14 @@ unit ACL.Utils.Clipboard;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  Winapi.ActiveX,
-  Winapi.ShlObj,
-  Winapi.ShellAPI,
+  // Winapi
+  Windows,
+  ActiveX,
+  ShlObj,
+  ShellAPI,
   // System
-  System.Classes,
+  Classes,
   // ACL
-  ACL.Classes,
   ACL.Classes.StringList,
   ACL.FileFormats.INI;
 
@@ -76,12 +75,18 @@ function acTextToHGLOBAL(const S: UnicodeString): HGLOBAL; overload;
 implementation
 
 uses
-  System.SysUtils,
+  // System
+  SysUtils,
   // ACL
   ACL.FastCode,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
+
+{$IFDEF FPC}
+const
+  CFSTR_SHELLIDLIST = 'Shell IDList Array';
+{$ENDIF}
 
 function GlobalAllocFromData(AData: PByte; ADataSize: Integer): HGLOBAL;
 var
@@ -216,7 +221,7 @@ var
   AText: UnicodeString;
 begin
   AText := AFileList.GetDelimitedText(UNICODE_NULL);
-  ARequiredSize := SizeOf(TDropFiles) + (Length(AText) + 1) * SizeOf(WideChar);
+  ARequiredSize := SizeOf(TDropFiles) + (acStringLength(AText) + 1) * SizeOf(WideChar);
   Result := GlobalAlloc(GMEM_MOVEABLE or GMEM_ZEROINIT, ARequiredSize);
   if Result <> 0 then
   begin
@@ -224,7 +229,7 @@ begin
     try
       ADropFiles.pFiles := SizeOf(TDropFiles);
       ADropFiles.fWide := True;
-      FastMove(PWideChar(AText)^, PWideChar(NativeUInt(ADropFiles) + ADropFiles.pFiles)^, Length(AText) * SizeOf(WideChar));
+      FastMove(PWideChar(AText)^, PWideChar(NativeUInt(ADropFiles) + ADropFiles.pFiles)^, acStringLength(AText) * SizeOf(WideChar));
     finally
       GlobalUnlock(Result);
     end;
@@ -263,12 +268,12 @@ begin
         if ADropFiles^.fWide then
         begin
           AString := PWideChar(AFileName);
-          Inc(AFileName, (Length(AString) + 1) * 2);
+          Inc(AFileName, (acStringLength(AString) + 1) * 2);
         end
         else
         begin
           AString := acStringFromAnsi(AFileName);
-          Inc(AFileName, Length(AString) + 1);
+          Inc(AFileName, acStringLength(AString) + 1);
         end;
         AFiles.Add(AString);
         Result := True;
@@ -283,7 +288,7 @@ end;
 
 function acTextToHGLOBAL(const S: AnsiString): HGLOBAL;
 begin
-  Result := GlobalAllocFromData(@S[1], Length(S) + 1);
+  Result := GlobalAllocFromData(@S[1], acStringLength(S) + 1);
 end;
 
 procedure acConfigFromHGLOBAL(AGlobal: HGLOBAL; AConfig: TACLIniFile);
@@ -343,7 +348,7 @@ end;
 
 function acTextToHGLOBAL(const S: UnicodeString): HGLOBAL;
 begin
-  Result := GlobalAllocFromData(@S[1], (Length(S) + 1) * SizeOf(WideChar));
+  Result := GlobalAllocFromData(@S[1], (acStringLength(S) + 1) * SizeOf(WideChar));
 end;
 
 { TACLGlobalMemoryStream }

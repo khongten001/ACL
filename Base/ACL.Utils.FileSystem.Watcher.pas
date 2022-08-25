@@ -16,12 +16,13 @@ unit ACL.Utils.FileSystem.Watcher;
 interface
 
 uses
-  Winapi.Windows,
+  // Winapi
+  Windows,
   // System
-  System.SysUtils,
-  System.Classes,
-  System.Generics.Collections,
-  System.SyncObjs,
+  Classes,
+  Generics.Collections,
+  SyncObjs,
+  SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -117,8 +118,9 @@ function FileSystemWatcher: TACLFileSystemWatcher;
 implementation
 
 uses
-  System.Math,
-  System.DateUtils,
+  // System
+  DateUtils,
+  Math,
   // ACL
   ACL.Math,
   ACL.Utils.Common;
@@ -245,7 +247,7 @@ begin
   FActiveTasks := TACLList<IACLFileSystemWatcherTask>.Create;
   FActiveThreads := TACLObjectList<TACLThread>.Create;
   FTasks := TACLList<IACLFileSystemWatcherTask>.Create;
-  FLock := TACLCriticalSection.Create(Self);
+  FLock := TACLCriticalSection.Create;
 end;
 
 destructor TACLFileSystemWatcher.Destroy;
@@ -350,13 +352,15 @@ begin
 end;
 
 procedure TACLFileSystemWatcher.SafeStartThreads;
+type
+  TPairItem = TPair<Integer, IACLFileSystemWatcherTask>;
 
-  function PopulatePaths: TACLList<TPair<Integer, IACLFileSystemWatcherTask>>;
+  function PopulatePaths: TACLList<TPairItem>;
   var
     ATask: IACLFileSystemWatcherTask;
     I, J: Integer;
   begin
-    Result := TACLList<TPair<Integer, IACLFileSystemWatcherTask>>.Create;
+    Result := TACLList<TPairItem>.Create;
     for I := 0 to FTasks.Count - 1 do
     begin
       ATask := FTasks.List[I];
@@ -445,7 +449,7 @@ begin
   ABuffer := AllocMem(BufferSize);
   try
     ZeroMemory(@AOverlapped, SizeOf(AOverlapped));
-    AOverlapped.hEvent := AEvent.Handle;
+    AOverlapped.hEvent := {$IFDEF FPC}ULONG_PTR{$ENDIF}(AEvent.Handle);
 
     while not Terminated do
     begin
@@ -587,7 +591,7 @@ end;
 
 procedure TACLFileSystemWatcherFileTask.FetchFileInfo(out ASize: Int64; out ALastWriteTime: TDateTime);
 var
-  AFileData: TWin32FindData;
+  AFileData: TWin32FindDataW;
 begin
   if TACLFileDateTimeHelper.GetFileData(FFileName, AFileData) then
   begin

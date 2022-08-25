@@ -16,10 +16,12 @@ unit ACL.Utils.CommandLine;
 interface
 
 uses
-  Winapi.Windows,
+  // Winapi
+  Windows,
   // System
-  System.SysUtils,
-  System.Generics.Collections,
+  Math,
+  Generics.Collections,
+  SysUtils,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,
@@ -72,7 +74,7 @@ type
     end;
   {$ENDREGION}
   strict private
-    class var FCommands: TDictionary<string, TCommandHandler>;
+    class var FCommands: TACLDictionary<UnicodeString, TCommandHandler>;
     class var FLockCount: Integer;
     class var FPendingToExecute: TCommands;
   protected
@@ -130,9 +132,6 @@ function FindSwitch(const ACmdLine, ASwitch: UnicodeString; out ASwitchParam: Un
 function GetCommandLineParams: string;
 implementation
 
-uses
-  System.Math;
-
 function FindSwitch(const ACmdLine, ASwitch: UnicodeString): Boolean;
 var
   X: UnicodeString;
@@ -188,7 +187,7 @@ end;
 
 class constructor TACLCommandLineProcessor.Create;
 begin
-  FCommands := TDictionary<string, TCommandHandler>.Create(TACLStringComparer.Create);
+  FCommands := TACLDictionary<UnicodeString, TCommandHandler>.Create(TACLStringComparer.Create);
   FPendingToExecute := TCommands.Create;
 end;
 

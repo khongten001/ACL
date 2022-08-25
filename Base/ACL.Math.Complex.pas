@@ -20,7 +20,7 @@ unit ACL.Math.Complex;
 interface
 
 uses
-  Winapi.Windows;
+  Windows;
 
 const
   PowerOfTwoMax = 15; // supported by FFT Engine
@@ -104,7 +104,7 @@ const
 implementation
 
 uses
-  System.SysUtils,
+  SysUtils,
   // ACL
   ACL.Utils.Common;
 

@@ -1098,7 +1098,7 @@ begin
       end;
 
       // wait while block will be downloaded
-      if not FFreeBlocksEvent.WaitFor(WaitTimeout) then
+      if FFreeBlocksEvent.WaitFor(WaitTimeout) <> wrSignaled then
         Exit(0); // Download thread failed
       if FFatalError then
         Exit(0); // Failed

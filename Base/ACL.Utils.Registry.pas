@@ -16,15 +16,17 @@ unit ACL.Utils.Registry;
 interface
 
 uses
-  Winapi.Windows,
-  System.SysUtils,
+  // Winapi
+  Windows,
+  // System
+  SysUtils,
   // ACL
-  ACL.Classes,
   ACL.Utils.Common,
 {$IFDEF ACL_LOG_REGISTRY}
   ACL.Utils.Logger,
 {$ENDIF}
-  ACL.Utils.FileSystem;
+  ACL.Utils.FileSystem,
+  ACL.Utils.Strings;
 
 function acRegDeleteValue(Key: HKEY; const SubKey, Value: UnicodeString): Boolean; overload;
 function acRegDeleteValue(Key: HKEY; const Value: UnicodeString): Boolean; overload;
@@ -259,7 +261,7 @@ begin
   Result := Key <> 0;
   if Result then
     Result := RegCheck(RegSetValueExW(Key, PWideChar(ValueName), 0, REG_SZ,
-      PWideChar(Value), SizeOf(WideChar) * (Length(Value) + 1)));
+      PWideChar(Value), SizeOf(WideChar) * (acStringLength(Value) + 1)));
 end;
 
 function acRegReadStr(Key: HKEY; const ValueName: UnicodeString): UnicodeString;

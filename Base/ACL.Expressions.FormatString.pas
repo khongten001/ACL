@@ -16,20 +16,22 @@ unit ACL.Expressions.FormatString;
 interface
 
 uses
-  System.Math,
-  System.SysUtils,
-  System.Classes,
-  System.Variants,
-  System.Generics.Collections,
+  Math,
+  Classes,
+  Generics.Collections,
+  Variants,
+  SysUtils,
   // ACL
   ACL.Classes,
+  ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Expressions,
   ACL.Parsers,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.Strings;
 
 type
-  TACLFormatStringMacroProc = function (AContext: TObject): string of object;
+  TACLFormatStringMacroProc = function (AContext: TObject): UnicodeString of object;
   TACLFormatStringMacroEvalFunction = class;
 
   TACLFormatStringEnumMacrosProc = reference to procedure (const S: UnicodeString; AFunc: TACLExpressionFunctionInfo);
@@ -38,11 +40,12 @@ type
 
   TACLFormatString = class(TACLExpression)
   strict private
-    FTemplate: string;
+    FTemplate: UnicodeString;
   public
-    constructor Create(AFactory: TACLCustomExpressionFactory; ARoot: TACLExpressionElement; const ATemplate: string);
+    constructor Create(AFactory: TACLCustomExpressionFactory;
+      ARoot: TACLExpressionElement; const ATemplate: UnicodeString);
     function Evaluate(AContext: TObject): Variant; override;
-    function ToString: string; override;
+    function ToString: UnicodeString; override;
   end;
 
   { TACLFormatStringFactory }
@@ -84,7 +87,7 @@ type
     ShowCompileErrors: Boolean;
 
     function CreateCompiler: TACLExpressionCompiler; override;
-    function CreateExpression(const AExpression: string; ARoot: TACLExpressionElement): TACLExpression; override;
+    function CreateExpression(const AExpression: UnicodeString; ARoot: TACLExpressionElement): TACLExpression; override;
     function CreateMacroEvalFunction(const AName: UnicodeString;
       AProc: TACLFormatStringMacroProc; ACategory: Byte): TACLFormatStringMacroEvalFunction; virtual;
     class function TryProcessAsNumber(const AValue: Variant; out ANumber: Integer): Boolean;
@@ -124,7 +127,7 @@ type
     procedure Optimize; override;
     function Evaluate(AContext: TObject): Variant; override;
     function IsConstant: Boolean; override;
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
     //
     property Params: TACLExpressionElements read FParams;
   end;
@@ -133,7 +136,7 @@ type
 
   TACLFormatStringFunction = class(TACLExpressionElementFunction)
   public
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
   end;
 
   { TACLFormatStringMacroEvalFunction }
@@ -150,7 +153,6 @@ type
 implementation
 
 uses
-  ACL.Utils.Strings,
   ACL.Utils.Strings.Transcode;
 
 const
@@ -164,7 +166,7 @@ type
 
 constructor TACLFormatString.Create(
   AFactory: TACLCustomExpressionFactory;
-  ARoot: TACLExpressionElement; const ATemplate: string);
+  ARoot: TACLExpressionElement; const ATemplate: UnicodeString);
 begin
   inherited Create(AFactory, ARoot);
   FTemplate := ATemplate;
@@ -178,7 +180,7 @@ begin
     Result := FTemplate;
 end;
 
-function TACLFormatString.ToString: string;
+function TACLFormatString.ToString: UnicodeString;
 begin
   if Root <> nil then
     Result := inherited
@@ -214,9 +216,9 @@ procedure TACLFormatStringFactory.EnumMacros(AProc: TACLFormatStringEnumMacrosPr
 var
   AFunc: TACLExpressionFunctionInfo;
   I: Integer;
-  L: TList;
+  L: TACLList<Pointer>;
 begin
-  L := TList.Create;
+  L := TACLList<Pointer>.Create;
   try
     for I := 0 to FRegisteredFunctions.Count - 1 do
     begin
@@ -225,8 +227,8 @@ begin
         L.Add(AFunc);
     end;
 
-    L.SortList(
-      function (Item1, Item2: Pointer): Integer
+    L.Sort(
+      function (const Item1, Item2: Pointer): Integer
       begin
         Result := TACLExpressionFunctionInfo(Item1).Category - TACLExpressionFunctionInfo(Item2).Category;
         if Result = 0 then
@@ -245,7 +247,7 @@ begin
   Result := TACLFormatStringCompiler.Create(Self);
 end;
 
-function TACLFormatStringFactory.CreateExpression(const AExpression: string; ARoot: TACLExpressionElement): TACLExpression;
+function TACLFormatStringFactory.CreateExpression(const AExpression: UnicodeString; ARoot: TACLExpressionElement): TACLExpression;
 begin
   Result := TACLFormatString.Create(Self, ARoot, AExpression);
 end;
@@ -412,7 +414,7 @@ end;
 
 class function TACLFormatStringFactory.FunctionLength(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
-  Result := Length(AParams[0].Evaluate(AContext));
+  Result := acStringLength(AParams[0].Evaluate(AContext));
 end;
 
 class function TACLFormatStringFactory.FunctionLowerCase(AContext: TObject; AParams: TACLExpressionElements): Variant;
@@ -476,7 +478,7 @@ begin
   V := AParams[1].Evaluate(AContext);
 
   if TryProcessAsNumber(V, C) then
-    Result := Copy(S, Length(S) - C + 1, MaxInt)
+    Result := Copy(S, acStringLength(S) - C + 1, MaxInt)
   else
   begin
     T := V;
@@ -484,7 +486,7 @@ begin
     if C = 0 then
       Result := S
     else
-      Result := Copy(S, C + Length(T), MaxInt);
+      Result := Copy(S, C + acStringLength(T), MaxInt);
   end;
 end;
 
@@ -620,7 +622,7 @@ end;
 
 procedure TACLFormatStringConcatenateFunction.Optimize;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   AParams: TACLExpressionElementsAccess;
   I, J: Integer;
 begin
@@ -659,7 +661,7 @@ end;
 
 function TACLFormatStringConcatenateFunction.Evaluate(AContext: TObject): Variant;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   I: Integer;
 begin
   if FParams.Count = 0 then
@@ -682,14 +684,14 @@ begin
   Result := Params.IsConstant;
 end;
 
-procedure TACLFormatStringConcatenateFunction.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLFormatStringConcatenateFunction.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 begin
   FParams.ToString(ABuffer, AFactory, '');
 end;
 
 { TACLFormatStringFunction }
 
-procedure TACLFormatStringFunction.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLFormatStringFunction.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 var
   AFormatStringFactory: TACLFormatStringFactory absolute AFactory;
 begin

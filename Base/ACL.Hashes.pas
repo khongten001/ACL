@@ -11,19 +11,20 @@
 
 unit ACL.Hashes;
 
-
 {$I ACL.Config.inc}
 
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
+{$IFNDEF FPC}
   System.AnsiStrings,
-  System.Classes,
-  System.Generics.Defaults,
   System.Hash,
-  System.SysUtils,
+{$ENDIF}
+  Classes,
+  Generics.Defaults,
+  SysUtils,
   // ACL
   ACL.Classes;
 
@@ -220,8 +221,15 @@ function ElfHash(const S: UnicodeString; AIgnoryCase: Boolean = True): Integer; 
 
 implementation
 
+{$R-} { Range-Checking }
+{$Q-} { Overflow checking }
+
+{$IFDEF FPC}
+  {$WARN 4056 off : Conversion between ordinals and pointers is not portable}
+  {$WARN 5028 off : Local $1 "$2" is not used}
+{$ENDIF}
+
 uses
-  System.Math,
   // ACL
   ACL.FastCode,
   ACL.Utils.Common,
@@ -307,7 +315,7 @@ function CryptGetHashParam(hHash: HCRYPTHASH; dwParam: DWORD; pbData: LPBYTE; va
 {$EXTERNALSYM CryptGetHashParam}
 function CryptSetHashParam(hHash: HCRYPTHASH; dwParam: DWORD; pbData: LPBYTE; dwFlags: DWORD): BOOL; stdcall; external advapi32;
 {$EXTERNALSYM CryptSetHashParam}
-function CryptAcquireContextW(var phProv: HCRYPTPROV; pszContainer: LPCTSTR; pszProvider: LPCTSTR; dwProvType: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
+function CryptAcquireContextW(var phProv: HCRYPTPROV; pszContainer: LPWSTR; pszProvider: LPWSTR; dwProvType: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
 {$EXTERNALSYM CryptAcquireContextW}
 function CryptReleaseContext(hProv: HCRYPTPROV; dwFlags: ULONG_PTR): BOOL; stdcall; external advapi32;
 {$EXTERNALSYM CryptReleaseContext}
@@ -321,19 +329,25 @@ function CryptDestroyKey(hKey: HCRYPTKEY): BOOL; stdcall; external advapi32;
 // ELF Hash
 //==============================================================================
 
+function ElfHash(S: PWideChar; ACount: Integer; AIgnoryCase: Boolean): Integer;
 const
   ElfHashUpCaseBufferSize = 64;
-
-function ElfHash(S: PWideChar; ACount: Integer; AIgnoryCase: Boolean): Integer;
 var
+{$IFDEF MSWINDOWS}
   ABuffer: array[0..ElfHashUpCaseBufferSize - 1] of WideChar;
+{$ENDIF}
   AIndex: Integer;
 begin
   if AIgnoryCase then
   begin
-    ACount := Min(ACount, Length(ABuffer));
+  {$IFDEF MSWINDOWS}
+    if ACount > Length(ABuffer) then
+  {$ENDIF}
+      Exit(ElfHash(acUpperCase(acMakeString(S, ACount)), False));
+  {$IFDEF MSWINDOWS}
     ACount := LCMapStringW(0, LCMAP_UPPERCASE, S, ACount, @ABuffer[0], ACount);
     S := @ABuffer[0];
+  {$ENDIF}
   end;
 
   Result := 0;
@@ -350,7 +364,7 @@ end;
 
 function ElfHash(const S: UnicodeString; AIgnoryCase: Boolean = True): Integer;
 begin
-  Result := ElfHash(PWideChar(S), Length(S), AIgnoryCase);
+  Result := ElfHash(PWideChar(S), acStringLength(S), AIgnoryCase);
 end;
 
 { TACLHash }
@@ -428,7 +442,7 @@ end;
 class procedure TACLHash.Update(var AState: Pointer; const AText: AnsiString);
 begin
   if AText <> '' then
-    Update(AState, @AText[1], Length(AText));
+    Update(AState, @AText[1], acStringLength(AText));
 end;
 
 class procedure TACLHash.Update(var AState: Pointer; const AText: UnicodeString);
@@ -443,7 +457,7 @@ begin
     if AEncoding <> nil then
       Update(AState, AEncoding.GetBytes(AText))
     else
-      Update(AState, PByte(PWideChar(AText)), Length(AText) * SizeOf(Char));
+      Update(AState, PByte(PWideChar(AText)), acStringLength(AText) * SizeOf(Char));
   end;
 end;
 
@@ -505,9 +519,182 @@ end;
 
 { TACLHashBobJenkins }
 
+{$IFDEF FPC}
+function BobJenkinsHashLittle(const Data; Len, InitVal: Integer): Integer;
+
+  function Rot(x, k: Cardinal): Cardinal; inline;
+  begin
+    Result := (x shl k) or (x shr (32 - k));
+  end;
+
+  procedure Mix(var a, b, c: Cardinal); inline;
+  begin
+    Dec(a, c); a := a xor Rot(c, 4); Inc(c, b);
+    Dec(b, a); b := b xor Rot(a, 6); Inc(a, c);
+    Dec(c, b); c := c xor Rot(b, 8); Inc(b, a);
+    Dec(a, c); a := a xor Rot(c,16); Inc(c, b);
+    Dec(b, a); b := b xor Rot(a,19); Inc(a, c);
+    Dec(c, b); c := c xor Rot(b, 4); Inc(b, a);
+  end;
+
+  procedure Final(var a, b, c: Cardinal); inline;
+  begin
+    c := c xor b; Dec(c, Rot(b,14));
+    a := a xor c; Dec(a, Rot(c,11));
+    b := b xor a; Dec(b, Rot(a,25));
+    c := c xor b; Dec(c, Rot(b,16));
+    a := a xor c; Dec(a, Rot(c, 4));
+    b := b xor a; Dec(b, Rot(a,14));
+    c := c xor b; Dec(c, Rot(b,24));
+  end;
+
+{$POINTERMATH ON}
+var
+  pb: PByte;
+  pd: PCardinal absolute pb;
+  a, b, c: Cardinal;
+label
+  case_1, case_2, case_3, case_4, case_5, case_6,
+  case_7, case_8, case_9, case_10, case_11, case_12;
+begin
+  a := Cardinal($DEADBEEF) + Cardinal(Len) + Cardinal(InitVal);
+  b := a;
+  c := a;
+
+  pb := @Data;
+
+  // 4-byte aligned data
+  if (Cardinal(pb) and 3) = 0 then
+  begin
+    while Len > 12 do
+    begin
+      Inc(a, pd[0]);
+      Inc(b, pd[1]);
+      Inc(c, pd[2]);
+      Mix(a, b, c);
+      Dec(Len, 12);
+      Inc(pd, 3);
+    end;
+
+    case Len of
+      0: Exit(Integer(c));
+      1: Inc(a, pd[0] and $FF);
+      2: Inc(a, pd[0] and $FFFF);
+      3: Inc(a, pd[0] and $FFFFFF);
+      4: Inc(a, pd[0]);
+      5:
+      begin
+        Inc(a, pd[0]);
+        Inc(b, pd[1] and $FF);
+      end;
+      6:
+      begin
+        Inc(a, pd[0]);
+        Inc(b, pd[1] and $FFFF);
+      end;
+      7:
+      begin
+        Inc(a, pd[0]);
+        Inc(b, pd[1] and $FFFFFF);
+      end;
+      8:
+      begin
+        Inc(a, pd[0]);
+        Inc(b, pd[1]);
+      end;
+      9:
+      begin
+        Inc(a, pd[0]);
+        Inc(b, pd[1]);
+        Inc(c, pd[2] and $FF);
+      end;
+      10:
+      begin
+        Inc(a, pd[0]);
+        Inc(b, pd[1]);
+        Inc(c, pd[2] and $FFFF);
+      end;
+      11:
+      begin
+        Inc(a, pd[0]);
+        Inc(b, pd[1]);
+        Inc(c, pd[2] and $FFFFFF);
+      end;
+      12:
+      begin
+        Inc(a, pd[0]);
+        Inc(b, pd[1]);
+        Inc(c, pd[2]);
+      end;
+    end;
+  end
+  else
+  begin
+    // Ignoring rare case of 2-byte aligned data. This handles all other cases.
+    while Len > 12 do
+    begin
+      Inc(a, pb[0] + pb[1] shl 8 + pb[2] shl 16 + pb[3] shl 24);
+      Inc(b, pb[4] + pb[5] shl 8 + pb[6] shl 16 + pb[7] shl 24);
+      Inc(c, pb[8] + pb[9] shl 8 + pb[10] shl 16 + pb[11] shl 24);
+      Mix(a, b, c);
+      Dec(Len, 12);
+      Inc(pb, 12);
+    end;
+
+    case Len of
+      0: Exit(Integer(c));
+      1: goto case_1;
+      2: goto case_2;
+      3: goto case_3;
+      4: goto case_4;
+      5: goto case_5;
+      6: goto case_6;
+      7: goto case_7;
+      8: goto case_8;
+      9: goto case_9;
+      10: goto case_10;
+      11: goto case_11;
+      12: goto case_12;
+    end;
+
+case_12:
+    Inc(c, pb[11] shl 24);
+case_11:
+    Inc(c, pb[10] shl 16);
+case_10:
+    Inc(c, pb[9] shl 8);
+case_9:
+    Inc(c, pb[8]);
+case_8:
+    Inc(b, pb[7] shl 24);
+case_7:
+    Inc(b, pb[6] shl 16);
+case_6:
+    Inc(b, pb[5] shl 8);
+case_5:
+    Inc(b, pb[4]);
+case_4:
+    Inc(a, pb[3] shl 24);
+case_3:
+    Inc(a, pb[2] shl 16);
+case_2:
+    Inc(a, pb[1] shl 8);
+case_1:
+    Inc(a, pb[0]);
+  end;
+
+  Final(a, b, c);
+  Result := Integer(c);
+end;
+{$ENDIF}
+
 class procedure TACLHashBobJenkins.Update(var AState: Pointer; AData: PByte; ASize: Integer);
 begin
+{$IFDEF FPC}
+  AState := Pointer(BobJenkinsHashLittle(AData^, ASize, Integer(AState)));
+{$ELSE}
   AState := Pointer(THashBobJenkins.GetHashValue(AData^, ASize, Integer(AState)));
+{$ENDIF}
 end;
 
 { TACLHashCRC32 }
@@ -564,6 +751,9 @@ begin
       CryptCheck(CryptGetHashParam(PState(AState).Handle, HP_HASHSIZE, @AValue, ALength, 0));
 
       ALength := AValue;
+    {$IFDEF FPC}
+      AHash := nil;
+    {$ENDIF}
       SetLength(AHash, ALength);
       CryptCheck(CryptGetHashParam(PState(AState).Handle, HP_HASHVAL, @AHash[0], ALength, 0));
     finally

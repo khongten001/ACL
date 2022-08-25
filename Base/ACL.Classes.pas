@@ -16,18 +16,18 @@ unit ACL.Classes;
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
+  Messages,
+  Windows,
   // System
-  System.Types,
-  System.TypInfo,
-  System.Classes,
-  System.SysUtils,
-  System.Contnrs,
-  System.Generics.Collections,
+  Types,
+  TypInfo,
+  Classes,
+  Contnrs,
+  Generics.Collections,
+  SyncObjs,
+  SysUtils,
   // ACL
   ACL.ObjectLinks,
-  ACL.Threading,
   ACL.Utils.Common,
   ACL.Utils.Strings;
 
@@ -49,7 +49,7 @@ type
     FRefCount: Integer;
   protected
     // IUnknown
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; virtual; stdcall;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; virtual; stdcall;
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
   public
@@ -66,7 +66,7 @@ type
     // IUnknown
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; virtual; stdcall;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; virtual; stdcall;
   end;
 
   { TACLUnknownPersistent }
@@ -78,7 +78,7 @@ type
     // IUnknown
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; virtual; stdcall;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; virtual; stdcall;
     //
     property IsDestroying: Boolean read FIsDestroying;
   public
@@ -94,7 +94,7 @@ type
     // IUnknown
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; stdcall;
     //
     property IsDestroying: Boolean read FIsDestroying;
   public
@@ -113,7 +113,7 @@ type
     // IUnknown
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; stdcall;
   protected
     procedure Update(Item: TCollectionItem); override; final;
     procedure UpdateCore(Item: TCollectionItem); virtual;
@@ -154,7 +154,7 @@ type
   TACLReadWriteSyncPersistent = class(TACLLockablePersistent)
   strict private
     FReadWriteLock: IReadWriteSync;
-    FUpdateLock: TACLCriticalSection;
+    FUpdateLock: TCriticalSection;
   public
     destructor Destroy; override;
     procedure AfterConstruction; override;
@@ -246,21 +246,16 @@ procedure CallProgressEvent(AEvent: TACLProgressEvent; const APosition, ATotal: 
 function acComponentFieldSet(var AField; AOwner, ANewValue: TComponent): Boolean;
 function acFindComponent(AComponent: TComponent; const AName: TComponentName; ARecursive: Boolean = True): TComponent;
 function acFindOwnerThatSupportTheInterface(APersistent: TPersistent; const IID: TGUID; out AIntf): TPersistent;
-function acIsDelphiObject(AData: Pointer): Boolean;
-function acIsValidIdent(const S: UnicodeString; AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
+function acIsValidIdent(const S: string; AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
 
 function CreateUniqueName(AComponent: TComponent; const APrefixName, ASuffixName: string): string;
 implementation
 
 uses
-  System.Math,
-  System.SysConst,
+  Math,
   // ACL
   ACL.FastCode,
-  ACL.Math,
-  ACL.Threading.Sorting,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Stream;
+  ACL.Math;
 
 type
   TPersistentAccess = class(TPersistent);
@@ -325,31 +320,11 @@ begin
   until Result = nil;
 end;
 
-function acIsDelphiObject(AData: Pointer): Boolean;
-var
-  P: Pointer;
-  SelfPtr: Pointer;
-begin
-  Result := False;
-
-  P := Pointer(AData);
-  if IsBadReadPtr(P, SizeOf(Pointer)) then Exit;
-
-  P := PPointer(P)^;
-  if IsBadReadPtr(P, SizeOf(Pointer)) then Exit;
-
-  SelfPtr := Pointer(NativeInt(P) + vmtSelfPtr);
-  if IsBadReadPtr(SelfPtr, SizeOf(Pointer)) then Exit;
-  SelfPtr := PPointer(SelfPtr)^;
-
-  Result := P = SelfPtr;
-end;
-
-function acIsValidIdent(const S: UnicodeString; AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
+function acIsValidIdent(const S: string; AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
 var
   I: Integer;
 begin
-  Result := S.Length > 0;
+  Result := acStringLength(S) > 0;
   if Result and not AAllowUnicodeIdents then
   begin
     for I := Low(S) to High(S) do
@@ -365,7 +340,7 @@ function CreateUniqueName(AComponent: TComponent; const APrefixName, ASuffixName
     I: Integer;
   begin
     I := 1;
-    while I <= Length(AName) do
+    while I <= acStringLength(AName) do
       if CharInSet(AName[I], ['A'..'Z','a'..'z','_','0'..'9']) then
         Inc(I)
       else
@@ -384,7 +359,7 @@ function CreateUniqueName(AComponent: TComponent; const APrefixName, ASuffixName
     if ((S = '') or CharInSet(S[1], ['0'..'9'])) and (AClassName <> '') then
     begin
       if (APrefixName <> '') and acBeginsWith(AClassName, APrefixName) then
-        S := Copy(AClassName, Length(APrefixName) + 1, Length(AClassName)) + S
+        S := Copy(AClassName, acStringLength(APrefixName) + 1, acStringLength(AClassName)) + S
       else
       begin
         S := AClassName + S;
@@ -438,7 +413,7 @@ end;
 procedure TACLInterfacedObject.AfterConstruction;
 begin
   // Release the constructor's implicit refcount
-  AtomicDecrement(FRefCount);
+  InterlockedDecrement(FRefCount);
 end;
 
 procedure TACLInterfacedObject.BeforeDestruction;
@@ -456,7 +431,7 @@ begin
   TACLInterfacedObject(Result).FRefCount := 1;
 end;
 
-function TACLInterfacedObject.QueryInterface(const IID: TGUID; out Obj): HResult;
+function TACLInterfacedObject.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := 0
@@ -466,12 +441,12 @@ end;
 
 function TACLInterfacedObject._AddRef: Integer;
 begin
-  Result := AtomicIncrement(FRefCount);
+  Result := InterlockedIncrement(FRefCount);
 end;
 
 function TACLInterfacedObject._Release: Integer;
 begin
-  Result := AtomicDecrement(FRefCount);
+  Result := InterlockedDecrement(FRefCount);
   if Result = 0 then
     Destroy;
 end;
@@ -488,7 +463,7 @@ begin
   Result := -1;
 end;
 
-function TACLUnknownObject.QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+function TACLUnknownObject.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -514,7 +489,7 @@ begin
   Result := -1;
 end;
 
-function TACLUnknownPersistent.QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+function TACLUnknownPersistent.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -534,7 +509,7 @@ begin
   Result := -1;
 end;
 
-function TACLCollectionItem.QueryInterface(const IID: TGUID; out Obj): HRESULT;
+function TACLCollectionItem.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -594,7 +569,7 @@ begin
   Result := -1;
 end;
 
-function TACLCollection.QueryInterface(const IID: TGUID; out Obj): HRESULT;
+function TACLCollection.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -662,7 +637,7 @@ end;
 procedure TACLReadWriteSyncPersistent.AfterConstruction;
 begin
   inherited;
-  FUpdateLock := TACLCriticalSection.Create;
+  FUpdateLock := TCriticalSection.Create;
   FReadWriteLock := TMultiReadExclusiveWriteSynchronizer.Create;
 end;
 
@@ -729,7 +704,9 @@ end;
 procedure TACLComponent.BeforeDestruction;
 begin
   inherited BeforeDestruction;
-  RemoveFreeNotifications;
+{$IFNDEF FPC}
+  RemoveFreeNotifications; // TODO, find alternative
+{$ENDIF}
   TACLObjectLinks.Release(Self);
 end;
 

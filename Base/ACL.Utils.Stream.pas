@@ -16,14 +16,14 @@ unit ACL.Utils.Stream;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.SysUtils,
-  System.Classes,
+  Classes,
+  SyncObjs,
+  SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
-  ACL.Threading,
   ACL.Utils.Common,
   ACL.Utils.Strings;
 
@@ -51,7 +51,7 @@ type
   TACLStreamContainer = class(TInterfacedObject, IACLStreamContainer)
   strict private
     FData: TMemoryStream;
-    FLock: TACLCriticalSection;
+    FLock: TCriticalSection;
   public
     constructor Create; overload;
     constructor Create(const AStream: TStream; ASize: Integer = -1); overload;
@@ -81,10 +81,12 @@ type
     destructor Destroy; override;
 
     function Read(var Buffer; Count: Longint): Longint; override;
-    function Read(Buffer: TBytes; Offset, Count: Longint): Longint; override; final;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
     function Write(const Buffer; Count: Integer): Integer; override;
+  {$IFNDEF FPC}
+    function Read(Buffer: TBytes; Offset, Count: Longint): Longint; override; final;
     function Write(const Buffer: TBytes; Offset, Count: Longint): Longint; override; final;
+  {$ENDIF}
 
     class function Unwrap(AStream: TStream): TStream;
   end;
@@ -118,6 +120,7 @@ type
 
   TACLSubStream = class(TACLStreamWrapper)
   strict private
+    FLock: TCriticalSection;
     FOffset: Int64;
     FPosition: Int64;
     FSize: Int64;
@@ -128,6 +131,7 @@ type
     constructor Create(
       ASource: TStream; const AOffset, ASize: Int64;
       ASourceOwnership: TStreamOwnership = soReference); reintroduce;
+    destructor Destroy; override;
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
     function Write(const Buffer; Count: Longint): Longint; override;
@@ -226,7 +230,9 @@ type
   strict private
     FData: AnsiString;
   protected
-  {$IFDEF DELPHI110ALEXANDRIA}
+  {$IFDEF FPC}
+    function Realloc(var ANewCapacity: SizeInt): Pointer; override;
+  {$ELSEIF DEFINED(DELPHI110ALEXANDRIA)}
     function Realloc(var ANewCapacity: NativeInt): Pointer; override;
   {$ELSE}
     function Realloc(var ANewCapacity: Integer): Pointer; override;
@@ -281,8 +287,8 @@ function acSaveString(const AFileName: UnicodeString; const AString: AnsiString)
 implementation
 
 uses
-  System.Math,
-  System.RTLConsts,
+  Math,
+  RTLConsts,
   // ACL
   ACL.Math,
   ACL.FastCode,
@@ -616,7 +622,7 @@ end;
 constructor TACLStreamContainer.CreateOwned(AData: TMemoryStream);
 begin
   FData := AData;
-  FLock := TACLCriticalSection.Create;
+  FLock := TCriticalSection.Create;
 end;
 
 destructor TACLStreamContainer.Destroy;
@@ -670,11 +676,6 @@ begin
   Result := Source.Read(Buffer, Count);
 end;
 
-function TACLStreamWrapper.Read(Buffer: TBytes; Offset, Count: Longint): Longint;
-begin
-  Result := Read(Buffer[Offset], Count);
-end;
-
 function TACLStreamWrapper.Seek(const Offset: Int64; Origin: TSeekOrigin): Int64;
 begin
   Result := Source.Seek(Offset, Origin);
@@ -685,10 +686,17 @@ begin
   Result := Source.Write(Buffer, Count);
 end;
 
+{$IFNDEF FPC}
+function TACLStreamWrapper.Read(Buffer: TBytes; Offset, Count: Longint): Longint;
+begin
+  Result := Read(Buffer[Offset], Count);
+end;
+
 function TACLStreamWrapper.Write(const Buffer: TBytes; Offset, Count: Longint): Longint;
 begin
   Result := Write(Buffer[Offset], Count);
 end;
+{$ENDIF}
 
 function TACLStreamWrapper.GetSize: Int64;
 begin
@@ -824,9 +832,16 @@ var
   ARealSize: Int64;
 begin
   inherited Create(ASource, ASourceOwnership);
+  FLock := TCriticalSection.Create;
   ARealSize := Source.Size;
   FOffset := Min(AOffset, ARealSize);
   FSize := Min(ASize, ARealSize - FOffset);
+end;
+
+destructor TACLSubStream.Destroy;
+begin
+  FreeAndNil(FLock);
+  inherited;
 end;
 
 function TACLSubStream.GetSize: Int64;
@@ -836,14 +851,14 @@ end;
 
 function TACLSubStream.Read(var Buffer; Count: Longint): Longint;
 begin
-  TMonitor.Enter(Source);
+  FLock.Enter;
   try
     Source.Position := FPosition + FOffset;
     Result := Source.Read(Buffer, Min(Count, FSize - FPosition));
     if Result > 0 then
       Inc(FPosition, Result);
   finally
-    TMonitor.Exit(Source);
+    FLock.Leave;
   end;
 end;
 
@@ -970,7 +985,7 @@ begin
     ReadBuffer(Result[1], SizeOf(WideChar) * ALength);
   end
   else
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
 function TACLStreamHelper.ReadStringA(ALength: Integer): AnsiString;
@@ -981,7 +996,7 @@ begin
     ReadBuffer(Result[1], ALength);
   end
   else
-    Result := EmptyAnsiStr;
+    Result := EmptyStrA;
 end;
 
 function TACLStreamHelper.ReadStringWithLength: UnicodeString;
@@ -995,7 +1010,7 @@ begin
     ReadBuffer(PWideChar(Result)^, 2 * ALength);
   end
   else
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
 function TACLStreamHelper.ReadStringWithLengthA: AnsiString;

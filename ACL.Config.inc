@@ -1,7 +1,7 @@
 {$R-} { Range-Checking }
 {$Q-} { Overflow checking }
 
-{$IF NOT DEFINED(ACL_RTTI_ALL)}
+{$IF NOT DEFINED(ACL_RTTI_ALL) AND NOT DEFINED(FPC)}
   {$WEAKLINKRTTI ON}
   {$IF DEFINED(ACL_RTTI_OFF)}
     {$RTTI EXPLICIT METHODS([]) FIELDS([]) PROPERTIES([])}
@@ -10,11 +10,29 @@
   {$IFEND}
 {$IFEND}
 
-{$IF DEFINED(CPUX64) || DEFINED(CPU64)}
+{$IF DEFINED(CPUX64) or DEFINED(CPU64)}
   {$DEFINE CPUX64}
 {$IFEND}
 
-{$WARN DUPLICATE_CTOR_DTOR OFF} // We does not support for C++Builder
+{$IFDEF FPC}
+  {$Mode Delphi}
+  {$H+}
+  {$ModeSwitch FunctionReferences}
+  {$ModeSwitch AnonymousFunctions}
+  {$CodePage UTF8}
+  {$DEFINE ACL_BASE_NOVCL} // just for development stage
+{$ENDIF}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Warnings
+// ---------------------------------------------------------------------------------------------------------------------
+
+{$IFDEF FPC}
+  {$WARN 5024 off : Parameter "$1" not used}
+  {$WARN 6058 off : Call to subroutine "$1" marked as inline is not inlined}
+{$ELSE}
+  {$WARN DUPLICATE_CTOR_DTOR OFF} // We does not support for C++Builder
+{$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Debug and Logging

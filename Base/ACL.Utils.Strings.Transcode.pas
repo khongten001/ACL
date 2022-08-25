@@ -16,13 +16,12 @@ unit ACL.Utils.Strings.Transcode;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  Winapi.MultiMon,
+  Windows,
+  Messages,
   // System
-  System.SysUtils,
-  System.Types,
-  System.Classes,
+  Classes,
+  SysUtils,
+  Types,
   // ACL
   ACL.Classes;
 
@@ -133,9 +132,12 @@ type
 implementation
 
 uses
-  System.Math,
-  System.Character,
+  Math,
+  StrUtils,
+{$IFNDEF FPC}
   System.AnsiStrings,
+  System.Character,
+{$ENDIF}
   // ACL
   ACL.FastCode,
   ACL.Hashes,
@@ -635,7 +637,7 @@ begin
       A := acExtractString(ACursorStart, ACursorFinish);
       if AResult <> '' then
         AResult := AResult + '.';
-      if System.AnsiStrings.SameText(Copy(A, 1, 4), 'xn--') then
+      if StartsText(AnsiString('xn--'), A) then
         AResult := AResult + Decode(Copy(A, 5, MaxInt))
       else
         AResult := AResult + UnicodeString(A);

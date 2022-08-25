@@ -17,13 +17,12 @@ unit ACL.Utils.FileSystem;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Types,
-  System.Classes,
-  System.SysUtils,
-  System.SyncObjs,
-  System.Generics.Collections,
+  Types,
+  Classes,
+  SysUtils,
+  SyncObjs,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -285,16 +284,23 @@ procedure acClearFileLongPath(out W: TFileLongPath);
 implementation
 
 uses
-  System.Character,
-  System.Math,
-  System.RTLConsts,
+  Character,
+  Math,
+  RTLConsts,
   // ACL
   ACL.FastCode,
   ACL.FileFormats.INI,
   ACL.Math,
   ACL.Utils.Strings;
 
-function GetFileAttributesExW(AFileName: PChar; AInfoLevelId: TGetFileExInfoLevels; AFileInformation: Pointer): BOOL; stdcall; external kernel32;
+function GetFileAttributesExW(AFileName: PWideChar;
+  AInfoLevelId: TGetFileExInfoLevels; AFileInformation: Pointer): BOOL; stdcall; external kernel32;
+{$IFDEF FPC}
+function GetLongPathNameW(lpszShortPath: LPCWSTR;
+  lpszLongPath: LPWSTR; cchBuffer: DWORD): DWORD; stdcall; external kernel32;
+function ReplaceFileW(lpReplacedFileName, lpReplacementFileName,
+  lpBackupFileName: LPCWSTR; dwReplaceFlags: DWORD; lpExclude, lpReserved: Pointer): BOOL; stdcall; external kernel32;
+{$ENDIF}
 
 procedure acClearFilePath(out W: TFilePath);
 begin
@@ -435,7 +441,7 @@ const
   InvalidChars = '\"<>*:?|/';
   MaxNameLength = MaxByte;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   AChar: Char;
   AIndex: Integer;
   ALength: Integer;
@@ -519,19 +525,19 @@ begin
   ALength := Length(FileName);
   if acIsUrlFileName(FileName) then
   begin
-    AUrlParamPos := acLastDelimiter('?', PChar(FileName), 1, ALength);
+    AUrlParamPos := acLastDelimiter('?', PWideChar(FileName), 1, ALength);
     if AUrlParamPos > 0 then
       ALength := AUrlParamPos - 1;
   end;
 
-  AExtDelimPos := acLastDelimiter(PChar(sFileExtDelims), PChar(FileName), Length(sFileExtDelims), ALength);
+  AExtDelimPos := acLastDelimiter(PWideChar(sFileExtDelims), PWideChar(FileName), acStringLength(sFileExtDelims), ALength);
   if (AExtDelimPos > 0) and (Ord(FileName[AExtDelimPos]) = Ord('.')) then
   begin
     AStart := AExtDelimPos;
     AFinish := ALength;
     if ADoubleExt then
     begin
-      AExtDelimPos := acLastDelimiter(PChar(sFileExtDelims), PChar(FileName), Length(sFileExtDelims), AStart - 1);
+      AExtDelimPos := acLastDelimiter(PWideChar(sFileExtDelims), PWideChar(FileName), acStringLength(sFileExtDelims), AStart - 1);
       if (AExtDelimPos > 0) and (Ord(FileName[AExtDelimPos]) = Ord('.')) then
         AStart := AExtDelimPos;
     end;
@@ -565,7 +571,7 @@ begin
   begin
     if acIsPathSeparator(APath[AStartIndex]) then
       Dec(AStartIndex);
-    AStartIndex := acLastDelimiter(PChar(sFilePathDelims), PChar(APath), Length(sFilePathDelims), AStartIndex);
+    AStartIndex := acLastDelimiter(PWideChar(sFilePathDelims), PWideChar(APath), acStringLength(sFilePathDelims), AStartIndex);
     Dec(ADepth);
   end;
   Inc(AStartIndex);
@@ -789,7 +795,7 @@ end;
 
 function acLastDelimiter(const Delimiters, Str: UnicodeString): Integer;
 begin
-  Result := acLastDelimiter(PChar(Delimiters), PChar(Str), Length(Delimiters), Length(Str));
+  Result := acLastDelimiter(PWideChar(Delimiters), PWideChar(Str), acStringLength(Delimiters), Length(Str));
 end;
 
 function acLastDelimiter(Delimiters, Str: PWideChar; DelimitersLength, StrLength: Integer): Integer;
@@ -1230,7 +1236,7 @@ destructor TACLFindFileInfo.Destroy;
 begin
   if FFindHandle <> INVALID_HANDLE_VALUE then
   begin
-    Winapi.Windows.FindClose(FFindHandle);
+    Windows.FindClose(FFindHandle);
     FFindHandle := INVALID_HANDLE_VALUE;
   end;
   inherited Destroy;
@@ -1413,7 +1419,7 @@ end;
 
 function TACLSearchPaths.ToString: string;
 var
-  B: TStringBuilder;
+  B: TACLStringBuilder;
   I: Integer;
 begin
   B := TACLStringBuilderManager.Get(Count * 32);
@@ -1621,7 +1627,7 @@ begin
   try
     Result := AData.dwFileAttributes and FILE_ATTRIBUTE_DIRECTORY = 0;
   finally
-    Winapi.Windows.FindClose(AHandle);
+    Windows.FindClose(AHandle);
   end;
 end;
 

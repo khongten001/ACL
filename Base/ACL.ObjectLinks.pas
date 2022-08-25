@@ -16,14 +16,13 @@ unit ACL.ObjectLinks;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
-  // ACL
-  ACL.Threading;
+  Classes,
+  Generics.Collections,
+  SyncObjs,
+  SysUtils,
+  Types;
 
 type
 
@@ -47,8 +46,8 @@ type
   TACLObjectLinks = class sealed
   strict private
     class var FFreeNotifier: TComponent;
-    class var FLinks: TDictionary<TObject, TObject>;
-    class var FLock: TACLCriticalSection;
+    class var FLinks: TObject;
+    class var FLock: TObject;
 
     class function SafeCreateLink(AObject: TObject): TObject;
   public
@@ -70,7 +69,8 @@ type
 implementation
 
 uses
-  ACL.Classes.Collections;
+  ACL.Classes.Collections,
+  ACL.Threading;
 
 type
 
@@ -87,7 +87,7 @@ type
   strict private
     FObject: TObject;
 
-    FBridges: TList;
+    FBridges: TACLList;
     FExtensions: TACLInterfaceList;
     FRemoveListeners: TACLList<IACLObjectRemoveNotify>;
     FWeakReferences: TList;
@@ -109,8 +109,8 @@ type
 
 class constructor TACLObjectLinks.Create;
 begin
-  FLock := TACLCriticalSection.Create(nil, ClassName);
-  FLinks := TObjectDictionary<TObject, TObject>.Create([doOwnsValues]);
+  FLock := TACLCriticalSection.Create;
+  FLinks := TACLObjectDictionary.Create([doOwnsValues]);
   FFreeNotifier := TFreeNotifier.Create(nil);
 end;
 
@@ -125,71 +125,72 @@ class function TACLObjectLinks.GetExtension(AObject: TObject; const IID: TGUID; 
 var
   ALink: TACLObjectLink;
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
-    Result := FLinks.TryGetValue(AObject, TObject(ALink)) and ALink.GetExtension(IID, Obj);
+    Result := TACLObjectDictionary(FLinks).TryGetValue(AObject, TObject(ALink)) and ALink.GetExtension(IID, Obj);
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
 end;
 
 class procedure TACLObjectLinks.Release(AObject: TObject);
 var
-  APair: TPair<TObject, TObject>;
+  AValue: TObject;
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
-    APair := FLinks.ExtractPair(AObject);
+    if not TACLObjectDictionary(FLinks).TryExtract(AObject, AValue) then
+      AValue := nil;
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
-  if APair.Value <> nil then
-    APair.Value.Free;
+  if AValue <> nil then
+    AValue.Free;
 end;
 
 class procedure TACLObjectLinks.RegisterBridge(AObject1, AObject2: TObject);
 var
   ALink1, ALink2: TACLObjectLink;
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
     ALink1 := TACLObjectLink(SafeCreateLink(AObject1));
     ALink2 := TACLObjectLink(SafeCreateLink(AObject2));
     ALink1.AddBridge(ALink2);
     ALink2.AddBridge(ALink1);
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
 end;
 
 class procedure TACLObjectLinks.RegisterExtension(AObject: TObject; AExtension: IInterface);
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
     TACLObjectLink(SafeCreateLink(AObject)).AddExtension(AExtension);
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
 end;
 
 class procedure TACLObjectLinks.RegisterRemoveListener(AObject: TObject; ARemoveListener: IACLObjectRemoveNotify);
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
     TACLObjectLink(SafeCreateLink(AObject)).AddRemoveListener(ARemoveListener);
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
 end;
 
 class procedure TACLObjectLinks.RegisterWeakReference(AObject: TObject; AWeakReference: PObject);
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
     TACLObjectLink(SafeCreateLink(AObject)).AddWeakReference(AWeakReference);
     AWeakReference^ := AObject;
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
 end;
 
@@ -197,15 +198,16 @@ class procedure TACLObjectLinks.UnregisterBridge(AObject1, AObject2: TObject);
 var
   ALink1, ALink2: TACLObjectLink;
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
-    if FLinks.TryGetValue(AObject1, TObject(ALink1)) and FLinks.TryGetValue(AObject2, TObject(ALink2)) then
+    if TACLObjectDictionary(FLinks).TryGetValue(AObject1, TObject(ALink1)) and
+       TACLObjectDictionary(FLinks).TryGetValue(AObject2, TObject(ALink2)) then
     begin
       ALink1.RemoveBridge(ALink2);
       ALink2.RemoveBridge(ALink1);
     end;
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
 end;
 
@@ -213,12 +215,12 @@ class procedure TACLObjectLinks.UnregisterExtension(AObject: TObject; AExtension
 var
   AValue: TObject;
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
-    if FLinks.TryGetValue(AObject, AValue) then
+    if TACLObjectDictionary(FLinks).TryGetValue(AObject, AValue) then
       TACLObjectLink(AValue).RemoveExtension(AExtension);
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
 end;
 
@@ -226,18 +228,18 @@ class procedure TACLObjectLinks.UnregisterRemoveListener(ARemoveListener: IACLOb
 var
   ALink: TObject;
 begin
-  FLock.Enter;
+  TACLCriticalSection(FLock).Enter;
   try
     if AObject = nil then
     begin
-      for ALink in FLinks.Values do
+      for ALink in TACLObjectDictionary(FLinks).GetValues do
         TACLObjectLink(ALink).RemoveRemoveListener(ARemoveListener);
     end
     else
-      if FLinks.TryGetValue(AObject, ALink) then
+      if TACLObjectDictionary(FLinks).TryGetValue(AObject, ALink) then
         TACLObjectLink(ALink).RemoveRemoveListener(ARemoveListener);
   finally
-    FLock.Leave;
+    TACLCriticalSection(FLock).Leave;
   end;
 end;
 
@@ -247,12 +249,12 @@ var
 begin
   if AWeakReference^ <> nil then
   try
-    FLock.Enter;
+    TACLCriticalSection(FLock).Enter;
     try
-      if FLinks.TryGetValue(AWeakReference^, AValue) then
+      if TACLObjectDictionary(FLinks).TryGetValue(AWeakReference^, AValue) then
         TACLObjectLink(AValue).RemoveWeakReference(AWeakReference);
     finally
-      FLock.Leave;
+      TACLCriticalSection(FLock).Leave;
     end;
   finally
     AWeakReference^ := nil;
@@ -261,7 +263,7 @@ end;
 
 class function TACLObjectLinks.SafeCreateLink(AObject: TObject): TObject;
 begin
-  if not FLinks.TryGetValue(AObject, Result) then
+  if not TACLObjectDictionary(FLinks).TryGetValue(AObject, Result) then
   begin
     if not Supports(AObject, IACLObjectLinksSupport) then
     begin
@@ -271,7 +273,7 @@ begin
         raise Exception.Create('Object must implement the IACLObjectLinksSupport interface');
     end;
     Result := TACLObjectLink.Create(AObject);
-    FLinks.Add(AObject, Result);
+    TACLObjectDictionary(FLinks).Add(AObject, Result);
   end;
 end;
 
@@ -331,7 +333,7 @@ end;
 procedure TACLObjectLink.AddBridge(const ALink: TACLObjectLink);
 begin
   if FBridges = nil then
-    FBridges := TList.Create;
+    FBridges := TACLList.Create;
   FBridges.Add(ALink);
 end;
 
@@ -380,7 +382,11 @@ end;
 procedure TACLObjectLink.RemoveBridge(const ALink: TACLObjectLink);
 begin
   if FBridges <> nil then
+  {$IFDEF FPC}
+    FBridges.Remove(ALink);
+  {$ELSE}
     FBridges.RemoveItem(ALink, TDirection.FromEnd);
+  {$ENDIF}
 end;
 
 procedure TACLObjectLink.RemoveExtension(const AIntf: IInterface);

@@ -16,12 +16,14 @@ unit ACL.Utils.Logger;
 interface
 
 uses
-  Winapi.Windows,
+  // Winapi
+  Windows,
   // System
-  System.Classes,
-  System.SysUtils,
+  Classes,
+  SysUtils,
   // ACL
   ACL.Threading,
+  ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Shell,
   ACL.Utils.Strings,
@@ -114,7 +116,7 @@ function GetDebugLogFileName: string;
 implementation
 
 uses
-  System.StrUtils;
+  StrUtils;
 
 var
   FGeneralLog: TACLCriticalSection;
@@ -217,8 +219,7 @@ begin
   Lock.Enter;
   try
     Add(ATag, Format('Error: %s - %s', [E.ClassName, E.ToString]));
-
-    AStackTrace := E.StackTrace;
+    AStackTrace := {$IFDEF FPC}EmptyStr{$ELSE}E.StackTrace{$ENDIF};
     if AStackTrace <> '' then
     begin
       WriteSeparator;

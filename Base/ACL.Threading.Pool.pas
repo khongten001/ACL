@@ -16,14 +16,14 @@ unit ACL.Threading.Pool;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.SyncObjs,
-  System.Types,
-  System.SysUtils,
-  System.Classes,
-  System.Generics.Collections,
-  System.Generics.Defaults,
+  Classes,
+  Generics.Collections,
+  Generics.Defaults,
+  SyncObjs,
+  SysUtils,
+  Types,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -41,7 +41,7 @@ type
 
   IACLTaskEvent = interface
   ['{3CAF68AD-4959-429F-A6BB-19DC671BD3BB}']
-    function Signal: Boolean;
+    procedure Signal;
     function WaitFor(ATimeOut: Cardinal): TWaitResult;
   end;
 
@@ -159,26 +159,26 @@ function TaskDispatcher: TACLTaskDispatcher;
 implementation
 
 uses
-  System.Math;
+  Math;
 
 type
 
   { TACLTaskComparer }
 
   TACLTaskComparer = class(TComparer<TACLTask>)
-  protected
-    function Compare(const Left, Right: TACLTask): Integer; override;
+  public
+    function Compare({$IFDEF FPC}constref{$ELSE}const{$ENDIF} Left, Right: TACLTask): Integer; override;
   end;
 
   { TACLTaskEvent }
 
   TACLTaskEvent = class(TInterfacedObject, IACLTaskEvent)
   strict private
-    FHandle: THandle;
+    FEvent: TACLEvent;
   public
     constructor Create;
     destructor Destroy; override;
-    function Signal: Boolean;
+    procedure Signal;
     function WaitFor(ATimeOut: Cardinal): TWaitResult;
   end;
 
@@ -322,7 +322,7 @@ end;
 
 { TACLTaskComparer }
 
-function TACLTaskComparer.Compare(const Left, Right: TACLTask): Integer;
+function TACLTaskComparer.Compare({$IFDEF FPC}constref{$ELSE}const{$ENDIF} Left, Right: TACLTask): Integer;
 begin
   Result := Ord(Right.GetPriority) - Ord(Left.GetPriority);
 end;
@@ -357,7 +357,7 @@ begin
   IsMultiThread := True;
   FTasks := TACLObjectList<TACLTask>.Create;
   FActiveTasks := TACLList<TACLTask>.Create;
-  FLock := TACLCriticalSection.Create(Self, 'TaskLock');
+  FLock := TACLCriticalSection.Create;
   FCpuUsageMonitor := TACLTimer.CreateEx(HandlerCpuUsageMonitor, CpuUsageMonitorUpdateInterval, True);
   MaxActiveTasks := 4 * CPUCount;
 end;
@@ -562,7 +562,7 @@ end;
 
 function TACLTaskDispatcher.ToString: string;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
 begin
   ABuffer := TACLStringBuilderManager.Get(64);
   try
@@ -680,7 +680,7 @@ var
 begin
   for I := Low(FCpuUsageLog) to High(FCpuUsageLog) - 1 do
     FCpuUsageLog[I + 1] := FCpuUsageLog[I];
-  FCpuUsageLog[0] := TThread.GetCPUUsage(FPrevSystemTimes);
+  FCpuUsageLog[0] := TACLThread.GetCPUUsage(FPrevSystemTimes);
   FCpuUsageMonitorCounter := Min(FCpuUsageMonitorCounter + 1, CpuUsageMonitorLogSize);
 
   if FCpuUsageMonitorCounter >= CpuUsageMonitorLogSize then
@@ -733,23 +733,23 @@ end;
 
 constructor TACLTaskEvent.Create;
 begin
-  FHandle := CreateEvent(nil, True, False, nil);
+  FEvent := TACLEvent.Create(True, False);
 end;
 
 destructor TACLTaskEvent.Destroy;
 begin
-  CloseHandle(FHandle);
+  FreeAndNil(FEvent);
   inherited Destroy;
 end;
 
-function TACLTaskEvent.Signal: Boolean;
+procedure TACLTaskEvent.Signal;
 begin
-  Result := SetEvent(FHandle);
+  FEvent.Signal;
 end;
 
 function TACLTaskEvent.WaitFor(ATimeOut: Cardinal): TWaitResult;
 begin
-  Result := WaitForSyncObject(FHandle, ATimeOut);
+  Result := FEvent.WaitFor(ATimeOut);
 end;
 
 initialization

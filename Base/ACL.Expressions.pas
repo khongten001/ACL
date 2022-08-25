@@ -20,18 +20,20 @@ unit ACL.Expressions;
 interface
 
 uses
-  Winapi.Windows,
+{$IFNDEF FPC}
+  Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.Math,
-  System.SysUtils,
-  System.Variants,
+  Classes,
+  Generics.Collections,
+  Math,
+  SysUtils,
+  Variants,
   // ACL
   ACL.Parsers,
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList;
+  ACL.Utils.Strings;
 
 const
   acExprTokenFunction   = acTokenMax + 1;
@@ -98,7 +100,7 @@ type
   public
     constructor Create(const AName: UnicodeString; AParamCount: Integer;
       ADependedFromParametersOnly: Boolean; AProc: TACLExpressionEvalProc; ACategory: Byte);
-    function ToString: string; override;
+    function ToString: UnicodeString;{$IFDEF FPC}reintroduce; virtual;{$ELSE}override;{$ENDIF}
     //
     property Category: Byte read FCategory;
     property DependedFromParametersOnly: Boolean read FDependedFromParametersOnly;
@@ -131,7 +133,7 @@ type
     constructor Create(const AName: UnicodeString;
       AEvaluateProc: TACLExpressionEvalProc; APriority, AParamCount: Integer;
       AAssociativity: TACLExpressionOperatorInfoAssociativity = eoaLeftToRight);
-    function ToString: string; override;
+    function ToString: UnicodeString; override;
     //
     property Associativity: TACLExpressionOperatorInfoAssociativity read FAssociativity;
     property Priority: Integer read FPriority;
@@ -146,7 +148,7 @@ type
     FValue: Variant;
   public
     constructor Create(const AName: UnicodeString; const AValue: Variant);
-    function ToString: string; override;
+    function ToString: UnicodeString; override;
   end;
 
   { TACLExpressionElement }
@@ -156,7 +158,7 @@ type
     procedure Optimize; virtual; abstract;
     function Evaluate(AContext: TObject): Variant; virtual; abstract;
     function IsConstant: Boolean; virtual; abstract;
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); reintroduce; virtual; abstract;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); reintroduce; virtual; abstract;
   end;
 
   { TACLExpressionElements }
@@ -176,7 +178,7 @@ type
     constructor Create; virtual;
     destructor Destroy; override;
     function IsConstant: Boolean;
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory; const ASeparator: string = ','); reintroduce;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory; const ASeparator: UnicodeString = ','); reintroduce;
     //
     property Count: Integer read GetCount;
     property Items[Index: Integer]: TACLExpressionElement read GetItem; default;
@@ -192,7 +194,7 @@ type
     procedure Optimize; override;
     function Evaluate(AContext: TObject): Variant; override;
     function IsConstant: Boolean; override;
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
   end;
 
   { TACLExpressionElementFunction }
@@ -211,7 +213,7 @@ type
     procedure Optimize; override;
     function Evaluate(AContext: TObject): Variant; override;
     function IsConstant: Boolean; override;
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
     //
     property Info: TACLExpressionFunctionInfo read FInfo write SetInfo;
     property Name: UnicodeString read GetName;
@@ -222,7 +224,7 @@ type
 
   TACLExpressionElementOperator = class(TACLExpressionElementFunction)
   public
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
   end;
 
   { TACLExpression }
@@ -238,12 +240,12 @@ type
     constructor Create(AFactory: TACLCustomExpressionFactory; ARoot: TACLExpressionElement);
     destructor Destroy; override;
     function Evaluate(AContext: TObject): Variant; virtual;
-    function ToString: string; override;
+    function ToString: UnicodeString; {$IFDEF FPC}reintroduce; virtual;{$ELSE}override;{$ENDIF}
   end;
 
   { TACLExpressionCache }
 
-  TACLExpressionCache = class(TACLValueCacheManager<string, TACLExpression>)
+  TACLExpressionCache = class(TACLValueCacheManager<UnicodeString, TACLExpression>)
   strict private
     FFactory: TACLCustomExpressionFactory;
   protected
@@ -286,7 +288,7 @@ type
     destructor Destroy; override;
     function Compile(const AExpression: UnicodeString; AOptimize: Boolean = False): TACLExpression;
     function Evaluate(const AExpression: UnicodeString; AContext: TObject): Variant;
-    function ToString: string; override;
+    function ToString: UnicodeString; {$IFDEF FPC}reintroduce; virtual;{$ELSE}override;{$ENDIF}
     //
     property CacheSize: Integer read GetCacheSize write SetCacheSize;
   end;
@@ -338,8 +340,7 @@ type
 implementation
 
 uses
-  ACL.Utils.Common,
-  ACL.Utils.Strings;
+  ACL.Utils.Common;
 
 procedure OptimizeElement(var AElement: TACLExpressionElement);
 var
@@ -354,7 +355,7 @@ begin
       AElement := TACLExpressionElementConstant.Create(APrevElement.Evaluate(nil));
       APrevElement.Free;
     except
-      // Evaluate can produce an exception, if fucntion has one of incorrect argumets.
+      // Evaluate can produce an exception, if function has one of incorrect argumets.
     end;
   end;
 end;
@@ -429,9 +430,9 @@ begin
   FDependedFromParametersOnly := ADependedFromParametersOnly;
 end;
 
-function TACLExpressionFunctionInfo.ToString: string;
+function TACLExpressionFunctionInfo.ToString: UnicodeString;
 var
-  B: TStringBuilder;
+  B: TACLStringBuilder;
   I: Integer;
 begin
   if ParamCount = 0 then
@@ -493,18 +494,18 @@ end;
 
 function TACLExpressionFunctionInfoList.Find(const AName: UnicodeString; out AFunction: TACLExpressionFunctionInfo): Boolean;
 begin
-  Result := Find(PWideChar(AName), Length(AName), AFunction);
+  Result := Find(PWideChar(AName), acStringLength(AName), AFunction);
 end;
 
 function TACLExpressionFunctionInfoList.Find(const AName: UnicodeString;
   AParamCount: Integer; out AFunction: TACLExpressionFunctionInfo): Boolean;
 begin
-  Result := Find(PWideChar(AName), Length(AName), AParamCount, AFunction);
+  Result := Find(PWideChar(AName), acStringLength(AName), AParamCount, AFunction);
 end;
 
 function TACLExpressionFunctionInfoList.Compare(const S: UnicodeString; B: PWideChar; L: Integer): Boolean;
 begin
-  Result := acCompareTokens(PWideChar(S), B, L, Length(S));
+  Result := acCompareTokens(PWideChar(S), B, L, acStringLength(S));
 end;
 
 { TACLExpressionOperatorInfo }
@@ -518,7 +519,7 @@ begin
   FPriority := APriority;
 end;
 
-function TACLExpressionOperatorInfo.ToString: string;
+function TACLExpressionOperatorInfo.ToString: UnicodeString;
 begin
   if ParamCount > 1 then
     Result := 'A ' + Name + ' B'
@@ -539,7 +540,7 @@ begin
   Result := FValue;
 end;
 
-function TACLExpressionVariableInfo.ToString: string;
+function TACLExpressionVariableInfo.ToString: UnicodeString;
 begin
   Result := Name;
 end;
@@ -587,7 +588,7 @@ begin
     Items[I].Free;
 end;
 
-procedure TACLExpressionElements.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory; const ASeparator: string = ',');
+procedure TACLExpressionElements.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory; const ASeparator: UnicodeString = ',');
 var
   I: Integer;
 begin
@@ -648,7 +649,7 @@ begin
   Result := True;
 end;
 
-procedure TACLExpressionElementConstant.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLExpressionElementConstant.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 begin
   ABuffer.Append(UnicodeString(FValue));
 end;
@@ -682,7 +683,7 @@ begin
   Result := Info.DependedFromParametersOnly and Params.IsConstant;
 end;
 
-procedure TACLExpressionElementFunction.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLExpressionElementFunction.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 begin
   ABuffer.Append(Name);
   if Params.Count > 0 then
@@ -707,7 +708,7 @@ end;
 
 { TACLExpressionElementOperator }
 
-procedure TACLExpressionElementOperator.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLExpressionElementOperator.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 
   procedure ParamToString(AParam: TACLExpressionElement);
   begin
@@ -760,9 +761,9 @@ begin
     raise EACLExpression.Create(sErrorNotCompiled);
 end;
 
-function TACLExpression.ToString: string;
+function TACLExpression.ToString: UnicodeString;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
 begin
   if FRoot <> nil then
   begin
@@ -858,7 +859,7 @@ begin
     Result := 0;
 end;
 
-function TACLCustomExpressionFactory.ToString: string;
+function TACLCustomExpressionFactory.ToString: UnicodeString;
 begin
   raise Exception.Create('Unsupported!');
 end;

@@ -16,13 +16,11 @@ unit ACL.Utils.RTTI;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
   // System
-  System.Classes,
-  System.Variants,
-  System.TypInfo,
-  System.Rtti;
+  Rtti,
+  Classes,
+  Variants,
+  TypInfo;
 
 type
   TMemberVisibilities = set of TMemberVisibility;
@@ -44,7 +42,7 @@ type
     class function FindPropertyByName(AType: TRttiType; const AName: string; out AProperty: TRttiProperty): Boolean; overload;
     class function GetProperties(AClass: TClass; out AList: PPropList; out ACount: Integer): Boolean; overload;
     class function GetProperties(AObject: TObject; out AList: PPropList; out ACount: Integer): Boolean; overload;
-    class function GetPropInfo(AObject: TObject; const AName: UnicodeString; AVisibility: TMemberVisibilities = [mvPublished]): PPropInfo;
+    class function GetPropInfo(AObject: TObject; const AName: string; AVisibility: TMemberVisibilities = [mvPublished]): PPropInfo;
     class function GetType(AObject: TObject): TRttiType; static;
     class procedure ResolvePath(var AObject: TObject; var ANamePath: string; AVisibility: TMemberVisibilities = [mvPublished]);
 
@@ -79,10 +77,11 @@ type
 implementation
 
 uses
-  System.Types,
-  System.SysUtils,
-  System.Math,
-  System.RTLConsts,
+  // System
+  Types,
+  SysUtils,
+  Math,
+  RTLConsts,
   // ACL
   ACL.FastCode,
   ACL.Utils.Common,
@@ -127,7 +126,7 @@ begin
         AEnumProc(T(APropertyValue))
       else
         if ARecursive then
-          EnumClassProperties(APropertyValue, AEnumProc, ARecursive, AVisibility);
+          EnumClassProperties<T>(APropertyValue, AEnumProc, ARecursive, AVisibility);
     end;
   end;
 end;
@@ -172,12 +171,12 @@ begin
   Result := False;
 end;
 
-class function TRTTI.GetPropInfo(AObject: TObject; const AName: UnicodeString; AVisibility: TMemberVisibilities): PPropInfo;
+class function TRTTI.GetPropInfo(AObject: TObject; const AName: string; AVisibility: TMemberVisibilities): PPropInfo;
 var
   AProperty: TRttiProperty;
 begin
   if mvPublished in AVisibility then
-    Result := System.TypInfo.GetPropInfo(AObject, AName)
+    Result := TypInfo.GetPropInfo(AObject, AName)
   else
     Result := nil;
 
@@ -185,8 +184,12 @@ begin
   begin
     if FindPropertyByName(GetType(AObject), AName, AProperty) and (AProperty.Visibility in AVisibility) then
     begin
+    {$IFDEF FPC}
+      Result := AProperty.Handle; // а так заметно удобнее!
+    {$ELSE}
       if AProperty is TRttiInstanceProperty then
         Result := TRttiInstanceProperty(AProperty).PropInfo;
+    {$ENDIF}
     end;
   end;
 end;
@@ -228,7 +231,12 @@ end;
 
 class function TRTTI.IsStored(AObject: TObject; APropInfo: PPropInfo): Boolean;
 begin
-  Result := IsStoredProp(AObject, APropInfo) and (APropInfo^.PropType^.Kind <> tkMethod) and not IsDefaultPropertyValue(AObject, APropInfo, nil);
+  Result := IsStoredProp(AObject, APropInfo) and (APropInfo^.PropType^.Kind <> tkMethod) and
+  {$IFDEF FPC}
+    IsStoredProp(AObject, APropInfo);
+  {$ELSE}
+    not IsDefaultPropertyValue(AObject, APropInfo, nil);
+  {$ENDIF}
 end;
 
 class function TRTTI.IsString(APropInfo: PPropInfo): Boolean;
@@ -243,13 +251,14 @@ begin
   Result := False;
   if APropInfo^.PropType^.Kind = tkInteger then
   begin
-    ATypeData := GetTypeData(APropInfo^.PropType^);
+    ATypeData := GetTypeData(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF});
     Result := ATypeData.MinValue >= ATypeData.MaxValue;
   end;
 end;
+
 class function TRTTI.IsSameType(APropInfo: PPropInfo; const ATypeInfo: Pointer): Boolean;
 begin
-  Result := (APropInfo <> nil) and (APropInfo^.PropType^ = ATypeInfo);
+  Result := (APropInfo <> nil) and (APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF} = ATypeInfo);
 end;
 
 class function TRTTI.GetPropValue(AObject: TObject; APropInfo: PPropInfo): UnicodeString;
@@ -287,7 +296,7 @@ class function TRTTI.GetPropValueAsVariant(AObject: TObject; APropInfo: PPropInf
 begin
   if AObject <> nil then
   begin
-    Result := System.TypInfo.GetPropValue(AObject, APropInfo, PreferStrings);
+    Result := TypInfo.GetPropValue(AObject, APropInfo, PreferStrings);
     if IsUnsignedInt(APropInfo) then
       Result := LongWord(Int64(Result));
   end
@@ -309,10 +318,10 @@ var
   ATypeData: PTypeData;
   AValueOrd: Integer;
 begin
-  AData := GetEnumValue(APropInfo^.PropType^, AValue);
+  AData := GetEnumValue(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF}, AValue);
   if AData < 0 then
   begin
-    ATypeData := GetTypeData(APropInfo^.PropType^);
+    ATypeData := GetTypeData(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF});
     AValueOrd := StrToIntDef(AValue, ATypeData^.MinValue - 1);
     if (AValueOrd >= ATypeData^.MinValue) and (AValueOrd <= ATypeData^.MaxValue) then
       AData := AValueOrd;
@@ -338,7 +347,7 @@ begin
     if APropInfo^.PropType^.Kind = tkEnumeration then
       SetEnumPropValue(AObject, APropInfo, AValue)
     else
-      System.TypInfo.SetPropValue(AObject, APropInfo, AValue);
+      TypInfo.SetPropValue(AObject, APropInfo, AValue);
   finally
     FormatSettings := APrevFormatSettings;
   end;
@@ -356,7 +365,7 @@ begin
   if IsBoolean(APropInfo) and VarIsNumeric(AValue) then
     SetOrdProp(AObject, APropInfo, Ord(FastTrunc(AValue) <> 0))
   else
-    System.TypInfo.SetPropValue(AObject, APropInfo, AValue);
+    TypInfo.SetPropValue(AObject, APropInfo, AValue);
 end;
 
 class procedure TRTTI.SetPropValueAsVariant(AObject: TObject; const AName: UnicodeString; const AValue: Variant);

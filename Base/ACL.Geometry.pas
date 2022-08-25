@@ -16,18 +16,19 @@ unit ACL.Geometry;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  // Winapi
+  Windows,
+  Messages,
   // Vcl
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Controls,
 {$ENDIF}
   // System
-  System.Types,
-  System.SysUtils,
-  System.Classes,
-  System.Math,
-  System.Generics.Collections,
+  Types,
+  Math,
+  Generics.Collections,
+  Classes,
+  SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -216,7 +217,7 @@ type
 
   TACLXFormHelper = record helper for TXForm
   public
-    class function Combine(const AMatrix1, AMatrix2: TXForm): TXForm; static;
+    class function Combine({$IFNDEF FPC}const{$ENDIF} AMatrix1, AMatrix2: TXForm): TXForm; static;
     class function CreateFlip(AFlipHorizontally, AFlipVertically: Boolean; const APivotPointX, APivotPointY: Single): TXForm; static;
     class function CreateIdentityMatrix: TXForm; static;
     class function CreateMatrix(M11, M12, M21, M22, DX, DY: Single): TXForm; static;
@@ -1460,9 +1461,9 @@ end;
 
 { TACLXFormHelper }
 
-class function TACLXFormHelper.Combine(const AMatrix1, AMatrix2: TXForm): TXForm;
+class function TACLXFormHelper.Combine;
 begin
-  CombineTransform(Result, AMatrix1, AMatrix2);
+  CombineTransform({$IFDEF FPC}@{$ENDIF}Result, AMatrix1, AMatrix2);
 end;
 
 class function TACLXFormHelper.CreateFlip(

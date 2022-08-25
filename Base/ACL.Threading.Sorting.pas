@@ -16,11 +16,11 @@ unit ACL.Threading.Sorting;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Classes,
-  System.Generics.Defaults,
-  System.SysUtils,
+  Classes,
+  Generics.Defaults,
+  SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,

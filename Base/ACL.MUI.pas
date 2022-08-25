@@ -16,11 +16,12 @@ unit ACL.MUI;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  // Winapi
+  Windows,
+  Messages,
   // System
-  System.Classes,
-  System.Generics.Collections,
+  Classes,
+  Generics.Collections,
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Forms,
@@ -93,29 +94,6 @@ type
     procedure LangChanging;
   end;
 
-  { TACLCodePages }
-
-  TACLCodePages = class
-  strict private
-    FList: TStringList;
-    function GetCount: Integer;
-    function GetID(Index: Integer): Integer;
-    function GetName(Index: Integer): string;
-  protected
-    procedure AddCodePage(ID: Cardinal);
-    //
-    class function CompareCodePages(List: TStringList; Index1, Index2: Integer): Integer; static;
-    class function EnumCodePagesProc(lpCodePageString: PWideChar): Cardinal; stdcall; static;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    function IndexOf(ACodePageID: Integer): Integer;
-    //
-    property ID[Index: Integer]: Integer read GetID;
-    property Name[Index: Integer]: string read GetName;
-    property Count: Integer read GetCount;
-  end;
-
   { TACLLocalizationInfo }
 
   TACLLocalizationInfo = packed record
@@ -140,7 +118,7 @@ type
   public
     constructor Create(const AFileName: UnicodeString; AutoSave: Boolean = True); override;
     destructor Destroy; override;
-    procedure ExpandLinks(AInst: HINST; const AName: UnicodeString; AType: PWideChar); overload;
+    procedure ExpandLinks(AInst: HINST; const AName: string; AType: PChar); overload;
     procedure ExpandLinks(ALinks: TACLIniFile); overload;
     procedure LoadFromFile(const AFileName: UnicodeString); override;
     procedure LoadFromStream(AStream: TStream); override;
@@ -157,7 +135,6 @@ type
 var
   LangFilePath: UnicodeString = '';
 
-function CodePages: TACLCodePages;
 function GetCodePageByLCID(LCID: Cardinal): UINT;
 function GetUserLangID: Integer;
 function LangFile: TACLLocalization;
@@ -184,8 +161,9 @@ procedure LangSetFileClass(AClass: TACLLocalizationClass);
 implementation
 
 uses
-  System.TypInfo,
-  System.SysUtils,
+  // System
+  TypInfo,
+  SysUtils,
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Controls,
@@ -196,21 +174,13 @@ uses
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
-const
-  LOCALE_RETURN_NUMBER = $20000000;   { return number instead of string }
+{$IFDEF FPC}
+function GetUserDefaultUILanguage: LANGID; stdcall; external kernel32;
+{$ENDIF}
 
 var
   FLangFile: TACLLocalization;
   FLangFileClass: TACLLocalizationCLass = TACLLocalization;
-  FCodePages: TACLCodePages;
-  LCodePages: TACLCodePages;
-
-function CodePages: TACLCodePages;
-begin
-  if FCodePages = nil then
-    FCodePages := TACLCodePages.Create;
-  Result := FCodePages;
-end;
 
 function LangGetComponentPath(const AComponent: TComponent): UnicodeString;
 var
@@ -325,13 +295,13 @@ end;
 function LangExpandMacros(const AText: UnicodeString; const ADefaultSection: UnicodeString = ''): UnicodeString;
 var
   K, I, J, L: Integer;
-  S: TStringBuilder;
+  S: TACLStringBuilder;
   V: UnicodeString;
 begin
   if Pos(sLangMacroBegin, AText) = 0 then
     Exit(AText);
 
-  S := TACLStringBuilderManager.Get(Length(AText));
+  S := TACLStringBuilderManager.Get(acStringLength(AText));
   try
     I := 1;
     repeat
@@ -339,13 +309,13 @@ begin
       L := Pos(sLangMacroEnd, AText, J + 1);
       if (J = 0) or (L = 0) then
       begin
-        S.Append(AText, I - 1, Length(AText) - I + 1);
+        S.Append(AText, I - 1, acStringLength(AText) - I + 1);
         Break;
       end;
       S.Append(AText, I - 1, J - I);
 
       // Expand
-      J := J + Length(sLangMacroBegin);
+      J := J + acStringLength(sLangMacroBegin);
       V := Copy(AText, J, L - J);
       K := acPos('\', V);
       if K = 0 then
@@ -353,7 +323,7 @@ begin
       else
         S.Append(LangGet(Copy(V, 1, K - 1), Copy(V, K + 1, MaxInt)));
 
-      I := L + Length(sLangMacroEnd);
+      I := L + acStringLength(sLangMacroEnd);
     until False;
     Result := S.ToString;
   finally
@@ -370,13 +340,13 @@ begin
   begin
     APos := acPos(sLangPartSeparator, Result);
     if APos = 0 then
-      APos := Length(Result);
+      APos := acStringLength(Result);
     Delete(Result, 1, APos);
     Dec(APartIndex);
   end;
   APos := acPos(sLangPartSeparator, Result) - 1;
   if APos < 0 then
-    APos := Length(Result);
+    APos := acStringLength(Result);
   Result := Copy(Result, 1, APos);
 end;
 
@@ -448,7 +418,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLLocalization.ExpandLinks(AInst: HINST; const AName: UnicodeString; AType: PWideChar);
+procedure TACLLocalization.ExpandLinks(AInst: HINST; const AName: string; AType: PChar);
 var
   ALinks: TACLIniFile;
 begin
@@ -577,71 +547,9 @@ begin
   WriteInteger(sLangMainSection, sLangID, Value);
 end;
 
-{ TACLCodePages }
-
-constructor TACLCodePages.Create;
-begin
-  inherited Create;
-  FList := TStringList.Create;
-  LCodePages := Self;
-  EnumSystemCodePagesW(@EnumCodePagesProc, CP_INSTALLED);
-  LCodePages := nil;
-  FList.CustomSort(CompareCodePages);
-end;
-
-destructor TACLCodePages.Destroy;
-begin
-  FreeAndNil(FList);
-  inherited Destroy;
-end;
-
-function TACLCodePages.IndexOf(ACodePageID: Integer): Integer;
-begin
-  Result := FList.IndexOfObject(TObject(ACodePageID));
-end;
-
-procedure TACLCodePages.AddCodePage(ID: Cardinal);
-var
-  AInfo: TCPInfoEx;
-begin
-  if GetCPInfoEx(ID, 0, AInfo) then
-    FList.AddObject(AInfo.CodePageName, TObject(ID));
-end;
-
-class function TACLCodePages.CompareCodePages(List: TStringList; Index1, Index2: Integer): Integer;
-begin
-  Result := acLogicalCompare(List[Index1], List[Index2]);
-end;
-
-class function TACLCodePages.EnumCodePagesProc(lpCodePageString: PWideChar): Cardinal; stdcall;
-var
-  ACodePage: Integer;
-begin
-  ACodePage := StrToIntDef(lpCodePageString, -1);
-  if ACodePage > 0 then
-    LCodePages.AddCodePage(ACodePage);
-  Result := 1;
-end;
-
-function TACLCodePages.GetCount: Integer;
-begin
-  Result := FList.Count;
-end;
-
-function TACLCodePages.GetID(Index: Integer): Integer;
-begin
-  Result := Integer(FList.Objects[Index]);
-end;
-
-function TACLCodePages.GetName(Index: Integer): string;
-begin
-  Result := FList[Index];
-end;
-
 initialization
   LangFilePath := acSelfPath + 'Langs' + PathDelim;
 
 finalization
   FreeAndNil(FLangFile);
-  FreeAndNil(FCodePages);
 end.

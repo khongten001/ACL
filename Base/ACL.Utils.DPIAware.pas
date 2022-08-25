@@ -16,10 +16,13 @@ unit ACL.Utils.DPIAware;
 interface
 
 uses
-  Winapi.Windows,
+  // Winapi
+  Windows,
+  // VCL
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Graphics,
 {$ENDIF}
+  // ACL
   ACL.Geometry;
 
 const
@@ -57,8 +60,9 @@ uses
 {$IFNDEF ACL_BASE_NOVCL}
   ACL.Graphics,
 {$ENDIF}
-  System.SysUtils,
-  System.Math;
+  // System
+  SysUtils,
+  Math;
 
 type
 

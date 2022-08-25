@@ -16,11 +16,12 @@ unit ACL.FileFormats.CSV;
 interface
 
 uses
-  System.Classes,
-  System.Math,
-  System.StrUtils,
-  System.SysUtils,
-  System.Variants,
+  // System
+  Classes,
+  Math,
+  StrUtils,
+  SysUtils,
+  Variants,
   // ACL
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
@@ -350,7 +351,7 @@ end;
 class procedure TACLCSVDocument.ReadData(const S: string;
   const ASettings: TACLCSVDocumentSettings; const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc);
 begin
-  ReadData(PWideChar(S), Length(S), ASettings, OnRow, OnValue);
+  ReadData(PWideChar(S), acStringLength(S), ASettings, OnRow, OnValue);
 end;
 
 class procedure TACLCSVDocument.ReadData(const C: PWideChar; ACount: Integer;

@@ -16,8 +16,8 @@ unit ACL.Classes.StringList;
 interface
 
 uses
-  System.Classes,
-  System.SysUtils,
+  Classes,
+  SysUtils,
   // ACL
   ACL.Classes,
   ACL.Utils.Common,
@@ -102,7 +102,7 @@ type
     // I/O
     function LoadFromFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
     procedure LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil); virtual;
-    procedure LoadFromResource(AInstance: HINST; const AName: UnicodeString; AType: PChar);
+    procedure LoadFromResource(AInstance: THandle; const AName: UnicodeString; AType: PChar);
     function SaveToFile(const AFile: UnicodeString; AEncoding: TEncoding = nil): Boolean;
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil); virtual;
 
@@ -172,7 +172,7 @@ type
 implementation
 
 uses
-  System.Math,
+  Math,
   // ACL
   ACL.FastCode,
   ACL.Parsers,
@@ -293,7 +293,7 @@ begin
     begin
       if Ord(AText[ALength]) = Ord(ADelimiter) then
         Dec(ALength);
-      acExplodeString(PChar(AText), ALength, ADelimiter,
+      acExplodeString(PWideChar(AText), ALength, ADelimiter,
         procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
         begin
           Add(acExtractString(ACursorStart, ACursorNext));
@@ -351,7 +351,7 @@ begin
     Clear;
 end;
 
-procedure TACLStringList.LoadFromResource(AInstance: HINST; const AName: UnicodeString; AType: PChar);
+procedure TACLStringList.LoadFromResource(AInstance: THandle; const AName: UnicodeString; AType: PChar);
 var
   AStream: TResourceStream;
 begin

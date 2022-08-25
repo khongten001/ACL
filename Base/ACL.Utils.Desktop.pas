@@ -16,19 +16,23 @@ unit ACL.Utils.Desktop;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.MultiMon,
-  Winapi.Messages,
-  Winapi.ShellApi,
+  // Winapi
+  Windows,
+  MultiMon,
+  Messages,
+  ShellApi,
   // System
-  System.Types,
-  System.Classes,
+  Types,
+  Classes,
   // Vcl
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Forms,
 {$ENDIF}
   // ACL
   ACL.Classes.Collections;
+
+type
+  TGetDpiForMonitor = function (hmonitor: HMONITOR; dpiType: Cardinal; out dpiX, dpiY: UINT): HRESULT; stdcall;
 
 type
   TTaskBarPosition = (tbpLeft, tbpTop, tbpRight, tbpBottom);
@@ -119,10 +123,12 @@ function MouseCursorSize: TSize;
 implementation
 
 uses
+  // VCL
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Controls,
 {$ENDIF}
-  System.SysUtils,
+  // System
+  SysUtils,
   // ACL
   ACL.Utils.Messaging,
   ACL.Utils.Common,
@@ -131,12 +137,9 @@ uses
 const
   Shcore = 'Shcore.dll';
 
-{$WARNINGS OFF}
-function GetDpiForMonitor(hmonitor: HMONITOR; dpiType: Cardinal; out dpiX, dpiY: UINT): HRESULT; stdcall; external Shcore delayed;
-{$WARNINGS ON}
-
 var
-  FHelper: TACLScreenHelper;
+  FGetMonitorDpiProc: TGetDpiForMonitor = nil;
+  FHelper: TACLScreenHelper = nil;
 
 function ScreenHelper: TACLScreenHelper;
 begin
@@ -307,21 +310,21 @@ end;
 
 function MonitorGetTaskBarInfo: TACLTaskbarInfo;
 var
-	AData: TAppBarData;
+  AData: TAppBarData;
 begin
   ZeroMemory(@AData, SizeOf(AData));
   AData.cbSize := SizeOf(TAppBarData);
-	AData.Hwnd := FindWindow('ShellTrayWnd', nil);
+  AData.Hwnd := FindWindow('ShellTrayWnd', nil);
   if AData.hWnd = 0 then
     AData.Hwnd := FindWindow('Shell_TrayWnd', nil);
 
   ZeroMemory(@Result, SizeOf(Result));
   if AData.Hwnd <> 0 then
   begin
-    SHAppBarMessage(ABM_GETTASKBARPOS, AData);
+    SHAppBarMessage(ABM_GETTASKBARPOS, {$IFDEF FPC}@{$ENDIF}AData);
     Result.Position := TTaskBarPosition(AData.uEdge);
     Result.Bounds := AData.rc;
-    Result.AutoHide := SHAppBarMessage(ABM_GETSTATE, AData) and ABS_AUTOHIDE = ABS_AUTOHIDE;
+    Result.AutoHide := SHAppBarMessage(ABM_GETSTATE, {$IFDEF FPC}@{$ENDIF}AData) and ABS_AUTOHIDE = ABS_AUTOHIDE;
   end;
 end;
 
@@ -401,8 +404,11 @@ var
   DC: HDC;
 {$ENDIF}
 begin
-  if CheckWin32Version(6, 3) and (GetDpiForMonitor(Handle, 0, Xdpi, Ydpi) = S_OK) then
-    Exit(Xdpi);
+  if CheckWin32Version(6, 3) and Assigned(FGetMonitorDpiProc) then
+  begin
+    if FGetMonitorDpiProc(Handle, 0, Xdpi, Ydpi) = S_OK then
+      Exit(Xdpi);
+  end;
 
 {$IFDEF ACL_BASE_NOVCL}
   DC := GetDC(0);
@@ -439,6 +445,7 @@ constructor TACLScreenHelper.Create;
 begin
   inherited Create;
   FMonitors := TACLObjectList.Create;
+  FGetMonitorDpiProc := GetProcAddress(LoadLibrary(Shcore), 'GetDpiForMonitor');
   TACLMessaging.HandlerAdd(MessageHandler);
 end;
 

@@ -16,10 +16,11 @@ unit ACL.Utils.Shell.UserAccounts;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.ShlObj,
+  // Winapi
+  Windows,
+  ShlObj,
   // System
-  System.SysUtils,
+  SysUtils,
   // ACL
   ACL.Classes.Collections;
 
@@ -67,7 +68,6 @@ function acUserName: UnicodeString;
 implementation
 
 uses
-  ACL.Classes.StringList,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Registry,
@@ -161,7 +161,7 @@ begin
   AList.Add(TACLUserAccountInfo.Create(acUserName, '', ShellGetSystemFolder(CSIDL_PROFILE), ShellGetAppData));
 
   acRegEnumKeys(HKEY_LOCAL_MACHINE, PathProfileList,
-    procedure (const S: string)
+    procedure (const S: UnicodeString)
     var
       ASubPath: string;
     begin

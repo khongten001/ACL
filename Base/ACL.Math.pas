@@ -16,7 +16,7 @@ unit ACL.Math;
 interface
 
 uses
-  System.Math;
+  Math;
 
 // MinMax, MaxMin
 function MaxMin(const AValue, AMinValue, AMaxValue: Double): Double; overload; inline;
@@ -37,6 +37,10 @@ function HiInteger(const A: UInt64): Integer;
 function LoInteger(const A: UInt64): Integer;
 function MakeInt64(const A, B: Integer): UInt64;
 function MulDiv64(const AValue, ANumerator, ADenominator: Int64): Int64;
+
+{$IFDEF FPC}
+procedure DivMod(Dividend: UInt64; Divisor: UInt64; var Result, Remainder: UInt64); overload;
+{$ENDIF}
 implementation
 
 //==============================================================================
@@ -151,4 +155,11 @@ begin
   Result := Round(ARatio * AValue); //#AI: must be round!!
 end;
 
+{$IFDEF FPC}
+procedure DivMod(Dividend: UInt64; Divisor: UInt64; var Result, Remainder: UInt64); overload;
+begin
+  Result := Dividend div Divisor;
+  Remainder := Dividend mod Divisor;
+end;
+{$ENDIF}
 end.

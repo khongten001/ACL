@@ -16,9 +16,9 @@ unit ACL.Parsers.Ripper;
 interface
 
 uses
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  Math,
+  SysUtils,
+  Types,
   // ACL
   ACL.Classes.Collections,
   ACL.Expressions,
@@ -33,13 +33,13 @@ type
   strict private
     FSource: TACLRipperRule;
   protected
-    procedure ProcessCore(const ATarget: TACLList<string>; const ASource: string); virtual;
+    procedure ProcessCore(const ATarget: TACLList<UnicodeString>; const ASource: UnicodeString); virtual;
   public
     constructor Create(ASource: TACLRipperRule = nil);
     destructor Destroy; override;
-    function Extract(const AData: string): string; overload;
-    function ExtractEx(const AData: string): TACLList<string>; overload;
-    procedure Process(var AData: TACLList<string>);
+    function Extract(const AData: UnicodeString): UnicodeString; overload;
+    function ExtractEx(const AData: UnicodeString): TACLList<UnicodeString>; overload;
+    procedure Process(var AData: TACLList<UnicodeString>);
   end;
 
   { TACLRipperRuleAimingByTags }
@@ -52,11 +52,11 @@ type
     FOptions: TACLRipperRuleAimingByTagsOptions;
     FStartTags: TStringDynArray;
 
-    function Find(const AStrToFind, AStr: string; AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
+    function Find(const AStrToFind, AStr: UnicodeString; AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
   protected
-    procedure ProcessCore(const ATarget: TACLList<string>; const ASource: string); override;
+    procedure ProcessCore(const ATarget: TACLList<UnicodeString>; const ASource: UnicodeString); override;
   public
-    constructor Create(const AStartTags, AFinishTags: string;
+    constructor Create(const AStartTags, AFinishTags: UnicodeString;
       AOptions: TACLRipperRuleAimingByTagsOptions; ASource: TACLRipperRule = nil);
   end;
 
@@ -66,9 +66,9 @@ type
   strict private
     FExpression: TACLExpression;
   protected
-    procedure ProcessCore(const ATarget: TACLList<string>; const ASource: string); override;
+    procedure ProcessCore(const ATarget: TACLList<UnicodeString>; const ASource: UnicodeString); override;
   public
-    constructor Create(const AExpression: string; ASource: TACLRipperRule = nil);
+    constructor Create(const AExpression: UnicodeString; ASource: TACLRipperRule = nil);
     destructor Destroy; override;
   end;
 
@@ -76,7 +76,7 @@ type
 
   TACLRipperRuleRemoveHtmlTags = class(TACLRipperRule)
   protected
-    procedure ProcessCore(const ATarget: TACLList<string>; const ASource: string); override;
+    procedure ProcessCore(const ATarget: TACLList<UnicodeString>; const ASource: UnicodeString); override;
   end;
 
 implementation
@@ -91,7 +91,7 @@ type
 
   TACLRipperRuleExpressionContext = class
   public
-    Value: string;
+    Value: UnicodeString;
   end;
 
   { TACLRipperRuleExpressions }
@@ -99,7 +99,7 @@ type
   TACLRipperRuleExpressions = class(TACLFormatStringFactory)
   strict private
     class var FInstance: TACLRipperRuleExpressions;
-    class function GetValue(AContext: TObject): string;
+    class function GetValue(AContext: TObject): UnicodeString;
   protected
     procedure RegisterMacros; override;
   public
@@ -114,7 +114,7 @@ begin
   FreeAndNil(FInstance);
 end;
 
-class function TACLRipperRuleExpressions.GetValue(AContext: TObject): string;
+class function TACLRipperRuleExpressions.GetValue(AContext: TObject): UnicodeString;
 begin
   Result := TACLRipperRuleExpressionContext(AContext).Value;
 end;
@@ -145,38 +145,38 @@ begin
   inherited;
 end;
 
-function TACLRipperRule.Extract(const AData: string): string;
+function TACLRipperRule.Extract(const AData: UnicodeString): UnicodeString;
 var
-  AList: TACLList<string>;
+  AList: TACLList<UnicodeString>;
 begin
   AList := ExtractEx(AData);
   try
     if AList.Count > 0 then
       Result := AList.List[0]
     else
-      Result := EmptyStr;
+      Result := EmptyStrU;
   finally
     AList.Free;
   end;
 end;
 
-function TACLRipperRule.ExtractEx(const AData: string): TACLList<string>;
+function TACLRipperRule.ExtractEx(const AData: UnicodeString): TACLList<UnicodeString>;
 begin
-  Result := TACLList<string>.Create;
+  Result := TACLList<UnicodeString>.Create;
   Result.Capacity := 1;
   Result.Add(AData);
   Process(Result)
 end;
 
-procedure TACLRipperRule.Process(var AData: TACLList<string>);
+procedure TACLRipperRule.Process(var AData: TACLList<UnicodeString>);
 var
-  ATarget: TACLList<string>;
+  ATarget: TACLList<UnicodeString>;
   I: Integer;
 begin
   if FSource <> nil then
     FSource.Process(AData);
 
-  ATarget := TACLList<string>.Create;
+  ATarget := TACLList<UnicodeString>.Create;
   try
     ATarget.Capacity := AData.Count;
     for I := 0 to AData.Count - 1 do
@@ -187,17 +187,17 @@ begin
   end;
 end;
 
-procedure TACLRipperRule.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
+procedure TACLRipperRule.ProcessCore(const ATarget: TACLList<UnicodeString>; const ASource: UnicodeString);
 begin
   ATarget.Add(ASource);
 end;
 
 { TACLRipperRuleAimingByTags }
 
-constructor TACLRipperRuleAimingByTags.Create(const AStartTags, AFinishTags: string;
+constructor TACLRipperRuleAimingByTags.Create(const AStartTags, AFinishTags: UnicodeString;
   AOptions: TACLRipperRuleAimingByTagsOptions; ASource: TACLRipperRule);
 
-  procedure SplitTags(const S: string; var ATags: TStringDynArray);
+  procedure SplitTags(const S: UnicodeString; var ATags: TStringDynArray);
   var
     I: Integer;
   begin
@@ -216,7 +216,7 @@ begin
   SplitTags(AFinishTags, FFinishTags);
 end;
 
-procedure TACLRipperRuleAimingByTags.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
+procedure TACLRipperRuleAimingByTags.ProcessCore(const ATarget: TACLList<UnicodeString>; const ASource: UnicodeString);
 var
   I0: Integer;
   L1, L2: Integer;
@@ -236,7 +236,7 @@ begin
   P1 := 1;
   repeat
     PE := -1;
-    P2 := Length(ASource);
+    P2 := acStringLength(ASource);
 
     for I0 := 0 to Max(L1, L2) - 1 do
     begin
@@ -245,7 +245,7 @@ begin
         P1 := Find(FStartTags[I0], US, P1, P2, False);
         if P1 = 0 then
           Exit;
-        P1 := P1 + Length(FStartTags[I0]);
+        P1 := P1 + acStringLength(FStartTags[I0]);
       end;
 
       if I0 < L2 then
@@ -262,7 +262,7 @@ begin
   until (P1 < 0) or not (ratMultipleTargets in FOptions);
 end;
 
-function TACLRipperRuleAimingByTags.Find(const AStrToFind, AStr: string; AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
+function TACLRipperRuleAimingByTags.Find(const AStrToFind, AStr: UnicodeString; AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
 var
   AIterationCount: Integer;
   AStrScan: PWideChar;
@@ -274,8 +274,8 @@ begin
   if AStartPos > AEndPos then
     Exit(0);
 
-  AStrToFindLength := Length(AStrToFind);
-  AEndPos := Min(AEndPos, Length(AStr));
+  AStrToFindLength := acStringLength(AStrToFind);
+  AEndPos := Min(AEndPos, acStringLength(AStr));
   AIterationCount := AEndPos - AStartPos - AStrToFindLength + 1;
   if AIterationCount < 0 then
     Exit(0);
@@ -312,7 +312,7 @@ end;
 
 { TACLRipperRuleExpression }
 
-constructor TACLRipperRuleExpression.Create(const AExpression: string; ASource: TACLRipperRule);
+constructor TACLRipperRuleExpression.Create(const AExpression: UnicodeString; ASource: TACLRipperRule);
 begin
   inherited Create(ASource);
   FExpression := TACLRipperRuleExpressions.Instance.Compile(AExpression, True);
@@ -324,7 +324,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLRipperRuleExpression.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
+procedure TACLRipperRuleExpression.ProcessCore(const ATarget: TACLList<UnicodeString>; const ASource: UnicodeString);
 var
   AContext: TACLRipperRuleExpressionContext;
 begin
@@ -339,11 +339,11 @@ end;
 
 { TACLRipperRuleRemoveHtmlTags }
 
-procedure TACLRipperRuleRemoveHtmlTags.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
+procedure TACLRipperRuleRemoveHtmlTags.ProcessCore(const ATarget: TACLList<UnicodeString>; const ASource: UnicodeString);
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   ACount: Integer;
-  AData: string;
+  AData: UnicodeString;
   AScan: PWideChar;
 begin
 //    Result := acStringReplace(Result, #13, '');
@@ -358,10 +358,10 @@ begin
 //    until P1 = 0;
 
   AData := TACLXMLHelper.DecodeString(ASource);
-  ABuffer := TStringBuilder.Create(Length(AData));
+  AScan := PWideChar(AData);
+  ACount := acStringLength(AData);
+  ABuffer := TACLStringBuilder.Create(ACount);
   try
-    AScan := PWideChar(AData);
-    ACount := Length(AData);
     repeat
       case Ord(AScan^) of
         0:

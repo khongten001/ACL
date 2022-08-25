@@ -12,21 +12,21 @@
 unit ACL.Threading;
 
 {$I ACL.Config.inc}
-{.$DEFINE ACL_LOCKS_USE_MONITORS}
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  Windows,
+  Messages,
   // System
-  System.SyncObjs,
-  System.Types,
-  System.SysUtils,
-  System.Classes,
-  System.Generics.Defaults,
-  System.Generics.Collections,
+  Classes,
+  Generics.Defaults,
+  Generics.Collections,
+  SyncObjs,
+  SysUtils,
+  Types,
   // ACL
+  ACL.Classes.Collections,
   ACL.Utils.Common,
   ACL.Utils.Messaging;
 
@@ -35,19 +35,21 @@ type
 
   { TACLCriticalSection }
 
+{$IFDEF FPC}
+  TACLCriticalSection = class(TCriticalSection);
+{$ELSE}
   TACLCriticalSection = class
   strict private
-  {$IFNDEF ACL_LOCKS_USE_MONITORS}
     FLocked: Byte;
     FOwningThreadID: Cardinal;
     FRecursionCount: Integer;
-  {$ENDIF}
   public
     constructor Create(AOwner: TObject = nil; const AName: string = '');
     procedure Enter; inline;
     procedure Leave; inline;
     function TryEnter(AMaxTryCount: Integer = 15{~15 msec}): Boolean; inline;
   end;
+{$ENDIF}
 
   { TACLEvent }
 
@@ -58,8 +60,8 @@ type
     constructor Create; overload;
     constructor Create(AManualReset, AInitialState: LongBool); overload;
     destructor Destroy; override;
-    function WaitFor(ATimeOut: Cardinal = INFINITE): LongBool;
-    function WaitForNoSynchronize(ATimeOut: Cardinal = INFINITE): LongBool;
+    function WaitFor(ATimeOut: Cardinal = INFINITE): TWaitResult;
+    function WaitForNoSynchronize(ATimeOut: Cardinal = INFINITE): TWaitResult;
     procedure Reset; inline;
     procedure Signal; inline;
     //
@@ -105,12 +107,14 @@ type
     // IUnknown
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; stdcall;
   public
     procedure BeforeDestruction; override;
     procedure Terminate; virtual;
     procedure TerminateForce;
-    function WaitFor(ATimeOut: Cardinal = INFINITE): Boolean;
+  {$IFDEF FPC}
+    class function GetCPUUsage(var PrevSystemTimes: TSystemTimes): Integer;
+  {$ENDIF}
     /// <summary>
     ///    Returns True if after AStartTime the specified ATimeout is passed.
     ///    If ATimeout = 0 or ATimeout = INFINITY - function always returns False.
@@ -165,7 +169,7 @@ type
   {$ENDREGION}
   strict private
     class var FHandle: HWND;
-    class var FQueue: TThreadList<PSynchronizeRecord>;
+    class var FQueue: TACLThreadList<PSynchronizeRecord>;
 
     class function Allocate(AReceiver: Pointer; AProc: TThreadMethod): PSynchronizeRecord; overload;
     class function Allocate(AReceiver: Pointer; AProc: TProcedureRef): PSynchronizeRecord; overload;
@@ -189,8 +193,6 @@ type
 
 procedure CheckIsMainThread;
 function IsMainThread: Boolean; inline;
-function LockCompareExchange(const ACompareValue, ANewValue: Byte; const AReturnAddress: PByte): Byte;
-function WaitForSyncObject(AHandle: THandle; ATimeOut: Cardinal): TWaitResult;
 
 procedure CallThreadMethod(AMethod: TThreadMethod; ACallInMainThread: Boolean); overload;
 procedure CallThreadMethod(AMethod: TThreadMethod; AMode: TACLThreadMethodCallMode); overload;
@@ -198,11 +200,16 @@ procedure CallThreadMethod(AMethod: TThreadMethod; AMode: TACLThreadMethodCallMo
 procedure RunInMainThread(AProc: TProcedureRef; AWaitFor: Boolean = True); overload; inline;
 procedure RunInMainThread(AProc: TThreadMethod; AWaitFor: Boolean = True); overload; inline;
 procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
+
+{$IFNDEF FPC}
+function LockCompareExchange(ACompareValue, ANewValue: Byte; AReturnAddress: PByte): Byte;
+function WaitForSyncObject(AHandle: THandle; ATimeOut: Cardinal): TWaitResult;
+{$ENDIF}
 implementation
 
 uses
   // System
-  System.Math,
+  Math,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -219,7 +226,8 @@ begin
   Result := GetCurrentThreadId = MainThreadID;
 end;
 
-function LockCompareExchange(const ACompareValue, ANewValue: Byte; const AReturnAddress: PByte): Byte;
+{$IFNDEF FPC}
+function LockCompareExchange(ACompareValue, ANewValue: Byte; AReturnAddress: PByte): Byte;
 asm
 {$IFDEF CPUX64}
   // cl = CompareVal
@@ -235,7 +243,9 @@ asm
   lock cmpxchg [ecx], dl
 {$ENDIF}
 end;
+{$ENDIF}
 
+{$IFNDEF FPC}
 function WaitForSyncObject(AHandle: THandle; ATimeOut: Cardinal): TWaitResult;
 const
   MaxWaitTime = 100;
@@ -280,6 +290,7 @@ begin
         Result := wrTimeout;
     end;
 end;
+{$ENDIF}
 
 procedure CallThreadMethod(AMethod: TThreadMethod; ACallInMainThread: Boolean);
 const
@@ -310,6 +321,10 @@ begin
 end;
 
 procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
+{$IFDEF FPC}
+const
+  WT_EXECUTELONGFUNCTION  = ULONG($00000010);
+{$ENDIF}
 begin
   if not QueueUserWorkItem(Func, Context, WT_EXECUTELONGFUNCTION) then
     RaiseLastOSError;
@@ -317,17 +332,13 @@ end;
 
 { TACLCriticalSection }
 
+{$IFNDEF FPC}
 constructor TACLCriticalSection.Create(AOwner: TObject = nil; const AName: string = '');
 begin
   // do nothing
 end;
 
 procedure TACLCriticalSection.Enter;
-{$IFDEF ACL_LOCKS_USE_MONITORS}
-begin
-  System.TMonitor.Enter(Self);
-end;
-{$ELSE}
 var
   AThreadId: Cardinal;
 begin
@@ -345,13 +356,9 @@ begin
   end;
   Inc(FRecursionCount);
 end;
-{$ENDIF}
 
 procedure TACLCriticalSection.Leave;
 begin
-{$IFDEF ACL_LOCKS_USE_MONITORS}
-  System.TMonitor.Exit(Self);
-{$ELSE}
   if FOwningThreadId <> GetCurrentThreadId then
     raise EInvalidOperation.Create('Section is not owned');
 
@@ -364,18 +371,9 @@ begin
     FOwningThreadId := 0;
     FLocked := 0;
   end;
-{$ENDIF}
 end;
 
 function TACLCriticalSection.TryEnter(AMaxTryCount: Integer = 15): Boolean;
-{$IFDEF ACL_LOCKS_USE_MONITORS}
-begin
-  repeat
-    Result := System.TMonitor.TryEnter(Self);
-    Dec(AMaxTryCount);
-  until Result or (AMaxTryCount <= 0);
-end;
-{$ELSE}
 var
   AThreadId: Cardinal;
 begin
@@ -415,14 +413,54 @@ begin
   inherited Destroy;
 end;
 
-function TACLEvent.WaitFor(ATimeOut: Cardinal = INFINITE): LongBool;
+function TACLEvent.WaitFor(ATimeOut: Cardinal = INFINITE): TWaitResult;
+{$IFNDEF FPC}
 begin
-  Result := WaitForSyncObject(Handle, ATimeOut) = wrSignaled;
+  Result := WaitForSyncObject(Handle, ATimeOut);
 end;
-
-function TACLEvent.WaitForNoSynchronize(ATimeOut: Cardinal = INFINITE): LongBool;
+{$ELSE}
+const
+  MaxWaitTime = 100;
+var
+  AStartWaitTime: Cardinal;
 begin
-  Result := WaitForSingleObject(Handle, ATimeOut) = WAIT_OBJECT_0;
+  if IsMainThread then
+  begin
+    Result := wrError;
+    AStartWaitTime := TACLThread.GetTickCount;
+    while True do
+    begin
+      case WaitForSingleObject(Handle, Min(MaxWaitTime, ATimeOut)) of
+        WAIT_TIMEOUT:
+          TACLMainThread.CheckSynchronize;
+        WAIT_FAILED:
+          Exit(wrError);
+        WAIT_OBJECT_0:
+          Exit(wrSignaled);
+        WAIT_ABANDONED:
+          Exit(wrAbandoned);
+      end;
+      if TACLThread.IsTimeout(AStartWaitTime, ATimeOut) then
+        Exit(wrTimeout);
+    end;
+  end
+  else
+    Result := WaitForNoSynchronize(ATimeOut);
+end;
+{$ENDIF}
+
+function TACLEvent.WaitForNoSynchronize(ATimeOut: Cardinal = INFINITE): TWaitResult;
+begin
+  case WaitForSingleObject(FHandle, ATimeOut) of
+    WAIT_OBJECT_0:
+      Result := wrSignaled;
+    WAIT_ABANDONED:
+      Result := wrAbandoned;
+    WAIT_TIMEOUT:
+      Result := wrTimeout;
+  else
+    Result := wrError;
+  end;
 end;
 
 procedure TACLEvent.Reset;
@@ -520,7 +558,7 @@ begin
     finally
       FLockCounter.Leave;
     end;
-    Result := FNoReadersEvent.WaitFor(30);
+    Result := FNoReadersEvent.WaitFor(30) = wrSignaled;
     FWaitingWriter := False;
   end;
   if not Result then
@@ -542,7 +580,7 @@ begin
   if (ATimeOut = 0) or (ATimeOut = INFINITE) then
     Exit(False);
 
-  ANow := GetTickCount;
+  ANow := TACLThread.GetTickCount;
   if ANow < AStartTime then
     Result := High(Cardinal) - AStartTime + ANow >= ATimeOut
   else
@@ -564,10 +602,30 @@ begin
   DoTerminate;
 end;
 
-function TACLThread.WaitFor(ATimeOut: Cardinal = INFINITE): Boolean;
+{$IFDEF FPC}
+class function TACLThread.GetCPUUsage(var PrevSystemTimes: TSystemTimes): Integer;
+var
+  CurSystemTimes: TSystemTimes;
+  Usage, Idle: UInt64;
 begin
-  Result := WaitForSyncObject(Handle, ATimeOut) = wrSignaled;
+  Result := 0;
+{$IFDEF FPC}
+  GetSystemTimes(CurSystemTimes);
+{$ELSE}
+  if GetSystemTimes(CurSystemTimes) then
+{$ENDIF}
+  begin
+    Usage :=
+      (CurSystemTimes.UserTime - PrevSystemTimes.UserTime) +
+      (CurSystemTimes.KernelTime - PrevSystemTimes.KernelTime) +
+      (CurSystemTimes.NiceTime - PrevSystemTimes.NiceTime);
+    Idle := CurSystemTimes.IdleTime - PrevSystemTimes.IdleTime;
+    if Usage > Idle then
+      Result := (Usage - Idle) * 100 div Usage;
+    PrevSystemTimes := CurSystemTimes;
+  end;
 end;
+{$ENDIF}
 
 function TACLThread._AddRef: Integer; stdcall;
 begin
@@ -579,7 +637,7 @@ begin
   Result := -1;
 end;
 
-function TACLThread.QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+function TACLThread.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -611,7 +669,7 @@ end;
 
 function TACLPauseableThread.WaitForUnpause(ATimeOut: Cardinal = INFINITE): Boolean;
 begin
-  Result := not Terminated and FPauseEvent.WaitFor(ATimeOut);
+  Result := not Terminated and (FPauseEvent.WaitFor(ATimeOut) = wrSignaled);
 end;
 
 procedure TACLPauseableThread.SetPaused(AValue: Boolean);
@@ -688,7 +746,7 @@ end;
 class constructor TACLMainThread.Create;
 begin
   FHandle := WndCreate(WndProc, ClassName, True);
-  FQueue := TThreadList<PSynchronizeRecord>.Create;
+  FQueue := TACLThreadList<PSynchronizeRecord>.Create;
 end;
 
 class destructor TACLMainThread.Destroy;
@@ -708,7 +766,7 @@ class procedure TACLMainThread.CheckSynchronize;
 begin
   if not IsMainThread then
     raise EInvalidArgument.Create(ClassName);
-  System.Classes.CheckSynchronize;
+  Classes.CheckSynchronize;
   Execute;
 end;
 

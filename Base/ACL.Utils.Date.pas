@@ -11,13 +11,12 @@
 
 unit ACL.Utils.Date;
 
+{$I ACL.Config.inc}
+
 interface
 
-uses
-  Winapi.Windows;
-
 type
-  TCalendarId = type DWORD;
+  TCalendarId = type Cardinal;
 
   TWeekDay = (wdMonday, wdTuesday, wdWednesday, wdThusday, wdFriday, wdSaturday, wdSunday);
   TWeekDays = set of TWeekDay;
@@ -74,23 +73,43 @@ function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
 implementation
 
 uses
-  System.Math,
-  System.DateUtils,
-  System.SysUtils;
+  Windows,
+  // System
+  Math,
+  DateUtils,
+  SysUtils,
+  // ACL
+  ACL.Math;
+
+{$IFDEF FPC}
+const
+  CAL_GREGORIAN = 1;              { Gregorian (localized) calendar }
+  CAL_GREGORIAN_US = 2;           { Gregorian (U.S.) calendar }
+  CAL_JAPAN = 3;                  { Japanese Emperor Era calendar }
+  CAL_TAIWAN = 4;                 { Republic of China Era calendar }
+  CAL_KOREA = 5;                  { Korean Tangun Era calendar }
+  CAL_HIJRI = 6;                  { Hijri (Arabic Lunar) calendar }
+  CAL_THAI = 7;                   { Thai calendar }
+  CAL_HEBREW = 8;                 { Hebrew calendar }
+  CAL_GREGORIAN_ME_FRENCH = 9;    { Gregorian Middle East French calendar }
+  CAL_GREGORIAN_ARABIC = 10;      { Gregorian Arabic calendar }
+  CAL_GREGORIAN_XLIT_ENGLISH = 11;{ Gregorian Transliterated English calendar }
+  CAL_GREGORIAN_XLIT_FRENCH = 12; { Gregorian Transliterated French calendar }
+  CAL_UMALQURA = 23;              { UmAlQura Hijri (Arabic Lunar) calendar }
+{$ENDIF}
 
 function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation;
   var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall; external kernel32;
 function SystemTimeToTzSpecificLocalTime(lpTimeZoneInformation: PTimeZoneInformation;
   var lpUniversalTime, lpLocalTime: TSystemTime): BOOL; stdcall; external kernel32;
 
-function GetCalendarID(Locale: LCID): TCalendarId; overload;
+function GetCalendarID: TCalendarId;
 begin
-  GetLocaleInfo(Locale, LOCALE_ICALENDARTYPE or CAL_RETURN_NUMBER, @Result, SizeOf(Result));
-end;
-
-function GetCalendarID: TCalendarId; overload;
-begin
-  Result := GetCalendarID(GetThreadLocale);
+{$IFDEF MSWINDOWS}
+  GetLocaleInfo(GetThreadLocale, LOCALE_ICALENDARTYPE or LOCALE_RETURN_NUMBER, @Result, SizeOf(Result));
+{$ELSE}
+  Result := CAL_GREGORIAN;
+{$ENDIF}
 end;
 
 function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
@@ -104,8 +123,11 @@ begin
   TzSpecificLocalTimeToSystemTime(@AInfo, ALocalTime, AUniversalTime);
   Result := SystemTimeToDateTime(AUniversalTime);
 end;
+//begin
+//  Result := TTimeZone.Local.ToUniversalTime(AValue);
+//end;
 
-function UTCToLocalDateTime(const AValue: TDateTime):TDateTime;
+function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
 var
   AInfo: TTimeZoneInformation;
   ALocalTime: TSystemTime;
@@ -116,6 +138,9 @@ begin
   SystemTimeToTzSpecificLocalTime(@AInfo, AUniversalTime, ALocalTime);
   Result := SystemTimeToDateTime(ALocalTime);
 end;
+//begin
+//  Result := TTimeZone.Local.ToLocalTime(AValue);
+//end;
 
 { TWeekDaysHelper }
 
@@ -206,7 +231,7 @@ end;
 
 class function TACLDateUtils.GetDayOfMonth(const AValue: TDateTime): Byte;
 begin
-  Result := System.DateUtils.DayOfTheMonth(AValue);
+  Result := DateUtils.DayOfTheMonth(AValue);
 end;
 
 class function TACLDateUtils.GetDayOfWeek(const AValue: TDateTime): Byte;
@@ -271,7 +296,7 @@ const
   OffsetDistance: array[TWeekDay] of Integer = (0, 6, 5, 4, 3, 2, 1);
 begin
   Result := AddDays(AValue, OffsetDistance[FFirstDayInWeek]);
-  Result := System.DateUtils.StartOfTheWeek(Result); // always starts from Monday
+  Result := DateUtils.StartOfTheWeek(Result); // always starts from Monday
   Result := AddDays(Result, -OffsetDistance[FFirstDayInWeek]);
 end;
 
@@ -294,9 +319,16 @@ begin
 end;
 
 class function TACLDateUtils.InRange(const AValue, AMinDate, AMaxDate: TDateTime): Boolean;
+var
+  ACurValue: UInt64;
+  AMaxValue: UInt64;
+  AMinValue: UInt64;
 begin
   try
-    Result := System.Math.InRange(DateTimeToSeconds(AValue), DateTimeToSeconds(AMinDate), DateTimeToSeconds(AMaxDate));
+    ACurValue := DateTimeToSeconds(AValue);
+    AMaxValue := DateTimeToSeconds(AMaxDate);
+    AMinValue := DateTimeToSeconds(AMinDate);
+    Result := (ACurValue >= AMinValue) and (ACurValue <= AMaxValue);
   except
     Result := (AValue >= AMinDate) and (AValue <= AMaxDate);
   end;

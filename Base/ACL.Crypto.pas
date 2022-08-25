@@ -16,8 +16,8 @@ unit ACL.Crypto;
 interface
 
 uses
-  System.Classes,
-  System.SysUtils;
+  Classes,
+  SysUtils;
 
 type
   { TRC4 }
@@ -63,7 +63,7 @@ function acEncryptString(const S, Key: string): string;
 implementation
 
 uses
-  System.Math,
+  Math,
   // ACL
   ACL.FastCode,
   ACL.Utils.Strings.Transcode;

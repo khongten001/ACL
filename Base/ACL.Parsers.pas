@@ -16,12 +16,12 @@ unit ACL.Parsers;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.Math,
-  System.SysUtils;
+  Generics.Collections,
+  Generics.Defaults,
+  Math,
+  SysUtils;
 
 const
   acParserDefaultSpaceChars = ' '#13#10#9#0;
