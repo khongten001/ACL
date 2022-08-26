@@ -211,9 +211,7 @@ uses
   // System
   Math,
   // ACL
-  ACL.Classes,
-  ACL.Classes.StringList,
-  ACL.Utils.Stream;
+  ACL.Classes;
 
 procedure CheckIsMainThread;
 begin
@@ -745,7 +743,7 @@ end;
 
 class constructor TACLMainThread.Create;
 begin
-  FHandle := WndCreate(WndProc, ClassName, True);
+  FHandle := WndCreate(WndProc, 'TACLMainThread', True);
   FQueue := TACLThreadList<PSynchronizeRecord>.Create;
 end;
 
@@ -887,7 +885,7 @@ begin
     if IsMainThread then
       Execute(ARecord)
     else
-      SendMessage(FHandle, WM_USER, 0, LPARAM(ARecord));
+      SendMessage(FHandle, WM_USER, 0, PointerToLParam(ARecord));
   end
   else
   begin
@@ -901,7 +899,7 @@ begin
   if Message.Msg = WM_USER then
   begin
     if Message.LParam <> 0 then
-      Execute(PSynchronizeRecord(Message.LParam))
+      Execute(LParamToPointer(Message.LParam))
     else
       Execute;
   end;

@@ -196,6 +196,9 @@ begin
     Result := Result and (AType = REG_BINARY);
     if Result then
     begin
+    {$IFDEF FPC}
+      ABytes := nil;
+    {$ENDIF}
       SetLength(ABytes, ASize);
       Result := acRegReadValue(Key, ValueName, @ABytes[0], ASize);
     end;
@@ -308,6 +311,9 @@ begin
 {$IFDEF ACL_LOG_REGISTRY}
   AddToDebugLog('Registry', 'RegOpen(%d, %s, %d)', [Key, SubKey, AFlags]);
 {$ENDIF}
+{$IFDEF FPC}
+  Result := 0;
+{$ENDIF}
   if not RegCheck(RegOpenKeyExW(Key, PWideChar(SubKey), 0, AFlags, Result)) then
     Result := 0;
 {$IFDEF ACL_LOG_REGISTRY}
@@ -330,6 +336,9 @@ function acRegOpenCreate(Key: HKEY; const SubKey: UnicodeString): HKEY;
 begin
 {$IFDEF ACL_LOG_REGISTRY}
   AddToDebugLog('Registry', 'RegCreate(%d, %s)', [Key, SubKey]);
+{$ENDIF}
+{$IFDEF FPC}
+  Result := 0;
 {$ENDIF}
   if not RegCheck(RegCreateKeyExW(Key, PWideChar(SubKey), 0, nil, 0, KEY_ALL_ACCESS, nil, Result, nil)) then
     Result := 0;

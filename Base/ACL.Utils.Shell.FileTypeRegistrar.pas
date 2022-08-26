@@ -21,8 +21,10 @@ uses
   // Winapi
   ActiveX,
   Windows,
+{$IFNDEF FPC}
   ShellAPI,
   ShlObj,
+{$ENDIF}
   // System
   SysUtils,
   // ACL
@@ -120,21 +122,21 @@ type
     class function CreateComObject(const CLSID, IID: TGUID; out AIntf): Boolean;
   protected
     // App information
-    class function AppClientType: string; virtual; abstract;
-    class function AppDescription: string; virtual; abstract;
-    class function AppDisplayName: string; virtual;
-    class function AppDropTargetClass: string; virtual;
-    class function AppFileName: string; virtual; abstract;
-    class function AppFileNameOfIconLibrary: string; virtual;
-    class function AppFileNameOfInstaller: string; virtual;
+    class function AppClientType: UnicodeString; virtual; abstract;
+    class function AppDescription: UnicodeString; virtual; abstract;
+    class function AppDisplayName: UnicodeString; virtual;
+    class function AppDropTargetClass: UnicodeString; virtual;
+    class function AppFileName: UnicodeString; virtual; abstract;
+    class function AppFileNameOfIconLibrary: UnicodeString; virtual;
+    class function AppFileNameOfInstaller: UnicodeString; virtual;
     class function AppGetClientPath: UnicodeString;
     class function AppGetDefaultIconLibraryMap: AnsiString; virtual;
-    class function AppName: string; virtual; abstract;
+    class function AppName: UnicodeString; virtual; abstract;
     class function AppVersion: Cardinal; virtual; abstract;
 
-    class procedure RegisterApplication(const AIconLibraryFileName: string); virtual;
-    class procedure RegisterFileTypeCommand(AKey: HKEY; const ATypeRoot, AName, ACaption, ACmdLine, ADropTargetClass: string);
-    class procedure RegisterFileTypeCommands(AKey: HKEY; const ATypeRoot: string; const AInfo: TACLFileTypeInfo); virtual;
+    class procedure RegisterApplication(const AIconLibraryFileName: UnicodeString); virtual;
+    class procedure RegisterFileTypeCommand(AKey: HKEY; const ATypeRoot, AName, ACaption, ACmdLine, ADropTargetClass: UnicodeString);
+    class procedure RegisterFileTypeCommands(AKey: HKEY; const ATypeRoot: UnicodeString; const AInfo: TACLFileTypeInfo); virtual;
     class function RegisterFileTypeInfo(AKey: HKEY; const AInfo: TACLFileTypeInfo; ALibrary: TACLFileTypeIconLibrary): Boolean; virtual;
     class procedure UnregisterApplication; virtual;
     class function UnregisterFileTypeInfo(AKey: HKEY; const AInfo: TACLFileTypeInfo): Boolean; virtual;
@@ -144,10 +146,10 @@ type
     class procedure SetAppAsDefault;
     class procedure ShowRegistrationUI;
 
-    class function LoadIconLibrary(const AFileName: string): TACLFileTypeIconLibrary;
-    class function GetIconLibrary: string;
+    class function LoadIconLibrary(const AFileName: UnicodeString): TACLFileTypeIconLibrary;
+    class function GetIconLibrary: UnicodeString;
     class function GetRegistered: Boolean;
-    class procedure SetIconLibrary(const Value: string);
+    class procedure SetIconLibrary(const Value: UnicodeString);
     class procedure SetRegistered(AValue: Boolean);
   end;
 
@@ -394,22 +396,22 @@ begin
     ShellExecute('control.exe', '/NAME Microsoft.DefaultPrograms /PAGE pageDefaultProgram');
 end;
 
-class function TACLFileTypeRegistrar.AppDisplayName: string;
+class function TACLFileTypeRegistrar.AppDisplayName: UnicodeString;
 begin
   Result := AppName;
 end;
 
-class function TACLFileTypeRegistrar.AppDropTargetClass: string;
+class function TACLFileTypeRegistrar.AppDropTargetClass: UnicodeString;
 begin
   Result := '';
 end;
 
-class function TACLFileTypeRegistrar.AppFileNameOfIconLibrary: string;
+class function TACLFileTypeRegistrar.AppFileNameOfIconLibrary: UnicodeString;
 begin
   Result := AppFileName;
 end;
 
-class function TACLFileTypeRegistrar.AppFileNameOfInstaller: string;
+class function TACLFileTypeRegistrar.AppFileNameOfInstaller: UnicodeString;
 begin
   Result := '';
 end;
@@ -420,7 +422,7 @@ begin
 end;
 
 class procedure TACLFileTypeRegistrar.RegisterFileTypeCommand(
-  AKey: HKEY; const ATypeRoot, AName, ACaption, ACmdLine, ADropTargetClass: string);
+  AKey: HKEY; const ATypeRoot, AName, ACaption, ACmdLine, ADropTargetClass: UnicodeString);
 begin
   acRegWriteDefaultStr(AKey, ATypeRoot + '\shell\' + AName + '\', ACaption);
   acRegWriteDefaultStr(AKey, ATypeRoot + '\shell\' + AName + '\command\', ACmdLine);
@@ -430,7 +432,7 @@ begin
 end;
 
 class procedure TACLFileTypeRegistrar.RegisterFileTypeCommands(
-  AKey: HKEY; const ATypeRoot: string; const AInfo: TACLFileTypeInfo);
+  AKey: HKEY; const ATypeRoot: UnicodeString; const AInfo: TACLFileTypeInfo);
 begin
   RegisterFileTypeCommand(AKey, ATypeRoot, 'open', 'Open', '"' + acSelfExeName + '" "%1"', AppDropTargetClass);
 end;
@@ -449,7 +451,7 @@ begin
 
     ATypeRoot := AInfo.GetProgID(AppName);
     acRegWriteDefaultStr(AKey, ATypeRoot, AppDisplayName + ': ' + AInfo.Title);
-    acRegWriteDefaultStr(AKey, ATypeRoot + '\DefaultIcon', ALibrary.FileName + ',' + IntToStr(AIconIndex));
+    acRegWriteDefaultStr(AKey, ATypeRoot + '\DefaultIcon', ALibrary.FileName + ',' + acIntToStr(AIconIndex));
     if AppDropTargetClass <> '' then
       acRegWriteDefaultStr(AKey, ATypeRoot + '\CLSID', AppDropTargetClass);
     RegisterFileTypeCommands(AKey, ATypeRoot, AInfo);
@@ -497,20 +499,20 @@ begin
   Result := '';
 end;
 
-class function TACLFileTypeRegistrar.LoadIconLibrary(const AFileName: string): TACLFileTypeIconLibrary;
+class function TACLFileTypeRegistrar.LoadIconLibrary(const AFileName: UnicodeString): TACLFileTypeIconLibrary;
 begin
   Result := TACLFileTypeIconLibrary.Create;
   Result.Load(AFileName, AppGetDefaultIconLibraryMap);
 end;
 
-class function TACLFileTypeRegistrar.GetIconLibrary: string;
+class function TACLFileTypeRegistrar.GetIconLibrary: UnicodeString;
 begin
   Result := acRegReadStr(HKEY_LOCAL_MACHINE, AppGetClientPath, 'IconLibrary');
   if Result = '' then
     Result := AppFileNameOfIconLibrary;
 end;
 
-class procedure TACLFileTypeRegistrar.RegisterApplication(const AIconLibraryFileName: string);
+class procedure TACLFileTypeRegistrar.RegisterApplication(const AIconLibraryFileName: UnicodeString);
 var
   AClassesRootKey: HKEY;
   AIconLibrary: TACLFileTypeIconLibrary;
@@ -605,7 +607,7 @@ begin
   end;
 end;
 
-class procedure TACLFileTypeRegistrar.SetIconLibrary(const Value: string);
+class procedure TACLFileTypeRegistrar.SetIconLibrary(const Value: UnicodeString);
 begin
   if GetRegistered then
   begin

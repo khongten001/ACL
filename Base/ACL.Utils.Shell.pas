@@ -225,6 +225,7 @@ uses
   ComObj,
   SysUtils,
   // ACL
+  ACL.FastCode,
   ACL.Utils.Strings,
   ACL.Utils.Stream,
   ACL.Utils.Registry;
@@ -232,6 +233,27 @@ uses
 {$IFDEF FPC}
 type
   TFolderTypeID = TGUID;
+
+  IShellItem = interface(IUnknown)
+  ['{43826D1E-E718-42EE-BC55-A1E261C37BFE}']
+    function BindToHandler(const pbc: IBindCtx; const bhid: TGUID; const riid: TIID; out ppv): HResult; stdcall;
+    function GetParent(var ppsi: IShellItem): HResult; stdcall;
+    function GetDisplayName(sigdnName: DWORD; out ppszName: LPWSTR): HResult; stdcall;
+    function GetAttributes(sfgaoMask: DWORD; var psfgaoAttribs: DWORD): HResult; stdcall;
+    function Compare(const psi: IShellItem; hint: DWORD; var piOrder: Integer): HResult; stdcall;
+  end;
+
+  IShellItemArray = interface(IUnknown)
+  ['{B63EA76D-1F85-456F-A19C-48159EFA858B}']
+    function BindToHandler(const pbc: IBindCtx; const rbhid: TGUID; const riid: TIID; out ppvOut): HResult; stdcall;
+    function GetPropertyStore(flags: DWORD; const riid: TIID; out ppv): HResult; stdcall;
+    function GetPropertyDescriptionList(const keyType: PROPERTYKEY; const riid: TIID; out ppv): HResult; stdcall;
+    function GetAttributes(dwAttribFlags: DWORD; sfgaoMask: DWORD; var psfgaoAttribs: DWORD): HResult; stdcall;
+    function GetCount(out pdwNumItems: DWORD): HResult; stdcall;
+    function GetItemAt(dwIndex: DWORD; var ppsi: IShellItem): HResult; stdcall;
+    function EnumItems(var ppenumShellItems: IEnumShellItems): HResult; stdcall;
+  end;
+
   IShellLibrary = interface(IUnknown)
     ['{11A66EFA-382E-451A-9234-1E0E12EF3085}']
     function LoadLibraryFromItem(const psiLibrary: IShellItem;
@@ -260,6 +282,7 @@ type
     function SaveInKnownFolder(const kfidToSaveIn: TIID; pszLibraryName: LPCWSTR;
       lsf: Integer; out ppsiSavedTo: IShellItem): HRESULT; stdcall;
   end;
+
 {$ENDIF}
 
 var
@@ -309,7 +332,7 @@ const
 function SHCreateItemFromParsingName(pszPath: LPCWSTR; const pbc: IBindCtx;
   const riid: TIID; out ppv): HResult; stdcall; external shell32;
 
-function SHQueryUserNotificationState(var pquns: Integer): HResult; stdcall; external shell32;
+function SHQueryUserNotificationState(out pquns: Integer): HResult; stdcall; external shell32;
 
 function SHCreateLibrary(const riid: TIID; out ppv): HResult;
 begin
@@ -675,11 +698,13 @@ end;
 function ShellDriveFree(const ADrive: WideChar; out AFreeSpace, ATotalSpace: Int64): LongBool;
 var
   AErrorMode: Integer;
-  X: Int64;
+  AUnused: Int64;
 begin
   AErrorMode := SetErrorMode(SEM_FailCriticalErrors);
   try
-    Result := GetDiskFreeSpaceExW(PWideChar(ADrive + ':'), X, ATotalSpace, @AFreeSpace);
+    AUnused := 0;
+    ATotalSpace := 0;
+    Result := GetDiskFreeSpaceExW(PWideChar(ADrive + ':'), AUnused, ATotalSpace, @AFreeSpace);
   finally
     SetErrorMode(AErrorMode);
   end;
@@ -706,12 +731,18 @@ function ShellShutdown(AMode: TShellShutdownMode): Boolean;
     AToken: THandle;
   begin
     Result := False;
+    AToken := 0;
     if OpenProcessToken(GetCurrentProcess, TOKEN_ADJUST_PRIVILEGES or TOKEN_QUERY, AToken) then
     begin
+      ALength := 0;
       if not GetTokenInformation(AToken, TokenPrivileges, nil, 0, ALength) then
       begin
+        ALuId := 0;
         if (GetLastError = 122) and LookupPrivilegeValue(nil, 'SeShutdownPrivilege', ALuID) then
         begin
+        {$IFDEF FPC}
+          FastZeroStruct(APrevPriv, SizeOf(APrevPriv));
+        {$ENDIF}
           ANewPriv.PrivilegeCount := 1;
           ANewPriv.Privileges[0].Luid := ALuID;
           ANewPriv.Privileges[0].Attributes := SE_PRIVILEGE_ENABLED;
@@ -842,6 +873,7 @@ begin
   Result := False;
   if fcCanRename in Capabilities then
   begin
+    ANewPIDL := nil;
     Result := ParentShellFolder.SetNameOf(0, FPIDL, PWideChar(NewName), {$IFDEF FPC}Ord{$ENDIF}(SHGDN_NORMAL), ANewPIDL) = S_OK;
     if Result then
     begin
@@ -923,6 +955,9 @@ function TACLShellFolder.GetImageIndex: Integer;
 var
   AFileInfo: TSHFileInfoW;
 begin
+{$IFDEF FPC}
+  FastZeroStruct(AFileInfo, SizeOf(AFileInfo));
+{$ENDIF}
   SHGetFileInfoW(PWideChar(FFullPIDL), 0, AFileInfo, SizeOf(AFileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
   Result := AFileInfo.iIcon;
 end;
@@ -953,7 +988,7 @@ begin
   if fscFileSystem in StorageCapabilities then
     Result := PathForParsing
   else
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
 function TACLShellFolder.GetPathForParsing: UnicodeString;
@@ -1014,7 +1049,7 @@ class function TPIDLHelper.GetDisplayName(AParentFolder: IShellFolder; PIDL: PIt
 var
   AStrRet: TStrRet;
 begin
-  FillChar(AStrRet, SizeOf(AStrRet), 0);
+  FastZeroStruct(AStrRet, SizeOf(AStrRet));
   AParentFolder.GetDisplayNameOf(PIDL, AFlags, AStrRet);
   Result := StrRetToString(PIDL, AStrRet);
 end;
@@ -1062,11 +1097,11 @@ class function TPIDLHelper.FilesToShellListStream(AFiles: TACLStringList; out AS
     for I := 1 to AFiles.Count - 1 do
     begin
       if not acGetMinimalCommonPath(Result, AFiles[I]) then
-        Exit(EmptyStr);
+        Exit(EmptyStrU);
     end;
   end;
 
-  function GetRootFolderPIDL(const ACommonPath: string): PItemIDList;
+  function GetRootFolderPIDL(const ACommonPath: UnicodeString): PItemIDList;
   begin
     if ACommonPath <> '' then
       Result := GetFolderPIDL(0, ACommonPath)
@@ -1092,6 +1127,9 @@ begin
     AStream := TMemoryStream.Create;
 
     // write the CIDA structure
+  {$IFDEF FPC}
+    AOffsets := nil;
+  {$ENDIF}
     SetLength(AOffsets, AFiles.Count + 1);
     AStream.WriteInt32(AFiles.Count);
     AStream.WriteBuffer(AOffsets[0], SizeOf(AOffsets[0]) * Length(AOffsets));
@@ -1138,7 +1176,7 @@ end;
 class function TPIDLHelper.ShellListStreamToFiles(AStream: TCustomMemoryStream; out AFiles: TACLStringList): Boolean;
 var
   ACount: Integer;
-  AFileName: string;
+  AFileName: UnicodeString;
   AOffsets: array of UInt;
   ARootPath: IShellFolder;
   ARootPIDL: PItemIDList;
@@ -1147,6 +1185,9 @@ begin
   ACount := AStream.ReadInt32;
   if ACount <= 0 then Exit(False);
 
+{$IFDEF FPC}
+  AOffsets := nil;
+{$ENDIF}
   SetLength(AOffsets, ACount + 1);
   AStream.ReadBuffer(AOffsets[0], SizeOf(AOffsets[0]) * Length(AOffsets));
 
@@ -1237,6 +1278,9 @@ end;
 
 class function TPIDLHelper.GetDesktopPIDL: PItemIDList;
 begin
+{$IFDEF FPC}
+  Result := nil;
+{$ENDIF}
   OleCheck(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, Result));
 end;
 
@@ -1244,6 +1288,9 @@ class function TPIDLHelper.GetFolderPIDL(Handle: HWND; const APath: UnicodeStrin
 var
   AEaten, AAttr: DWORD;
 begin
+{$IFDEF FPC}
+  AAttr := 0;
+{$ENDIF}
   if Failed(TACLShellFolder.Root.ShellFolder.ParseDisplayName(Handle, nil, PWideChar(APath), AEaten, Result, AAttr)) then
     Result := nil;
 end;

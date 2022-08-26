@@ -229,7 +229,7 @@ begin
     try
       ADropFiles.pFiles := SizeOf(TDropFiles);
       ADropFiles.fWide := True;
-      FastMove(PWideChar(AText)^, PWideChar(NativeUInt(ADropFiles) + ADropFiles.pFiles)^, acStringLength(AText) * SizeOf(WideChar));
+      FastMove(PWideChar(AText)^, PWideChar(PByte(ADropFiles) + ADropFiles.pFiles)^, acStringLength(AText) * SizeOf(WideChar));
     finally
       GlobalUnlock(Result);
     end;

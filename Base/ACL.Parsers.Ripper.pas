@@ -23,7 +23,8 @@ uses
   ACL.Classes.Collections,
   ACL.Expressions,
   ACL.Expressions.FormatString,
-  ACL.FileFormats.XML;
+  ACL.FileFormats.XML,
+  ACL.Utils.Strings;
 
 type
 
@@ -48,9 +49,9 @@ type
   TACLRipperRuleAimingByTagsOptions = set of TACLRipperRuleAimingByTagsOption;
   TACLRipperRuleAimingByTags = class(TACLRipperRule)
   strict private
-    FFinishTags: TStringDynArray;
+    FFinishTags: TUnicodeStringDynArray;
     FOptions: TACLRipperRuleAimingByTagsOptions;
-    FStartTags: TStringDynArray;
+    FStartTags: TUnicodeStringDynArray;
 
     function Find(const AStrToFind, AStr: UnicodeString; AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
   protected
@@ -82,8 +83,7 @@ type
 implementation
 
 uses
-  ACL.Utils.Common,
-  ACL.Utils.Strings;
+  ACL.Utils.Common;
 
 type
 
@@ -197,7 +197,7 @@ end;
 constructor TACLRipperRuleAimingByTags.Create(const AStartTags, AFinishTags: UnicodeString;
   AOptions: TACLRipperRuleAimingByTagsOptions; ASource: TACLRipperRule);
 
-  procedure SplitTags(const S: UnicodeString; var ATags: TStringDynArray);
+  procedure SplitTags(const S: UnicodeString; var ATags: TUnicodeStringDynArray);
   var
     I: Integer;
   begin

@@ -22,10 +22,8 @@ uses
   Types,
   Classes,
   SysUtils,
-  SyncObjs,
   // ACL
   ACL.Classes,
-  ACL.Classes.ByteBuffer,
   ACL.Classes.StringList,
   ACL.Parsers,
   ACL.Utils.Common,
@@ -133,9 +131,9 @@ type
     constructor Create(AChangeEvent: TNotifyEvent); overload;
     destructor Destroy; override;
     procedure Add(const APath: UnicodeString; ARecursive: Boolean);
-    procedure Assign(const ASource: string); reintroduce; overload; virtual;
+    procedure Assign(const ASource: UnicodeString); reintroduce; overload; virtual;
     procedure Clear; virtual;
-    function Contains(APath: string): Boolean;
+    function Contains(APath: UnicodeString): Boolean;
     function CreatePathList: TACLStringList; virtual;
     procedure Delete(Index: Integer);
     function ToString: string; override;
@@ -149,24 +147,24 @@ type
 
   TACLFileStream = class(THandleStream)
   strict private
-    FFileName: string;
+    FFileName: UnicodeString;
   protected
     function GetSize: Int64; override;
   public
     constructor Create(const AHandle: THandle); overload;
-    constructor Create(const AFileName: string; Mode: Word); overload;
-    constructor Create(const AFileName: string; Mode: Word; Rights: Cardinal); overload;
+    constructor Create(const AFileName: UnicodeString; Mode: Word); overload;
+    constructor Create(const AFileName: UnicodeString; Mode: Word; Rights: Cardinal); overload;
     destructor Destroy; override;
-    class function GetFileName(AStream: TStream; out AFileName: string): Boolean;
+    class function GetFileName(AStream: TStream; out AFileName: UnicodeString): Boolean;
     //
-    property FileName: string read FFileName;
+    property FileName: UnicodeString read FFileName;
   end;
 
   { TACLBufferedFileStream }
 
   TACLBufferedFileStream = class(TACLBufferedStream)
   public
-    constructor Create(const AFileName: string; AMode: Word;
+    constructor Create(const AFileName: UnicodeString; AMode: Word;
       ABufferSize: Integer = TACLBufferedStream.DefaultBufferSize); reintroduce;
   end;
 
@@ -284,13 +282,10 @@ procedure acClearFileLongPath(out W: TFileLongPath);
 implementation
 
 uses
-  Character,
-  Math,
   RTLConsts,
   // ACL
   ACL.FastCode,
   ACL.FileFormats.INI,
-  ACL.Math,
   ACL.Utils.Strings;
 
 function GetFileAttributesExW(AFileName: PWideChar;
@@ -325,7 +320,7 @@ end;
 
 function acIsLnkFileName(const AFileName: UnicodeString): Boolean;
 begin
-  Result := acSameText(acExtractFileExt(AFileName), '.lnk');
+  Result := acSameText(acExtractFileExt(AFileName), UnicodeString('.lnk'));
 end;
 
 function acIsLocalUnixPath(const AFileName: UnicodeString): Boolean;
@@ -374,7 +369,7 @@ begin
     Result := AFileName;
 end;
 
-function acMakePathFromParts(const AParts: TStringDynArray; ALastPathDelimeter: Boolean): UnicodeString;
+function acMakePathFromParts(const AParts: TUnicodeStringDynArray; ALastPathDelimeter: Boolean): UnicodeString;
 var
   I: Integer;
 begin
@@ -400,7 +395,7 @@ var
   L: Integer;
   W: TFileLongPath;
 begin
-  if AFileName <> EmptyStr then
+  if AFileName <> EmptyStrU then
     L := ExpandEnvironmentStringsW(PWideChar(AFileName), @W[0], Length(W))
   else
     L := 0;
@@ -421,6 +416,7 @@ begin
   Result := AFileName;
   if acPos('.\', Result) > 0 then
   begin
+    N := nil;
     L := GetFullPathNameW(PWideChar(AFileName), Length(W), @W[0], N);
     if L > 0 then
       SetString(Result, W, L)
@@ -491,7 +487,7 @@ end;
 
 function acValidateSubPath(const Path: UnicodeString): UnicodeString;
 var
-  AArr: TStringDynArray;
+  AArr: TUnicodeStringDynArray;
   AHasPathDelimeter: Boolean;
   I: Integer;
 begin
@@ -564,7 +560,7 @@ var
 begin
   AEndIndex := Length(APath);
   if AEndIndex = 0 then
-    Exit(EmptyStr);
+    Exit(EmptyStrU);
 
   AStartIndex := AEndIndex;
   while (ADepth > 0) and (AStartIndex > 0) do
@@ -697,7 +693,7 @@ begin
   Result := AFileName;
   while acFileExists(Result) do
   begin
-    Result := acChangeFileExt(AFileName, ' (' + IntToStr(AIndex) + ')' + acExtractFileExt(AFileName));
+    Result := acChangeFileExt(AFileName, Format(' (%d)%s', [AIndex, acExtractFileExt(AFileName)]));
     Inc(AIndex);
   end;
 end;
@@ -736,6 +732,9 @@ begin
   ALength := GetShortPathNameW(PWideChar(acPrepareFileName(APath)), nil, 0);
   if ALength > 0 then
   begin
+  {$IFDEF FPC}
+    Result := EmptyStrU;
+  {$ENDIF}
     SetLength(Result, ALength);
     ALength := GetShortPathNameW(PWideChar(acPrepareFileName(APath)), PWideChar(Result), ALength);
 
@@ -938,6 +937,7 @@ function acVolumeGetSerial(const ADrive: WideChar; out ASerialNumber: Cardinal):
 var
   X: Cardinal;
 begin
+  X := 0;
   Result := GetVolumeInformationW(PWideChar(ADrive + ':\'), nil, 0, @ASerialNumber, X, X, nil, 0);
 end;
 
@@ -955,6 +955,8 @@ var
 begin
   Result := '';
   if ADrive <> '' then
+  begin
+    X := 0;
     if GetVolumeInformationW(PWideChar(ADrive[1] + ':\'), @B[0], High(B), nil, X, X, nil, 0) then
     begin
       Result := B;
@@ -966,6 +968,7 @@ begin
           Free;
         end;
     end;
+  end;
 
   Result := Format('%s (%s)', [IfThenW(Result, ADefaultTitle), ADrive]);
 end;
@@ -1300,10 +1303,10 @@ begin
   Changed;
 end;
 
-procedure TACLSearchPaths.Assign(const ASource: string);
+procedure TACLSearchPaths.Assign(const ASource: UnicodeString);
 var
-  APath: string;
-  APaths: TStringDynArray;
+  APath: UnicodeString;
+  APaths: TUnicodeStringDynArray;
   I: Integer;
 begin
   BeginUpdate;
@@ -1333,7 +1336,7 @@ begin
   Changed;
 end;
 
-function TACLSearchPaths.Contains(APath: string): Boolean;
+function TACLSearchPaths.Contains(APath: UnicodeString): Boolean;
 var
   I: Integer;
 begin
@@ -1446,12 +1449,12 @@ begin
     raise EFOpenError.CreateResFmt(@SFOpenErrorEx, [FileName, SysErrorMessage(GetLastError)]);
 end;
 
-constructor TACLFileStream.Create(const AFileName: string; Mode: Word);
+constructor TACLFileStream.Create(const AFileName: UnicodeString; Mode: Word);
 begin
   Create(AFileName, Mode, 0);
 end;
 
-constructor TACLFileStream.Create(const AFileName: string; Mode: Word; Rights: Cardinal);
+constructor TACLFileStream.Create(const AFileName: UnicodeString; Mode: Word; Rights: Cardinal);
 begin
   FFileName := AFileName;
   Create(acFileCreate(AFileName, Mode, Rights));
@@ -1463,12 +1466,12 @@ begin
   inherited Destroy;
 end;
 
-class function TACLFileStream.GetFileName(AStream: TStream; out AFileName: string): Boolean;
+class function TACLFileStream.GetFileName(AStream: TStream; out AFileName: UnicodeString): Boolean;
 begin
   Result := True;
   AStream := TACLStreamWrapper.Unwrap(AStream);
   if AStream is TFileStream then
-    AFileName := TFileStream(AStream).FileName
+    AFileName := acStringToUnicode(TFileStream(AStream).FileName)
   else
     if AStream is TACLFileStream then
       AFileName := TACLFileStream(AStream).FileName
@@ -1487,7 +1490,7 @@ end;
 
 { TACLBufferedFileStream }
 
-constructor TACLBufferedFileStream.Create(const AFileName: string; AMode: Word; ABufferSize: Integer);
+constructor TACLBufferedFileStream.Create(const AFileName: UnicodeString; AMode: Word; ABufferSize: Integer);
 begin
   inherited Create(TACLFileStream.Create(AFileName, AMode), soOwned, ABufferSize);
 end;
@@ -1599,6 +1602,11 @@ var
   L: TFileTime;
   W1, W2: Word;
 begin
+{$IFDEF FPC}
+  W1 := 0;
+  W2 := 0;
+  FastZeroStruct(L, SizeOf(L));
+{$ENDIF}
   FileTimeToLocalFileTime(ATime, L);
   if FileTimeToDosDateTime(L, W2, W1) then
     Result := FileDateToDateTime(MakeLong(W1, W2))
@@ -1622,6 +1630,9 @@ var
 begin
   //#AI: W7x64, 13.05.2014: FindFirstFileW faster than GetFileAttributesExW
   Result := False;
+{$IFDEF FPC}
+  FastZeroStruct(AData, SizeOf(AData));
+{$ENDIF}
   AHandle := FindFirstFileW(PWideChar(acPrepareFileName(AFileName)), AData);
   if AHandle <> INVALID_HANDLE_VALUE then
   try

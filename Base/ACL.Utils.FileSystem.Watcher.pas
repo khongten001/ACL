@@ -78,7 +78,7 @@ type
     function Add(const APaths: TACLStringList; AChangeEvent: TACLFileSystemWatcherNotifyEvent;
       ARecursive: Boolean = True; AChanges: TACLFileSystemChanges = AllFileSystemChanges;
       ACombineSerialChanges: Boolean = True): IACLFileSystemWatcherTask; overload;
-    function AddFile(const AFileName: string; AChangeEvent: TACLFileSystemWatcherNotifyEvent): IACLFileSystemWatcherTask;
+    function AddFile(const AFileName: UnicodeString; AChangeEvent: TACLFileSystemWatcherNotifyEvent): IACLFileSystemWatcherTask;
     procedure Remove(var ATask: IACLFileSystemWatcherTask);
   end;
 
@@ -172,14 +172,14 @@ type
   TACLFileSystemWatcherFileTask = class(TACLFileSystemWatcherCustomTask)
   strict private
     FFileLastWriteTime: TDateTime;
-    FFileName: string;
+    FFileName: UnicodeString;
     FFileSize: Int64;
 
     procedure FetchFileInfo(out ASize: Int64; out ALastWriteTime: TDateTime);
   protected
     procedure DoChanged; override;
   public
-    constructor Create(const AFileName: string; AEvent: TACLFileSystemWatcherNotifyEvent);
+    constructor Create(const AFileName: UnicodeString; AEvent: TACLFileSystemWatcherNotifyEvent);
   end;
 
   { TACLFileSystemWatcherTask }
@@ -303,7 +303,7 @@ begin
   end;
 end;
 
-function TACLFileSystemWatcher.AddFile(const AFileName: string;
+function TACLFileSystemWatcher.AddFile(const AFileName: UnicodeString;
   AChangeEvent: TACLFileSystemWatcherNotifyEvent): IACLFileSystemWatcherTask;
 begin
   FLock.Enter;
@@ -449,7 +449,7 @@ begin
   ABuffer := AllocMem(BufferSize);
   try
     ZeroMemory(@AOverlapped, SizeOf(AOverlapped));
-    AOverlapped.hEvent := {$IFDEF FPC}ULONG_PTR{$ENDIF}(AEvent.Handle);
+    AOverlapped.hEvent := {$IFDEF FPC}PointerToLParam{$ENDIF}(AEvent.Handle);
 
     while not Terminated do
     begin
@@ -495,7 +495,7 @@ end;
 
 function TFileNotifyInformation.NextEntry: PFileNotifyInformation;
 begin
-  Result := PFileNotifyInformation(NativeUInt(@Self) + NextEntryOffset);
+  Result := PFileNotifyInformation(PByte(@Self) + NextEntryOffset);
 end;
 
 { TACLFileSystemWatcherCustomTask }
@@ -567,7 +567,7 @@ end;
 
 { TACLFileSystemWatcherFileTask }
 
-constructor TACLFileSystemWatcherFileTask.Create(const AFileName: string; AEvent: TACLFileSystemWatcherNotifyEvent);
+constructor TACLFileSystemWatcherFileTask.Create(const AFileName: UnicodeString; AEvent: TACLFileSystemWatcherNotifyEvent);
 begin
   inherited Create([fscFiles, fscSize, fscLastWriteTime], AEvent);
   FFileName := AFileName;

@@ -227,6 +227,7 @@ begin
     AAppMonitor := ScreenHelper.FindByWnd(AAppHandle);
     if (AMonitor = nil) or (AMonitor = AAppMonitor) then
     begin
+      R := NullRect;
       if Assigned(AAppMonitor) and GetWindowRect(AAppHandle, R) then
       begin
         with AAppMonitor.BoundsRect do
@@ -282,6 +283,7 @@ begin
   //Note: One of our Forms can be a Desktop toolbar, so, we need to calculate client area manually
   Result := MonitorGetBounds(P);
   ATaskBar := MonitorGetTaskBarInfo;
+  R := NullRect;
   if IntersectRect(R, Result, ATaskBar.Bounds) and not ATaskBar.AutoHide then
     case ATaskBar.Position of
       tbpLeft:

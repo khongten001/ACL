@@ -21,14 +21,12 @@ uses
   Messages,
   // System
   Classes,
-  Generics.Collections,
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Forms,
   Vcl.Graphics,
 {$ENDIF}
   // ACL
-  ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.FileFormats.INI;
@@ -363,7 +361,7 @@ end;
 
 function LangGetMsg(ID: Integer): UnicodeString;
 begin
-  Result := Langfile.ReadString(sLangMsg, IntToStr(ID));
+  Result := Langfile.ReadString(sLangMsg, acIntToStr(ID));
 end;
 
 function LangGetMsgPart(ID, APart: Integer): UnicodeString;

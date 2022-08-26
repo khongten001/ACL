@@ -24,7 +24,6 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
   ACL.Expressions,
   ACL.Parsers,
   ACL.Utils.Common,
@@ -82,7 +81,7 @@ type
     class function FunctionStrTrim(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionUpperCase(AContext: TObject; AParams: TACLExpressionElements): Variant;
   protected
-    MacroDelimiter: Char;
+    MacroDelimiter: WideChar;
     MacroDelimiterOnBothSides: Boolean;
     ShowCompileErrors: Boolean;
 

@@ -173,8 +173,7 @@ uses
   RTLConsts,
   // ACL
   ACL.FastCode,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Stream;
+  ACL.Utils.FileSystem;
 
 function acCompare(const AContainer1, AContainer2: IACLDataContainer): Boolean;
 begin

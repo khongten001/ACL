@@ -30,20 +30,20 @@ type
 
   TACLUserAccountInfo = class
   strict private
-    FDisplayName: string;
-    FName: string;
-    FPathAppData: string;
-    FPathProfile: string;
+    FDisplayName: UnicodeString;
+    FName: UnicodeString;
+    FPathAppData: UnicodeString;
+    FPathProfile: UnicodeString;
 
-    function GetDisplayName: string;
+    function GetDisplayName: UnicodeString;
   public
-    constructor Create(const AName, ADisplayName, AProfilePath, APathAppData: string);
+    constructor Create(const AName, ADisplayName, AProfilePath, APathAppData: UnicodeString);
     function Equals(Obj: TObject): Boolean; override;
     //
-    property DisplayName: string read GetDisplayName;
-    property Name: string read FName;
-    property PathAppData: string read FPathAppData;
-    property PathProfile: string read FPathProfile;
+    property DisplayName: UnicodeString read GetDisplayName;
+    property Name: UnicodeString read FName;
+    property PathAppData: UnicodeString read FPathAppData;
+    property PathProfile: UnicodeString read FPathProfile;
   end;
 
   { TACLUserAccountInfoList }
@@ -57,7 +57,7 @@ type
 
   TACLUserAccounts = class
   strict private
-    class function OpenUsersFolder(const AProfile: string; out AKey: HKEY): Boolean; static;
+    class function OpenUsersFolder(const AProfile: UnicodeString; out AKey: HKEY): Boolean; static;
   public
     class function Populate: TACLUserAccountInfoList; overload; static;
     class procedure Populate(AList: TACLUserAccountInfoList); overload; static;
@@ -74,7 +74,7 @@ uses
   ACL.Utils.Shell,
   ACL.Utils.Strings;
 
-function ExpandEnvironmentVariablesInPath(const APath: string): string;
+function ExpandEnvironmentVariablesInPath(const APath: UnicodeString): UnicodeString;
 var
   ABuffer: TFileLongPath;
 begin
@@ -109,7 +109,7 @@ end;
 
 { TACLUserAccountInfo }
 
-constructor TACLUserAccountInfo.Create(const AName, ADisplayName, AProfilePath, APathAppData: string);
+constructor TACLUserAccountInfo.Create(const AName, ADisplayName, AProfilePath, APathAppData: UnicodeString);
 begin
   inherited Create;
   FName := AName;
@@ -123,7 +123,7 @@ begin
   Result := (Obj is TACLUserAccountInfo) and (PathProfile = TACLUserAccountInfo(Obj).PathProfile);
 end;
 
-function TACLUserAccountInfo.GetDisplayName: string;
+function TACLUserAccountInfo.GetDisplayName: UnicodeString;
 begin
   Result := IfThenW(FDisplayName, Name);
 end;
@@ -156,14 +156,14 @@ const
   PathProfileList = 'Software\Microsoft\Windows NT\CurrentVersion\ProfileList\';
 var
   AKey: HKEY;
-  APath: string;
+  APath: UnicodeString;
 begin
   AList.Add(TACLUserAccountInfo.Create(acUserName, '', ShellGetSystemFolder(CSIDL_PROFILE), ShellGetAppData));
 
   acRegEnumKeys(HKEY_LOCAL_MACHINE, PathProfileList,
     procedure (const S: UnicodeString)
     var
-      ASubPath: string;
+      ASubPath: UnicodeString;
     begin
       if not acIsOurFile('*.bak;', S) then
       begin
@@ -183,7 +183,7 @@ begin
     end);
 end;
 
-class function TACLUserAccounts.OpenUsersFolder(const AProfile: string; out AKey: HKEY): Boolean;
+class function TACLUserAccounts.OpenUsersFolder(const AProfile: UnicodeString; out AKey: HKEY): Boolean;
 const
   PathUserFolders = 'Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\';
 begin

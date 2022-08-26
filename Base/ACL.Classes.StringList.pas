@@ -35,8 +35,8 @@ type
     FObject: TObject;
     FString: UnicodeString;
 
-    procedure Exchange(var Item: TACLStringListItem); inline;
-    procedure MoveFrom(const Item: TACLStringListItem); inline;
+    procedure Exchange(var Item: TACLStringListItem); {$IFNDEF FPC}inline;{$ENDIF}
+    procedure MoveFrom(const Item: TACLStringListItem); {$IFNDEF FPC}inline;{$ENDIF}
   end;
 
   PACLStringListItemList = ^TACLStringListItemList;
@@ -102,7 +102,7 @@ type
     // I/O
     function LoadFromFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
     procedure LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil); virtual;
-    procedure LoadFromResource(AInstance: THandle; const AName: UnicodeString; AType: PChar);
+    procedure LoadFromResource(AInstance: THandle; const AName: string; AType: PChar);
     function SaveToFile(const AFile: UnicodeString; AEncoding: TEncoding = nil): Boolean;
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil); virtual;
 
@@ -297,6 +297,9 @@ begin
         procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
         begin
           Add(acExtractString(ACursorStart, ACursorNext));
+        {$IFDEF FPC}
+          ACanContinue := True; // to make compiller happy
+        {$ENDIF}
         end)
     end;
   finally
@@ -351,7 +354,7 @@ begin
     Clear;
 end;
 
-procedure TACLStringList.LoadFromResource(AInstance: THandle; const AName: UnicodeString; AType: PChar);
+procedure TACLStringList.LoadFromResource(AInstance: THandle; const AName: string; AType: PChar);
 var
   AStream: TResourceStream;
 begin
@@ -669,7 +672,7 @@ begin
       for I := 0 to Count - 1 do
       begin
         with FList[I] do
-          AStrings.AddObject(FString, FObject);
+          AStrings.AddObject(acUnicodeToString(FString), FObject);
       end;
     finally
       AStrings.EndUpdate;
@@ -834,7 +837,7 @@ begin
     P := ABuffer;
     AStart := P;
     AFinish := ABuffer + ACount;
-    while (NativeUInt(P) + SizeOf(WideChar) <= NativeUInt(AFinish)) do
+    while (PByte(P) + SizeOf(WideChar) <= PByte(AFinish)) do
     begin
       if (P^ <> #10) and (P^ <> #13) and (P^ <> acLineSeparator) then
         Inc(P)

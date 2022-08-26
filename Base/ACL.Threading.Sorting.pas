@@ -22,11 +22,9 @@ uses
   Generics.Defaults,
   SysUtils,
   // ACL
-  ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
-  ACL.Threading,
-  ACL.Utils.Common;
+  ACL.Threading;
 
 type
 
@@ -303,7 +301,7 @@ begin
   AItemB := AHighA;
   Inc(AItemB);
   AHighB := @FTempList[AHiBound];
-  while (NativeUInt(AItemA) <= NativeUInt(AHighA)) and (NativeUInt(AItemB) <= NativeUInt(AHighB)) do
+  while (PByte(AItemA) <= PByte(AHighA)) and (PByte(AItemB) <= PByte(AHighB)) do
   begin
     if FCompareProc(AItemA^, AItemB^) < 0 then
     begin
@@ -420,7 +418,7 @@ begin
   AItemB := AHighA;
   Inc(AItemB);
   AHighB := @FTempList[AHiBound];
-  while (NativeUInt(AItemA) <= NativeUInt(AHighA)) and (NativeUInt(AItemB) <= NativeUInt(AHighB)) do
+  while (PByte(AItemA) <= PByte(AHighA)) and (PByte(AItemB) <= PByte(AHighB)) do
   begin
     if FCompareProc(AItemA^, AItemB^) < 0 then
     begin

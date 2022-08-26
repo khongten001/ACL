@@ -41,7 +41,7 @@ type
 
   EACLXMLUnexpectedToken = class(EACLXMLDocument)
   public
-    constructor Create(const AToken, AStringForParsing: string);
+    constructor Create(const AToken, AStringForParsing: UnicodeString);
   end;
 
   { TACLXMLEncoding }
@@ -75,7 +75,7 @@ type
     constructor Create(const ASource: UnicodeString); overload;
     procedure Clear;
     function ToDateTime: TDateTime;
-    function ToString: string;
+    function ToString: UnicodeString;
   end;
 
   { TACLXMLAttribute }
@@ -225,7 +225,7 @@ type
     // Load
     procedure LoadFromFile(const AFileName: UnicodeString); overload;
     procedure LoadFromFile(const AFileName: UnicodeString; const ADefaultEncoding: TACLXMLEncoding); overload;
-    procedure LoadFromResource(AInst: HINST; const AName, AType: string);
+    procedure LoadFromResource(AInst: HINST; const AName: string; AType: PChar);
     procedure LoadFromStream(AStream: TStream); overload;
     procedure LoadFromStream(AStream: TStream; const ADefaultEncoding: TACLXMLEncoding); overload; virtual;
     procedure LoadFromString(const AString: AnsiString); virtual;
@@ -240,25 +240,25 @@ type
 
   TACLXMLConfig = class
   strict private
-    class function FindOption(AOptionSet: TACLXMLNode; const AName: string; out AOption: TACLXMLNode; ACanCreate: Boolean = False): Boolean;
+    class function FindOption(AOptionSet: TACLXMLNode; const AName: UnicodeString; out AOption: TACLXMLNode; ACanCreate: Boolean = False): Boolean;
   public const
     Name = 'name';
     Option = 'option';
     Options = 'options';
     Value = 'value';
   public
-    class function GetBoolean(AOptionSet: TACLXMLNode; const AName: string; ADefault: Boolean = False): Boolean;
-    class function GetDateTime(AOptionSet: TACLXMLNode; const AName: string; const ADefault: TDateTime = 0): TDateTime;
-    class function GetDouble(AOptionSet: TACLXMLNode; const AName: string; const ADefault: Double = 0): Double;
-    class function GetInt64(AOptionSet: TACLXMLNode; const AName: string; const ADefault: Int64 = 0): Int64;
-    class function GetInteger(AOptionSet: TACLXMLNode; const AName: string; ADefault: Integer = 0): Integer;
-    class function GetString(AOptionSet: TACLXMLNode; const AName: string; const ADefault: string = ''): string;
-    class procedure SetBoolean(AOptionSet: TACLXMLNode; const AName: string; AValue: Boolean);
-    class procedure SetDateTime(AOptionSet: TACLXMLNode; const AName: string; const AValue: TDateTime);
-    class procedure SetDouble(AOptionSet: TACLXMLNode; const AName: string; const AValue: Double);
-    class procedure SetInt64(AOptionSet: TACLXMLNode; const AName: string; const AValue: Int64);
-    class procedure SetInteger(AOptionSet: TACLXMLNode; const AName: string; const AValue: Integer);
-    class procedure SetString(AOptionSet: TACLXMLNode; const AName: string; const AValue: string);
+    class function GetBoolean(AOptionSet: TACLXMLNode; const AName: UnicodeString; ADefault: Boolean = False): Boolean;
+    class function GetDateTime(AOptionSet: TACLXMLNode; const AName: UnicodeString; const ADefault: TDateTime = 0): TDateTime;
+    class function GetDouble(AOptionSet: TACLXMLNode; const AName: UnicodeString; const ADefault: Double = 0): Double;
+    class function GetInt64(AOptionSet: TACLXMLNode; const AName: UnicodeString; const ADefault: Int64 = 0): Int64;
+    class function GetInteger(AOptionSet: TACLXMLNode; const AName: UnicodeString; ADefault: Integer = 0): Integer;
+    class function GetString(AOptionSet: TACLXMLNode; const AName: UnicodeString; const ADefault: UnicodeString = ''): UnicodeString;
+    class procedure SetBoolean(AOptionSet: TACLXMLNode; const AName: UnicodeString; AValue: Boolean);
+    class procedure SetDateTime(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: TDateTime);
+    class procedure SetDouble(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: Double);
+    class procedure SetInt64(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: Int64);
+    class procedure SetInteger(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: Integer);
+    class procedure SetString(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: UnicodeString);
   end;
 
   { TACLXMLHelper }
@@ -271,7 +271,7 @@ type
   public
     class constructor Create;
     class destructor Destroy;
-    class function DecodeBoolean(const S: string): Boolean; static;
+    class function DecodeBoolean(const S: UnicodeString): Boolean; static;
     class function DecodeString(const S: UnicodeString): UnicodeString;
     class function EncodeString(const S: UnicodeString): UnicodeString;
     class function IsHTMLCode(var P: PWideChar; var L: Integer): Boolean;
@@ -291,8 +291,8 @@ uses
   ACL.Parsers;
 
 const
-  sXMLSpaceModeAttr = 'xml:space';
-  sXMLSpaceModePreserve = 'preserve';
+  sXMLSpaceModeAttr = _U('xml:space');
+  sXMLSpaceModePreserve = _U('preserve');
 
   sXMLBoolValues: array[Boolean] of AnsiString = ('false', 'true');
 
@@ -424,7 +424,7 @@ type
   strict private
     function EncodeValue(const S: UnicodeString): AnsiString;
     procedure WriteNode(ANode: TACLXMLNode; ALevel: Integer; AIsPreserveSpacesMode: Boolean);
-    procedure WriteNodeAttribute(ALevel: Integer; const AName: AnsiString; const AValue: string);
+    procedure WriteNodeAttribute(ALevel: Integer; const AName: AnsiString; const AValue: UnicodeString);
     procedure WriteNodeAttributes(ANode: TACLXMLNode; ALevel: Integer);
     procedure WriteString(const S: AnsiString); overload;
     procedure WriteString(const S: AnsiString; ADupeCount: Integer); overload;
@@ -443,9 +443,9 @@ end;
 
 { EACLXMLUnexpectedToken }
 
-constructor EACLXMLUnexpectedToken.Create(const AToken, AStringForParsing: string);
+constructor EACLXMLUnexpectedToken.Create(const AToken, AStringForParsing: UnicodeString);
 begin
-  inherited CreateFmt('Unexpected token was found ("%s" in "%s")', [IfThen(AToken <> #0, AToken, '#0'), AStringForParsing]);
+  inherited CreateFmt('Unexpected token was found ("%s" in "%s")', [IfThenW(AToken <> #0, AToken, '#0'), AStringForParsing]);
 end;
 
 { TACLXMLDateTime }
@@ -459,7 +459,7 @@ end;
 
 constructor TACLXMLDateTime.Create(const ASource: UnicodeString);
 
-  function GetNextPart(out ADelimiter: Char; var AIndex: Integer): string;
+  function GetNextPart(out ADelimiter: WideChar; var AIndex: Integer): UnicodeString;
   var
     I: Integer;
   begin
@@ -478,9 +478,9 @@ constructor TACLXMLDateTime.Create(const ASource: UnicodeString);
     ADelimiter := #0;
   end;
 
-  function GetNextPartAndCheckDelimiter(const AExpectedDelimiter: Char; var AIndex: Integer): string;
+  function GetNextPartAndCheckDelimiter(const AExpectedDelimiter: WideChar; var AIndex: Integer): UnicodeString;
   var
-    C: Char;
+    C: WideChar;
   begin
     Result := GetNextPart(C, AIndex);
     if C <> AExpectedDelimiter then
@@ -488,12 +488,12 @@ constructor TACLXMLDateTime.Create(const ASource: UnicodeString);
   end;
 
 var
-  ADelim: Char;
+  ADelim: WideChar;
   AIndex: Integer;
   AOffsetHour: Word;
   AOffsetMinutes: Word;
   ASign: Integer;
-  AValue: string;
+  AValue: UnicodeString;
 begin
   Clear;
   AIndex := 1;
@@ -562,9 +562,9 @@ begin
   Result := EncodeDate(Year, Month, Day) + EncodeTime(Hour, Minute, Second, Millisecond);
 end;
 
-function TACLXMLDateTime.ToString: string;
+function TACLXMLDateTime.ToString: UnicodeString;
 begin
-  Result := FormatDateTime('yyyy-mm-dd''T''hh:mm:ss.zzz', ToDateTimeCore, InvariantFormatSettings) + IfThen(IsUTC, 'Z');
+  Result := FormatDateTime(_U('yyyy-mm-dd''T''hh:mm:ss.zzz'), ToDateTimeCore, InvariantFormatSettings) + IfThenW(IsUTC, 'Z');
 end;
 
 { TACLXMLAttribute }
@@ -590,7 +590,7 @@ end;
 
 function TACLXMLAttributes.Add(const AName: AnsiString; const AValue: Integer): TACLXMLAttribute;
 begin
-  Result := Add(AName, IntToStr(AValue));
+  Result := Add(AName, acIntToStr(AValue));
 end;
 
 function TACLXMLAttributes.Add(const AName: AnsiString; const AValue: UnicodeString): TACLXMLAttribute;
@@ -830,17 +830,17 @@ end;
 
 procedure TACLXMLAttributes.SetValueAsDouble(const AName: AnsiString; const AValue: Double);
 begin
-  SetValue(AName, FloatToStr(AValue, InvariantFormatSettings));
+  SetValue(AName, acFloatToStr(AValue, InvariantFormatSettings));
 end;
 
 procedure TACLXMLAttributes.SetValueAsInt64(const AName: AnsiString; const AValue: Int64);
 begin
-  SetValue(AName, IntToStr(AValue));
+  SetValue(AName, acIntToStr(AValue));
 end;
 
 procedure TACLXMLAttributes.SetValueAsInteger(const AName: AnsiString; const AValue: Integer);
 begin
-  SetValue(AName, IntToStr(AValue));
+  SetValue(AName, acIntToStr(AValue));
 end;
 
 procedure TACLXMLAttributes.SetValueAsRect(const AName: AnsiString; const AValue: TRect);
@@ -1170,7 +1170,7 @@ end;
 
 procedure TACLXMLNode.SetNodeValueAsInteger(const Value: Integer);
 begin
-  NodeValue := IntToStr(Value)
+  NodeValue := acIntToStr(Value)
 end;
 
 procedure TACLXMLNode.SetParent(AValue: TACLXMLNode);
@@ -1274,11 +1274,11 @@ begin
     Clear;
 end;
 
-procedure TACLXMLDocument.LoadFromResource(AInst: HINST; const AName, AType: string);
+procedure TACLXMLDocument.LoadFromResource(AInst: HINST; const AName: string; AType: PChar);
 var
   AStream: TStream;
 begin
-  AStream := TResourceStream.Create(AInst, AName, PChar(AType));
+  AStream := TResourceStream.Create(AInst, AName, AType);
   try
     LoadFromStream(AStream);
   finally
@@ -1444,6 +1444,9 @@ var
   AIndex: Integer;
 begin
   ACount := ReadValue(AStream);
+{$IFDEF FPC}
+  AStringTable := nil;
+{$ENDIF}
   SetLength(AStringTable, ACount);
   for AIndex := 0 to ACount - 1 do
     AStringTable[AIndex] := AStream.ReadStringA(ReadValue(AStream));
@@ -1476,6 +1479,9 @@ class procedure TACLLegacyBinaryXMLParser.ReadNode(AStream: TStream; ANode: TACL
   var
     ALength: Integer;
   begin
+  {$IFDEF FPC}
+    Result := EmptyStrU;
+  {$ENDIF}
     ALength := AStream.ReadInt32;
     if ALength > 0 then
     begin
@@ -1545,8 +1551,8 @@ procedure TACLTextXMLParser.ParseEncoding;
 
   function DecodeEncoding(const AData: UnicodeString): TACLXMLEncoding;
   const
-    sUTF8 = 'utf-8';
-    sWindows = 'Windows-';
+    sUTF8 = UnicodeString('utf-8');
+    sWindows = UnicodeString('Windows-');
   begin
     if acSameText(AData, sUTF8) then
       Result := TACLXMLEncoding.Create(mxeUTF8)
@@ -1581,7 +1587,7 @@ begin
   begin
     S2 := ACursor - 1;
     S1 := ATagHeaderEndCursor;
-    ALength := NativeUInt(S2) - NativeUInt(S1) + 1;
+    ALength := PByte(S2) - PByte(S1) + 1;
     if not AIsPreserveSpacesMode then
     begin
       while (ALength > 0) and (Ord(S1^) <= Ord(' ')) do
@@ -1793,7 +1799,7 @@ begin
       MoveToNextSymbol;
       AToken.Buffer := P;
       MoveUntilQuotOrTag(AQuot);
-      AToken.BufferLengthInChars := NativeUInt(P) - NativeUInt(AToken.Buffer);
+      AToken.BufferLengthInChars := PByte(P) - PByte(AToken.Buffer);
       if P^ = AQuot then
         MoveToNextSymbol;
     end
@@ -1810,7 +1816,7 @@ begin
         begin
           AToken.Buffer := P;
           MoveUntilDelimiter;
-          AToken.BufferLengthInChars := NativeUInt(P) - NativeUInt(AToken.Buffer);
+          AToken.BufferLengthInChars := PByte(P) - PByte(AToken.Buffer);
         end;
       end;
   end;
@@ -1876,6 +1882,8 @@ begin
           if ANode = nil then Break;
           ATagHeaderEndCursor := nil;
         end;
+    else
+      // do nothing, but make FPC happy
     end;
 end;
 
@@ -1942,7 +1950,7 @@ begin
     WriteString(acCRLF);
 end;
 
-procedure TACLTextXMLBuilder.WriteNodeAttribute(ALevel: Integer; const AName: AnsiString; const AValue: string);
+procedure TACLTextXMLBuilder.WriteNodeAttribute(ALevel: Integer; const AName: AnsiString; const AValue: UnicodeString);
 begin
   if AName <> '' then
   begin
@@ -2097,6 +2105,9 @@ var
   L: Integer;
   S: AnsiString;
 begin
+{$IFDEF FPC}
+  AList := nil;
+{$ENDIF}
   SetLength(AList, FStringTable.Count);
   FStringTable.Enum(
     procedure (const A: AnsiString; const R: Integer)
@@ -2140,7 +2151,7 @@ end;
 
 { TACLXMLConfig }
 
-class function TACLXMLConfig.GetBoolean(AOptionSet: TACLXMLNode; const AName: string; ADefault: Boolean): Boolean;
+class function TACLXMLConfig.GetBoolean(AOptionSet: TACLXMLNode; const AName: UnicodeString; ADefault: Boolean): Boolean;
 var
   ANode: TACLXMLNode;
 begin
@@ -2150,7 +2161,7 @@ begin
     Result := ADefault;
 end;
 
-class function TACLXMLConfig.GetDateTime(AOptionSet: TACLXMLNode; const AName: string; const ADefault: TDateTime): TDateTime;
+class function TACLXMLConfig.GetDateTime(AOptionSet: TACLXMLNode; const AName: UnicodeString; const ADefault: TDateTime): TDateTime;
 var
   ANode: TACLXMLNode;
 begin
@@ -2160,7 +2171,7 @@ begin
     Result := ADefault;
 end;
 
-class function TACLXMLConfig.GetDouble(AOptionSet: TACLXMLNode; const AName: string; const ADefault: Double): Double;
+class function TACLXMLConfig.GetDouble(AOptionSet: TACLXMLNode; const AName: UnicodeString; const ADefault: Double): Double;
 var
   ANode: TACLXMLNode;
 begin
@@ -2170,7 +2181,7 @@ begin
     Result := ADefault;
 end;
 
-class function TACLXMLConfig.GetInt64(AOptionSet: TACLXMLNode; const AName: string; const ADefault: Int64): Int64;
+class function TACLXMLConfig.GetInt64(AOptionSet: TACLXMLNode; const AName: UnicodeString; const ADefault: Int64): Int64;
 var
   ANode: TACLXMLNode;
 begin
@@ -2180,7 +2191,7 @@ begin
     Result := ADefault;
 end;
 
-class function TACLXMLConfig.GetInteger(AOptionSet: TACLXMLNode; const AName: string; ADefault: Integer): Integer;
+class function TACLXMLConfig.GetInteger(AOptionSet: TACLXMLNode; const AName: UnicodeString; ADefault: Integer): Integer;
 var
   ANode: TACLXMLNode;
 begin
@@ -2190,7 +2201,7 @@ begin
     Result := ADefault;
 end;
 
-class function TACLXMLConfig.GetString(AOptionSet: TACLXMLNode; const AName: string; const ADefault: string): string;
+class function TACLXMLConfig.GetString(AOptionSet: TACLXMLNode; const AName: UnicodeString; const ADefault: UnicodeString): UnicodeString;
 var
   ANode: TACLXMLNode;
 begin
@@ -2200,7 +2211,7 @@ begin
     Result := ADefault;
 end;
 
-class procedure TACLXMLConfig.SetBoolean(AOptionSet: TACLXMLNode; const AName: string; AValue: Boolean);
+class procedure TACLXMLConfig.SetBoolean(AOptionSet: TACLXMLNode; const AName: UnicodeString; AValue: Boolean);
 var
   ANode: TACLXMLNode;
 begin
@@ -2208,7 +2219,7 @@ begin
     ANode.Attributes.SetValueAsBoolean(Value, AValue);
 end;
 
-class procedure TACLXMLConfig.SetDateTime(AOptionSet: TACLXMLNode; const AName: string; const AValue: TDateTime);
+class procedure TACLXMLConfig.SetDateTime(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: TDateTime);
 var
   ANode: TACLXMLNode;
 begin
@@ -2216,7 +2227,7 @@ begin
     ANode.Attributes.SetValueAsDateTime(Value, AValue);
 end;
 
-class procedure TACLXMLConfig.SetDouble(AOptionSet: TACLXMLNode; const AName: string; const AValue: Double);
+class procedure TACLXMLConfig.SetDouble(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: Double);
 var
   ANode: TACLXMLNode;
 begin
@@ -2224,7 +2235,7 @@ begin
     ANode.Attributes.SetValueAsDouble(Value, AValue);
 end;
 
-class procedure TACLXMLConfig.SetInt64(AOptionSet: TACLXMLNode; const AName: string; const AValue: Int64);
+class procedure TACLXMLConfig.SetInt64(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: Int64);
 var
   ANode: TACLXMLNode;
 begin
@@ -2232,7 +2243,7 @@ begin
     ANode.Attributes.SetValueAsInt64(Value, AValue);
 end;
 
-class procedure TACLXMLConfig.SetInteger(AOptionSet: TACLXMLNode; const AName: string; const AValue: Integer);
+class procedure TACLXMLConfig.SetInteger(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: Integer);
 var
   ANode: TACLXMLNode;
 begin
@@ -2240,7 +2251,7 @@ begin
     ANode.Attributes.SetValueAsInteger(Value, AValue);
 end;
 
-class procedure TACLXMLConfig.SetString(AOptionSet: TACLXMLNode; const AName: string; const AValue: string);
+class procedure TACLXMLConfig.SetString(AOptionSet: TACLXMLNode; const AName: UnicodeString; const AValue: UnicodeString);
 var
   ANode: TACLXMLNode;
 begin
@@ -2248,7 +2259,7 @@ begin
     ANode.Attributes.SetValue(Value, AValue);
 end;
 
-class function TACLXMLConfig.FindOption(AOptionSet: TACLXMLNode; const AName: string; out AOption: TACLXMLNode; ACanCreate: Boolean): Boolean;
+class function TACLXMLConfig.FindOption(AOptionSet: TACLXMLNode; const AName: UnicodeString; out AOption: TACLXMLNode; ACanCreate: Boolean): Boolean;
 var
   I: Integer;
 begin
@@ -2286,14 +2297,14 @@ begin
   FreeAndNil(FMap);
 end;
 
-class function TACLXMLHelper.DecodeBoolean(const S: string): Boolean;
+class function TACLXMLHelper.DecodeBoolean(const S: UnicodeString): Boolean;
 var
   AValue: Integer;
 begin
   if TryStrToInt(S, AValue) then
     Result := AValue <> 0
   else
-    Result := SameText(S, string(sXMLBoolValues[True]));
+    Result := acSameText(S, UnicodeString(sXMLBoolValues[True]));
 end;
 
 class function TACLXMLHelper.DecodeString(const S: UnicodeString): UnicodeString;
@@ -2416,7 +2427,7 @@ begin
   if not Map.TryGetKey(S, Result) then
   begin
     if (S <> '') and (S[1] = '#') then
-      Result := Char(StrToIntDef(Copy(S, 2, MaxInt), 0))
+      Result := WideChar(StrToIntDef(Copy(S, 2, MaxInt), 0))
     else
       Result := S;
   end;

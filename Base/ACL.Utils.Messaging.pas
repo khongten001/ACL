@@ -73,7 +73,9 @@ uses
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,
-  ACL.Threading;
+  ACL.FastCode,
+  ACL.Threading,
+  ACL.Utils.Common;
 
 {$IFDEF FPC}
 const
@@ -111,7 +113,7 @@ begin
   Result := CreateWindowExW(WS_EX_TOOLWINDOW, UtilWindowClass.lpszClassName,
     PWideChar(Name), WS_POPUP {!0}, 0, 0, 0, 0, ParentWnd, 0, HInstance, nil);
   if Assigned(Method) then
-    SetWindowLong(Result, GWL_WNDPROC, NativeUInt(Classes.MakeObjectInstance(Method)));
+    SetWindowLong(Result, GWL_WNDPROC, PointerToLParam(Classes.MakeObjectInstance(Method)));
 end;
 
 procedure WndDefaultProc(W: HWND; var Message: TMessage);
@@ -125,7 +127,7 @@ var
 begin
   if W <> 0 then
   begin
-    AInstance := Pointer(GetWindowLong(W, GWL_WNDPROC));
+    AInstance := LParamToPointer(GetWindowLong(W, GWL_WNDPROC));
     DestroyWindow(W);
     if AInstance <> @DefWindowProc then
       Classes.FreeObjectInstance(AInstance);
@@ -138,6 +140,9 @@ class function TMessagesHelper.IsInQueue(AWndHandle: HWND; AMessage: Cardinal): 
 var
   AMsg: TMSG;
 begin
+{$IFDEF FPC}
+  FastZeroStruct(AMsg, SizeOf(AMsg));
+{$ENDIF}
   Result := PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_NOREMOVE) and (AMsg.hwnd = AWndHandle);
 end;
 
@@ -145,6 +150,9 @@ class procedure TMessagesHelper.Process(AFromMessage, AToMessage: Cardinal; AWnd
 var
   AMsg: TMsg;
 begin
+{$IFDEF FPC}
+  FastZeroStruct(AMsg, SizeOf(AMsg));
+{$ENDIF}
   while PeekMessage(AMsg, AWndHandle, AFromMessage, AToMessage, PM_REMOVE) do
   begin
     TranslateMessage(AMsg);
@@ -161,6 +169,9 @@ class procedure TMessagesHelper.Remove(AMessage: Cardinal; AWndHandle: HWND = 0)
 var
   AMsg: TMsg;
 begin
+{$IFDEF FPC}
+  FastZeroStruct(AMsg, SizeOf(AMsg));
+{$ENDIF}
   while PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_REMOVE) do ;
 end;
 
@@ -171,7 +182,7 @@ begin
   FLock := TCriticalSection.Create;
   FCustomMessages := TACLStringList.Create;
   FHandlers := TACLList<TACLMessageHandler>.Create;
-  FHandle := WndCreate(WndProc, ClassName, True);
+  FHandle := WndCreate(WndProc, 'TACLMessaging', True);
 end;
 
 class destructor TACLMessaging.Destroy;

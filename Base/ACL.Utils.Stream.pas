@@ -56,7 +56,7 @@ type
     constructor Create; overload;
     constructor Create(const AStream: TStream; ASize: Integer = -1); overload;
     constructor Create(const AStreamWriteProc: TACLStreamProc); overload;
-    constructor Create(const AString: string); overload;
+    constructor Create(const AString: UnicodeString); overload;
     constructor CreateOwned(AData: TMemoryStream);
     destructor Destroy; override;
     // IACLStreamContainer
@@ -288,7 +288,6 @@ implementation
 
 uses
   Math,
-  RTLConsts,
   // ACL
   ACL.Math,
   ACL.FastCode,
@@ -529,6 +528,9 @@ begin
     end
     else
     begin
+    {$IFDEF FPC}
+      ABytes := nil;
+    {$ENDIF}
       SetLength(ABytes, ASize);
       AStream.ReadBuffer(ABytes[0], ASize);
       try
@@ -613,7 +615,7 @@ begin
   AStreamWriteProc(FData);
 end;
 
-constructor TACLStreamContainer.Create(const AString: string);
+constructor TACLStreamContainer.Create(const AString: UnicodeString);
 begin
   Create;
   acSaveString(FData, AString);
@@ -883,6 +885,9 @@ end;
 
 function TACLSubStream.Write(const Buffer; Count: Longint): Longint;
 begin
+{$IFDEF FPC}
+  Result := 0;
+{$ENDIF}
   raise EACLCannotModifyReadOnlyStream.Create;
 end;
 
@@ -913,6 +918,10 @@ begin
 end;
 
 { TACLStreamHelper }
+
+{$IFDEF FPC}
+  {$WARN 5060 off : Function result variable does not seem to be initialized}
+{$ENDIF}
 
 function TACLStreamHelper.ReadBoolean: Boolean;
 begin
@@ -981,6 +990,9 @@ function TACLStreamHelper.ReadString(ALength: Integer): UnicodeString;
 begin
   if ALength > 0 then
   begin
+  {$IFDEF FPC}
+    Result := EmptyStrU;
+  {$ENDIF}
     SetLength(Result, ALength);
     ReadBuffer(Result[1], SizeOf(WideChar) * ALength);
   end
@@ -992,6 +1004,9 @@ function TACLStreamHelper.ReadStringA(ALength: Integer): AnsiString;
 begin
   if ALength > 0 then
   begin
+  {$IFDEF FPC}
+    Result := EmptyStrA;
+  {$ENDIF}
     SetLength(Result, ALength);
     ReadBuffer(Result[1], ALength);
   end
@@ -1006,6 +1021,9 @@ begin
   ALength := ReadWord;
   if ALength > 0 then
   begin
+  {$IFDEF FPC}
+    Result := EmptyStrU;
+  {$ENDIF}
     SetLength(Result, ALength);
     ReadBuffer(PWideChar(Result)^, 2 * ALength);
   end
@@ -1444,6 +1462,9 @@ end;
 
 function TACLHGlobalReadOnlyStream.Write(const Buffer; Count: Integer): Integer;
 begin
+{$IFDEF FPC}
+  Result := 0;
+{$ENDIF}
   raise EACLCannotModifyReadOnlyStream.Create;
 end;
 

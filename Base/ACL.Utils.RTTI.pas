@@ -55,14 +55,14 @@ type
 
     class function GetPropValue(AObject: TObject; APropInfo: PPropInfo): UnicodeString; overload;
     class function GetPropValue(AObject: TObject; APropInfo: PPropInfo; out AValue: UnicodeString): Boolean; overload;
-    class function GetPropValue(AObject: TObject; const AName: UnicodeString): UnicodeString; overload;
+    class function GetPropValue(AObject: TObject; const AName: string): UnicodeString; overload;
     class function GetPropValueAsVariant(AObject: TObject; APropInfo: PPropInfo; PreferStrings: Boolean = False): Variant; overload;
-    class function GetPropValueAsVariant(AObject: TObject; const AName: UnicodeString; PreferStrings: Boolean = False): Variant; overload;
+    class function GetPropValueAsVariant(AObject: TObject; const AName: string; PreferStrings: Boolean = False): Variant; overload;
     class procedure SetEnumPropValue(AObject: TObject; APropInfo: PPropInfo; const AValue: UnicodeString);
     class procedure SetPropValue(AObject: TObject; APropInfo: PPropInfo; const AValue: UnicodeString); overload;
-    class procedure SetPropValue(AObject: TObject; const AName, AValue: UnicodeString); overload;
+    class procedure SetPropValue(AObject: TObject; const AName: string; const AValue: UnicodeString); overload;
     class procedure SetPropValueAsVariant(AObject: TObject; APropInfo: PPropInfo; const AValue: Variant); overload;
-    class procedure SetPropValueAsVariant(AObject: TObject; const AName: UnicodeString; const AValue: Variant); overload;
+    class procedure SetPropValueAsVariant(AObject: TObject; const AName: string; const AValue: Variant); overload;
 
     class property Context: TRttiContext read FContext;
   end;
@@ -78,7 +78,6 @@ implementation
 
 uses
   // System
-  Types,
   SysUtils,
   Math,
   RTLConsts,
@@ -207,7 +206,7 @@ var
   APropInfo: PPropInfo;
 begin
   repeat
-    APos := acPos('.', ANamePath);
+    APos := {$IFDEF FPC}Pos{$ELSE}acPos{$ENDIF}('.', ANamePath);
     if APos > 0 then
     begin
       APropInfo := GetPropInfo(AObject, Copy(ANamePath, 1, APos - 1), AVisibility);
@@ -284,7 +283,7 @@ begin
   end;
 end;
 
-class function TRTTI.GetPropValue(AObject: TObject; const AName: UnicodeString): UnicodeString;
+class function TRTTI.GetPropValue(AObject: TObject; const AName: string): UnicodeString;
 begin
   if AObject <> nil then
     Result := GetPropValue(AObject, GetPropInfo(AObject, AName))
@@ -304,7 +303,7 @@ begin
     Result := Null;
 end;
 
-class function TRTTI.GetPropValueAsVariant(AObject: TObject; const AName: UnicodeString; PreferStrings: Boolean): Variant;
+class function TRTTI.GetPropValueAsVariant(AObject: TObject; const AName: string; PreferStrings: Boolean): Variant;
 begin
   if AObject <> nil then
     Result := GetPropValueAsVariant(AObject, GetPropInfo(AObject, AName), PreferStrings)
@@ -317,12 +316,14 @@ var
   AData: Integer;
   ATypeData: PTypeData;
   AValueOrd: Integer;
+  AValueStr: string;
 begin
-  AData := GetEnumValue(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF}, AValue);
+  AValueStr := acUnicodeToString(AValue);
+  AData := GetEnumValue(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF}, AValueStr);
   if AData < 0 then
   begin
     ATypeData := GetTypeData(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF});
-    AValueOrd := StrToIntDef(AValue, ATypeData^.MinValue - 1);
+    AValueOrd := StrToIntDef(AValueStr, ATypeData^.MinValue - 1);
     if (AValueOrd >= ATypeData^.MinValue) and (AValueOrd <= ATypeData^.MaxValue) then
       AData := AValueOrd;
   end;
@@ -353,7 +354,7 @@ begin
   end;
 end;
 
-class procedure TRTTI.SetPropValue(AObject: TObject; const AName, AValue: UnicodeString);
+class procedure TRTTI.SetPropValue(AObject: TObject; const AName: string; const AValue: UnicodeString);
 begin
   SetPropValue(AObject, GetPropInfo(AObject, AName), AValue);
 end;
@@ -368,7 +369,7 @@ begin
     TypInfo.SetPropValue(AObject, APropInfo, AValue);
 end;
 
-class procedure TRTTI.SetPropValueAsVariant(AObject: TObject; const AName: UnicodeString; const AValue: Variant);
+class procedure TRTTI.SetPropValueAsVariant(AObject: TObject; const AName: string; const AValue: Variant);
 begin
   SetPropValueAsVariant(AObject, GetPropInfo(AObject, AName), AValue);
 end;

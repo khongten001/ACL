@@ -861,6 +861,9 @@ end;
 
 function TACLCustomExpressionFactory.ToString: UnicodeString;
 begin
+{$IFDEF FPC}
+  Result := EmptyStrU;
+{$ENDIF}
   raise Exception.Create('Unsupported!');
 end;
 
@@ -994,15 +997,19 @@ end;
 
 procedure TACLExpressionCompiler.Error(const AMessage: UnicodeString);
 var
+  AFullMessage: UnicodeString;
   AScanArea: UnicodeString;
 begin
   if ScanCount > 0 then
   begin
     SetString(AScanArea, Scan, Min(ScanCount, 16));
-    raise EACLExpressionCompiler.CreateFmt(AMessage + '(' + sErrorCursorInfo + ')', [Token.ToString, AScanArea]);
+    AFullMessage := Format(sErrorCursorInfo, [Token.ToString, AScanArea]);
+    AFullMessage := Format('%s (%s)', [AMessage, AFullMessage]);
   end
   else
-    raise EACLExpressionCompiler.Create(AMessage);
+    AFullMessage := AMessage;
+
+  raise EACLExpressionCompiler.Create(acUnicodeToString(AFullMessage));
 end;
 
 procedure TACLExpressionCompiler.Error(const AMessage: UnicodeString; const AArguments: array of const);
@@ -1188,7 +1195,7 @@ procedure TACLExpressionCompiler.ParseParametersList(AFunctionElement: TACLExpre
     ACompiler: TACLExpressionCompiler;
     ALength: Integer;
   begin
-    ALength := (NativeUInt(AScanFinish) - NativeUInt(AScanStart)) div SizeOf(WideChar);
+    ALength := (PByte(AScanFinish) - PByte(AScanStart)) div SizeOf(WideChar);
     if ALength > 0 then
     begin
       ACompiler := Factory.CreateCompiler;

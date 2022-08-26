@@ -18,7 +18,6 @@ interface
 uses
   // Winapi
   Windows,
-  Messages,
   // Vcl
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Controls,
@@ -33,7 +32,7 @@ uses
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Strings;
 
 type
   TACLBorder = (mLeft, mTop, mRight, mBottom);
@@ -445,6 +444,8 @@ begin
           AParts[AIndex].Top := R.Bottom;
           AParts[AIndex].Bottom := ADestRect.Bottom;
         end;
+    else
+      // do nothing, but make FPC happy
     end;
   end;
 end;
@@ -992,6 +993,8 @@ begin
           SourceWidth := Round(SourceWidth * K2);
         end;
       end;
+  else
+    // do nothing, but make FPC happy
   end;
   ATargetHeight := SourceHeight;
   ATargetWidth := SourceWidth;
@@ -1286,7 +1289,7 @@ end;
 
 function TACLSize.ToString: string;
 begin
-  Result := acSizeToString(Value);
+  Result := acUnicodeToString(acSizeToString(Value));
 end;
 
 procedure TACLSize.Changed;
@@ -1379,7 +1382,7 @@ end;
 
 function TACLRect.ToString: string;
 begin
-  Result := acRectToString(Value);
+  Result := acUnicodeToString(acRectToString(Value));
 end;
 
 procedure TACLRect.Reset;

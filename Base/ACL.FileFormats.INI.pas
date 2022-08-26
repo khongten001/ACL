@@ -128,7 +128,7 @@ type
     constructor Create(const AFileName: UnicodeString; AutoSave: Boolean = True); overload; virtual;
     destructor Destroy; override;
     procedure Assign(AIniFile: TACLIniFile);
-    procedure Merge(const AFileName: string; AOverwriteExisting: Boolean = True); overload;
+    procedure Merge(const AFileName: UnicodeString; AOverwriteExisting: Boolean = True); overload;
     procedure Merge(const AIniFile: TACLIniFile; AOverwriteExisting: Boolean = True); overload;
     function Equals(Obj: TObject): Boolean; override;
 
@@ -197,7 +197,7 @@ type
 
     // Load/Save
     procedure LoadFromFile(const AFileName: UnicodeString); virtual;
-    procedure LoadFromResource(Inst: HINST; const AName: UnicodeString; AType: PChar);
+    procedure LoadFromResource(Inst: HINST; const AName: string; AType: PChar);
     procedure LoadFromStream(AStream: TStream); virtual;
     procedure LoadFromString(const AString: UnicodeString); overload;
     procedure LoadFromString(const AString: PWideChar; ACount: Integer); overload; virtual;
@@ -268,10 +268,10 @@ end;
 
 function TACLIniFileSection.ReadFloat(const AKey: UnicodeString; const ADefault: Double): Double;
 var
-  AData: UnicodeString;
+  AData: string;
 begin
   try
-    AData := ReadString(AKey);
+    AData := acUnicodeToString(ReadString(AKey));
     if not TryStrToFloat(AData, Result, InvariantFormatSettings) then
     begin
       if not TryStrToFloat(AData, Result) then // Backward compatibility
@@ -363,12 +363,12 @@ end;
 
 procedure TACLIniFileSection.WriteFloat(const AKey: UnicodeString; const AValue: Double);
 begin
-  WriteString(AKey, FloatToStr(AValue, InvariantFormatSettings));
+  WriteString(AKey, acFloatToStr(AValue, InvariantFormatSettings));
 end;
 
 procedure TACLIniFileSection.WriteInt32(const AKey: UnicodeString; const AValue: Integer);
 begin
-  WriteString(AKey, IntToStr(AValue));
+  WriteString(AKey, acIntToStr(AValue));
 end;
 
 procedure TACLIniFileSection.WriteInt32(const AKey: UnicodeString; const AValue, ADefaultValue: Integer);
@@ -389,7 +389,7 @@ end;
 
 procedure TACLIniFileSection.WriteInt64(const AKey: UnicodeString; const AValue: Int64);
 begin
-  WriteString(AKey, IntToStr(AValue));
+  WriteString(AKey, acIntToStr(AValue));
 end;
 
 procedure TACLIniFileSection.WriteRect(const AKey: UnicodeString; const AValue: TRect);
@@ -567,7 +567,7 @@ begin
   end;
 end;
 
-procedure TACLIniFile.Merge(const AFileName: string; AOverwriteExisting: Boolean);
+procedure TACLIniFile.Merge(const AFileName: UnicodeString; AOverwriteExisting: Boolean);
 var
   AIniFile: TACLIniFile;
 begin
@@ -765,7 +765,7 @@ begin
       ACount := StrToIntDef(AList.ValueFromIndex[AValueIndex], 0);
       AStrings.Capacity := ACount;
       for I := 1 to ACount do
-        AStrings.Add(AList.ValueFromName['i' + IntToStr(I)]);
+        AStrings.Add(AList.ValueFromName[_U('i') + acIntToStr(I)]);
     end
     else
       AStrings.Text := AList.Text; // backward compatibility
@@ -776,6 +776,7 @@ end;
 function TACLIniFile.ReadStrings(const ASection: UnicodeString; AStrings: TStrings): Integer;
 var
   ACount: Integer;
+  AIndex: UnicodeString;
   AList: TACLIniFileSection;
   AValueIndex: Integer;
   I: Integer;
@@ -789,10 +790,13 @@ begin
       ACount := StrToIntDef(AList.ValueFromIndex[AValueIndex], 0);
       AStrings.Capacity := ACount;
       for I := 1 to ACount do
-        AStrings.Add(AList.ValueFromName['i' + IntToStr(I)]);
+      begin
+        AIndex := acStringToUnicode('i' + IntToStr(I));
+        AStrings.Add(acUnicodeToString(AList.ValueFromName[AIndex]));
+      end;
     end
     else
-      AStrings.Text := AList.Text; // backward compatibility
+      AStrings.Text := acUnicodeToString(AList.Text); // backward compatibility
   end;
   Result := AStrings.Count;
 end;
@@ -886,12 +890,12 @@ end;
 
 procedure TACLIniFile.WriteFloat(const ASection, AKey: UnicodeString; const AValue: Double);
 begin
-  WriteString(ASection, AKey, FloatToStr(AValue, InvariantFormatSettings));
+  WriteString(ASection, AKey, acFloatToStr(AValue, InvariantFormatSettings));
 end;
 
 procedure TACLIniFile.WriteInteger(const ASection, AKey: UnicodeString; AValue: Integer);
 begin
-  WriteString(ASection, AKey, IntToStr(AValue));
+  WriteString(ASection, AKey, acIntToStr(AValue));
 end;
 
 procedure TACLIniFile.WriteInteger(const ASection, AKey: UnicodeString; AValue, ADefaultValue: Integer);
@@ -904,7 +908,7 @@ end;
 
 procedure TACLIniFile.WriteInt64(const ASection, AKey: UnicodeString; const AValue: Int64);
 begin
-  WriteString(ASection, AKey, IntToStr(AValue));
+  WriteString(ASection, AKey, acIntToStr(AValue));
 end;
 
 procedure TACLIniFile.WriteInt64(const ASection, AKey: UnicodeString; const AValue, ADefaultValue: Int64);
@@ -967,9 +971,9 @@ begin
     AList := GetSection(ASection, True);
     AList.Clear;
     AList.Capacity := AStrings.Count;
-    AList.WriteString('Count', IntToStr(AStrings.Count));
+    AList.WriteString('Count', acIntToStr(AStrings.Count));
     for I := 0 to AStrings.Count - 1 do
-      AList.WriteString('i' + IntToStr(I + 1), AStrings[I]);
+      AList.WriteString(_U('i') + acIntToStr(I), AStrings[I]);
   finally
     EndUpdate;
   end;
@@ -985,9 +989,9 @@ begin
     AList := GetSection(ASection, True);
     AList.Clear;
     AList.Capacity := AStrings.Count;
-    AList.WriteString('Count', IntToStr(AStrings.Count));
+    AList.WriteInt32('Count', AStrings.Count);
     for I := 0 to AStrings.Count - 1 do
-      AList.WriteString('i' + IntToStr(I + 1), AStrings[I]);
+      AList.WriteString(_U('i') + acIntToStr(I), acStringToUnicode(AStrings[I]));
   finally
     EndUpdate;
   end;
@@ -1101,7 +1105,7 @@ begin
   end;
 end;
 
-procedure TACLIniFile.LoadFromResource(Inst: HINST; const AName: UnicodeString; AType: PChar);
+procedure TACLIniFile.LoadFromResource(Inst: HINST; const AName: string; AType: PChar);
 var
   AResStream: TStream;
 begin
@@ -1257,7 +1261,7 @@ begin
     S := P;
     F := S + ACount;
     ASection := nil;
-    while (NativeUInt(P) + SizeOf(WideChar) <= NativeUInt(F)) do
+    while (PByte(P) + SizeOf(WideChar) <= PByte(F)) do
     begin
       if (Ord(P^) <> Ord(#10)) and (Ord(P^) <> Ord(#13)) and (Ord(P^) <> Ord(acLineSeparator)) then
         Inc(P)
@@ -1294,7 +1298,7 @@ begin
   if AList <> nil then
     Result := AList.Text
   else
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
 procedure TACLIniFile.SectionChangeHandler(Sender: TObject);

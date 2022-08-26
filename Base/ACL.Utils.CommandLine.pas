@@ -48,7 +48,7 @@ type
   TACLCommandLineProcessor = class
   public type
     TCommandMultipleParamsProc = reference to procedure (const AParams: TACLStringList);
-    TCommandSingleParamProc = reference to procedure (const AParam: string);
+    TCommandSingleParamProc = reference to procedure (const AParam: UnicodeString);
   protected type
   {$REGION 'InternalTypes'}
     TCommandHandler = record
@@ -65,7 +65,7 @@ type
 
     TCommand = class(TACLStringList)
     public
-      Name: string;
+      Name: UnicodeString;
     end;
 
     TCommands = class(TACLObjectList<TCommand>)
@@ -79,25 +79,25 @@ type
     class var FPendingToExecute: TCommands;
   protected
     class procedure ExecuteCore;
-    class procedure Parse(ATarget: TCommands; const AParams: string);
-    class function ParseParams(const AParams: string): TCommands;
+    class procedure Parse(ATarget: TCommands; const AParams: UnicodeString);
+    class function ParseParams(const AParams: UnicodeString): TCommands;
   public
     class constructor Create;
     class destructor Destroy;
 
-    class procedure Execute(const AParams: string);
+    class procedure Execute(const AParams: UnicodeString);
     class procedure ExecuteFromCommandLine;
 
-    class function HasPendingCommand(const ACommand: string): Boolean; overload;
+    class function HasPendingCommand(const ACommand: UnicodeString): Boolean; overload;
     class function HasPendingCommand(const AFlags: Cardinal): Boolean; overload;
 
     class procedure BeginUpdate;
     class procedure EndUpdate;
 
-    class procedure Register(const ACommand: string; AProc: TCommandMultipleParamsProc; AFlags: Cardinal = 0); overload;
-    class procedure Register(const ACommand: string; AProc: TCommandSingleParamProc; AFlags: Cardinal = 0); overload;
-    class procedure Register(const ACommand: string; AProc: TProcedureRef; AFlags: Cardinal = 0); overload;
-    class procedure Unregister(const ACommand: string);
+    class procedure Register(const ACommand: UnicodeString; AProc: TCommandMultipleParamsProc; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: UnicodeString; AProc: TCommandSingleParamProc; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: UnicodeString; AProc: TProcedureRef; AFlags: Cardinal = 0); overload;
+    class procedure Unregister(const ACommand: UnicodeString);
   end;
 
   { TACLCommandLineParser }
@@ -109,7 +109,7 @@ type
   protected
     FCommand: TACLCommandLineProcessor.TCommand;
     FHandlers: array[TState] of TTokenHandler;
-    FParamBuffer: TStringBuilder;
+    FParamBuffer: TACLStringBuilder;
     FPrevToken: TACLParserToken;
     FState: TState;
     FTarget: TACLCommandLineProcessor.TCommands;
@@ -120,8 +120,8 @@ type
     procedure HandlerWaitingForCommandName(const AToken: TACLParserToken);
     procedure HandlerWaitingForParamSeparator(const AToken: TACLParserToken);
     //
-    procedure PutParam(AParam: string); overload;
-    procedure PutParam(AParamBuffer: TStringBuilder); overload;
+    procedure PutParam(AParam: UnicodeString); overload;
+    procedure PutParam(AParamBuffer: TACLStringBuilder); overload;
   public
     constructor Create; reintroduce;
     procedure Parse(ATarget: TACLCommandLineProcessor.TCommands);
@@ -129,7 +129,7 @@ type
 
 function FindSwitch(const ACmdLine, ASwitch: UnicodeString): Boolean; overload;
 function FindSwitch(const ACmdLine, ASwitch: UnicodeString; out ASwitchParam: UnicodeString): Boolean; overload;
-function GetCommandLineParams: string;
+function GetCommandLineParams: UnicodeString;
 implementation
 
 function FindSwitch(const ACmdLine, ASwitch: UnicodeString): Boolean;
@@ -158,7 +158,7 @@ begin
   end;
 end;
 
-function GetCommandLineParams: string;
+function GetCommandLineParams: UnicodeString;
 var
   AParser: TACLParser;
   AToken: TACLParserToken;
@@ -173,7 +173,7 @@ begin
     if AParser.GetToken(AToken) then
       Result := acTrim(acMakeString(AParser.Scan, AParser.ScanCount))
     else
-      Result := EmptyStr;
+      Result := EmptyStrU;
 
   {$IFDEF ACL_LOG_CMDLINE}
     AddToDebugLog('CmdLine', 'GetParams("%s")->"%s"', [GetCommandLine, Result]);
@@ -197,7 +197,7 @@ begin
   FreeAndNil(FCommands);
 end;
 
-class procedure TACLCommandLineProcessor.Execute(const AParams: string);
+class procedure TACLCommandLineProcessor.Execute(const AParams: UnicodeString);
 begin
 {$IFDEF ACL_LOG_CMDLINE}
   AddToDebugLog('CmdLine', 'Execute: "%s"', [AParams]);
@@ -212,7 +212,7 @@ begin
   Execute(GetCommandLineParams);
 end;
 
-class function TACLCommandLineProcessor.HasPendingCommand(const ACommand: string): Boolean;
+class function TACLCommandLineProcessor.HasPendingCommand(const ACommand: UnicodeString): Boolean;
 var
   I: Integer;
 begin
@@ -250,24 +250,24 @@ begin
 end;
 
 class procedure TACLCommandLineProcessor.Register(
-  const ACommand: string; AProc: TCommandSingleParamProc; AFlags: Cardinal);
+  const ACommand: UnicodeString; AProc: TCommandSingleParamProc; AFlags: Cardinal);
 begin
   FCommands.AddOrSetValue(ACommand, TCommandHandler.Create(nil, AProc, nil, AFlags));
 end;
 
 class procedure TACLCommandLineProcessor.Register(
-  const ACommand: string; AProc: TCommandMultipleParamsProc; AFlags: Cardinal);
+  const ACommand: UnicodeString; AProc: TCommandMultipleParamsProc; AFlags: Cardinal);
 begin
   FCommands.AddOrSetValue(ACommand, TCommandHandler.Create(nil, nil, AProc, AFlags));
 end;
 
 class procedure TACLCommandLineProcessor.Register(
-  const ACommand: string; AProc: TProcedureRef; AFlags: Cardinal);
+  const ACommand: UnicodeString; AProc: TProcedureRef; AFlags: Cardinal);
 begin
   FCommands.AddOrSetValue(ACommand, TCommandHandler.Create(AProc, nil, nil, AFlags));
 end;
 
-class procedure TACLCommandLineProcessor.Unregister(const ACommand: string);
+class procedure TACLCommandLineProcessor.Unregister(const ACommand: UnicodeString);
 var
   I: Integer;
 begin
@@ -291,7 +291,7 @@ begin
   end;
 end;
 
-class procedure TACLCommandLineProcessor.Parse(ATarget: TCommands; const AParams: string);
+class procedure TACLCommandLineProcessor.Parse(ATarget: TCommands; const AParams: UnicodeString);
 var
   AParser: TACLCommandLineParser;
 begin
@@ -304,7 +304,7 @@ begin
   end;
 end;
 
-class function TACLCommandLineProcessor.ParseParams(const AParams: string): TCommands;
+class function TACLCommandLineProcessor.ParseParams(const AParams: UnicodeString): TCommands;
 begin
   Result := TCommands.Create;
   Parse(Result, AParams);
@@ -342,10 +342,10 @@ end;
 
 function TACLCommandLineProcessor.TCommands.ToString: string;
 var
-  R: TStringBuilder;
+  R: TACLStringBuilder;
   I, J: Integer;
 begin
-  R := TStringBuilder.Create;
+  R := TACLStringBuilder.Create;
   try
     for I := 0 to Count - 1 do
     begin
@@ -389,7 +389,7 @@ var
   AToken: TACLParserToken;
 begin
   FTarget := ATarget;
-  FParamBuffer := TStringBuilder.Create;
+  FParamBuffer := TACLStringBuilder.Create;
   try
     FCommand := nil;
     FPrevToken.Reset;
@@ -512,7 +512,7 @@ begin
   end;
 end;
 
-procedure TACLCommandLineParser.PutParam(AParam: string);
+procedure TACLCommandLineParser.PutParam(AParam: UnicodeString);
 begin
   AParam := acTrim(AParam);
   if AParam <> '' then
@@ -529,7 +529,7 @@ begin
   end;
 end;
 
-procedure TACLCommandLineParser.PutParam(AParamBuffer: TStringBuilder);
+procedure TACLCommandLineParser.PutParam(AParamBuffer: TACLStringBuilder);
 begin
   PutParam(AParamBuffer.ToString);
   AParamBuffer.Length := 0;

@@ -301,7 +301,7 @@ begin
   FLock := TCriticalSection.Create;
   FTimers := TACLList<TACLTimer>.Create;
   FHighResolutionTimers := TACLThreadList<TACLTimer>.Create;
-  FHandle := WndCreate(HandleMessage, ClassName, True);
+  FHandle := WndCreate(HandleMessage, 'TACLTimerManager', True);
 end;
 
 destructor TACLTimerManager.Destroy;

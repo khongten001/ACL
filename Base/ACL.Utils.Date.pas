@@ -79,6 +79,7 @@ uses
   DateUtils,
   SysUtils,
   // ACL
+  ACL.FastCode,
   ACL.Math;
 
 {$IFDEF FPC}
@@ -118,6 +119,11 @@ var
   ALocalTime: TSystemTime;
   AUniversalTime: TSystemTime;
 begin
+{$IFDEF FPC}
+  FastZeroStruct(AInfo, SizeOf(AInfo));
+  FastZeroStruct(ALocalTime, SizeOf(ALocalTime));
+  FastZeroStruct(AUniversalTime, SizeOf(AUniversalTime));
+{$ENDIF}
   GetTimeZoneInformation(AInfo);
   DateTimeToSystemTime(AValue, ALocalTime);
   TzSpecificLocalTimeToSystemTime(@AInfo, ALocalTime, AUniversalTime);
@@ -133,6 +139,11 @@ var
   ALocalTime: TSystemTime;
   AUniversalTime: TSystemTime;
 begin
+{$IFDEF FPC}
+  FastZeroStruct(AInfo, SizeOf(AInfo));
+  FastZeroStruct(ALocalTime, SizeOf(ALocalTime));
+  FastZeroStruct(AUniversalTime, SizeOf(AUniversalTime));
+{$ENDIF}
   GetTimeZoneInformation(AInfo);
   DateTimeToSystemTime(AValue, AUniversalTime);
   SystemTimeToTzSpecificLocalTime(@AInfo, AUniversalTime, ALocalTime);

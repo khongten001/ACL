@@ -33,6 +33,7 @@ function FastSign(const AValue: Single): Integer; inline;
 function FastTrunc(const AValue: Double): Integer; overload; inline;
 function FastTrunc(const AValue: Single): Integer; overload; inline;
 procedure FastZeroMem(Destination: Pointer; Length: LongWord);
+procedure FastZeroStruct(out Value; Length: LongWord); inline;
 
 function GetCPUInstructions: TCPUInstructions;
 implementation
@@ -126,6 +127,16 @@ end;
 procedure FastZeroMem(Destination: Pointer; Length: LongWord);
 begin
   FillChar(Destination^, Length, 0);
+end;
+
+procedure FastZeroStruct(out Value; Length: LongWord);
+begin
+{$IFDEF FPC}
+  {$push}
+  {$hints off}
+  FillChar(Value, Length, 0);
+  {$pop}
+{$ENDIF}
 end;
 
 {$IFNDEF CPUX64}

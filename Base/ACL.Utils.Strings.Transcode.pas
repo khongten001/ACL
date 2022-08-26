@@ -17,13 +17,10 @@ interface
 
 uses
   Windows,
-  Messages,
   // System
   Classes,
   SysUtils,
-  Types,
-  // ACL
-  ACL.Classes;
+  Types;
 
 type
 
@@ -140,7 +137,6 @@ uses
 {$ENDIF}
   // ACL
   ACL.FastCode,
-  ACL.Hashes,
   ACL.Parsers,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream,
@@ -393,6 +389,9 @@ begin
   AStream := TMemoryStream.Create;
   try
     Decode(ACode, AStream);
+  {$IFDEF FPC}
+    Result := nil;
+  {$ENDIF}
     SetLength(Result, AStream.Size);
     AStream.Position := 0;
     AStream.ReadBuffer(Result[0], Length(Result));
@@ -416,8 +415,7 @@ class function TACLMimecode.Encode(ASrc: PByte; ASrcSize: Integer; AStream: TStr
       ABank := ABank shr 6;
     end;
     ABuffer[0] := EncodeTable[ABank];
-
-    AStream.WriteBuffer(ABuffer[0], SizeOf(ABuffer));
+    AStream.WriteBuffer(ABuffer, SizeOf(ABuffer));
   end;
 
 var
@@ -512,8 +510,12 @@ class function TACLPunycode.Decode(const S: AnsiString): UnicodeString;
 var
   AOutputLength: Cardinal;
 begin
+  AOutputLength := 0;
   if (Decode(PByte(S), Length(S), AOutputLength) = apcOK) and (Cardinal(Length(S)) <> AOutputLength) then
   begin
+  {$IFDEF FPC}
+    Result := EmptyStrU;
+  {$ENDIF}
     SetLength(Result, AOutputLength);
     Decode(PByte(S), Length(S), AOutputLength, PWordArray(Result));
   end
@@ -655,9 +657,13 @@ class function TACLPunycode.Encode(const S: UnicodeString; out A: AnsiString): B
 var
   AOutputLength: Cardinal;
 begin
+  AOutputLength := 0;
   Result := (Encode(PWordArray(S), Length(S), AOutputLength) = apcOK) and (Cardinal(Length(S) + 1) <> AOutputLength);
   if Result then
   begin
+  {$IFDEF FPC}
+    A := EmptyStrA;
+  {$ENDIF}
     SetLength(A, AOutputLength);
     Encode(PWordArray(S), Length(S), AOutputLength, PByte(A));
   end;

@@ -18,9 +18,7 @@ interface
 uses
   Windows,
   // System
-  Generics.Collections,
   Generics.Defaults,
-  Math,
   SysUtils;
 
 const
@@ -210,16 +208,16 @@ end;
 
 function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer;
 begin
-  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
-    Result := NativeUInt(AScanNext) - NativeUInt(AScanStart)
+  if PByte(AScanNext) > PByte(AScanStart) then
+    Result := PByte(AScanNext) - PByte(AScanStart)
   else
     Result := 0;
 end;
 
 function acStringLength(const AScanStart, AScanNext: PWideChar): Integer;
 begin
-  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
-    Result := (NativeUInt(AScanNext) - NativeUInt(AScanStart)) div SizeOf(WideChar)
+  if PByte(AScanNext) > PByte(AScanStart) then
+    Result := (PByte(AScanNext) - PByte(AScanStart)) div SizeOf(WideChar)
   else
     Result := 0;
 end;
@@ -228,7 +226,7 @@ procedure acUnquot(var AToken: TACLParserToken);
 begin
   if (AToken.DataLength >= 2) and (acPos(AToken.Data^, acParserDefaultQuotes) > 0) then
   begin
-    if PWideChar(NativeUInt(AToken.Data) + SizeOf(WideChar) * NativeUInt(AToken.DataLength - 1))^ = AToken.Data^ then
+    if PWideChar(PByte(AToken.Data) + SizeOf(WideChar) * NativeUInt(AToken.DataLength - 1))^ = AToken.Data^ then
     begin
       Dec(AToken.DataLength, 2);
       Inc(AToken.Data);
@@ -332,7 +330,7 @@ procedure TACLParser.Initialize(const P: PWideChar; C: Integer);
 begin
   FScan := P;
   FScanCount := C;
-  FScanBuffer := EmptyStr;
+  FScanBuffer := EmptyStrU;
 end;
 
 function TACLParser.GetToken(out AToken: TACLParserToken): Boolean;
@@ -412,7 +410,7 @@ function TACLParser.FetchToken(var P: PWideChar; var C: Integer; var AToken: TAC
       Dec(C);
       Inc(P);
     end;
-    AToken.DataLength := (NativeUInt(P) - NativeUInt(AToken.Data)) div SizeOf(WideChar);
+    AToken.DataLength := (PByte(P) - PByte(AToken.Data)) div SizeOf(WideChar);
   end;
 
   procedure SetToken(var AToken: TACLParserToken; var P: PWideChar; var C: Integer; ATokenType, ATokenLength: Integer); inline;

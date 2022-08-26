@@ -39,7 +39,7 @@ function MakeInt64(const A, B: Integer): UInt64;
 function MulDiv64(const AValue, ANumerator, ADenominator: Int64): Int64;
 
 {$IFDEF FPC}
-procedure DivMod(Dividend: UInt64; Divisor: UInt64; var Result, Remainder: UInt64); overload;
+procedure DivMod(Dividend: UInt64; Divisor: UInt64; out Result, Remainder: UInt64); overload;
 {$ENDIF}
 implementation
 
@@ -156,7 +156,7 @@ begin
 end;
 
 {$IFDEF FPC}
-procedure DivMod(Dividend: UInt64; Divisor: UInt64; var Result, Remainder: UInt64); overload;
+procedure DivMod(Dividend: UInt64; Divisor: UInt64; out Result, Remainder: UInt64); overload;
 begin
   Result := Dividend div Divisor;
   Remainder := Dividend mod Divisor;

@@ -21,9 +21,9 @@ uses
   Messages,
 {$IFNDEF ACL_BASE_NOVCL}
   Graphics,
+  System.UITypes,
 {$ENDIF}
   // System
-  System.UITypes,
   Types,
   SysUtils,
   Classes,
@@ -54,6 +54,8 @@ const
 type
   TObjectMethod = procedure of object;
   TProcedureRef = reference to procedure;
+
+  _U = UnicodeString; // For short naming coversion
 
 {$IFDEF FPC}
   TProc = reference to procedure;
@@ -139,12 +141,13 @@ var
 
   InvariantFormatSettings: TFormatSettings;
 
-  acLangSizeSuffixB: string = 'B';
-  acLangSizeSuffixKB: string = 'KB';
-  acLangSizeSuffixMB: string = 'MB';
-  acLangSizeSuffixGB: string = 'GB';
+  acLangSizeSuffixB: UnicodeString = 'B';
+  acLangSizeSuffixKB: UnicodeString = 'KB';
+  acLangSizeSuffixMB: UnicodeString = 'MB';
+  acLangSizeSuffixGB: UnicodeString = 'GB';
 
 // Conversion
+{$MESSAGE 'TODO-Move these functions to Utils.Strings'}
 {$IFNDEF ACL_BASE_NOVCL}
 function FontStyleDecode(const Style: TFontStyles): Byte;
 function FontStyleEncode(Style: Integer): TFontStyles;
@@ -161,6 +164,7 @@ function acStringToRect(const S: UnicodeString): TRect;
 function acStringToSize(const S: UnicodeString): TSize;
 
 // Formatting
+{$MESSAGE 'TODO-Move these functions to Utils.Strings'}
 function FormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): UnicodeString;
 function TrackFormat(ATrack: Integer): UnicodeString;
 function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; AShowPlusSign: Boolean): UnicodeString; overload;
@@ -178,8 +182,8 @@ function acGetWindowRect(AHandle: HWND): TRect;
 function acFindWindow(const AClassName: UnicodeString): HWND;
 function acGetClassName(Handle: HWND): UnicodeString;
 function acGetWindowText(AHandle: HWND): UnicodeString;
-procedure SwitchToThisWindow(AHandle: HWND; ABringToTop: BOOL);
 procedure acSetWindowText(AHandle: HWND; const AText: UnicodeString);
+procedure acSwitchToThisWindow(AHandle: HWND);
 
 // System
 procedure MinimizeMemoryUsage;
@@ -203,6 +207,8 @@ function acObjectUID(AObject: TObject): string;
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
 procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLBoolean; overload;
+function LParamToPointer(const LParam: LPARAM): Pointer;
+function PointerToLParam(const Ptr: Pointer): LPARAM;
 
 {$IFDEF FPC}
 function InterlockedExchangePointer(var ATarget: Pointer; const ASource: Pointer): Pointer;
@@ -215,7 +221,6 @@ uses
 {$ENDIF}
   TypInfo,
   // ACL
-  ACL.Math,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
@@ -256,12 +261,16 @@ end;
 {$IFDEF FPC}
 function InterlockedExchangePointer(var ATarget: Pointer; const ASource: Pointer): Pointer;
 begin
-{$IFDEF CPUX64}
-  Result := Pointer(InterlockedExchange64(QWORD(ATarget), QWORD(ASource)));
-{$ELSE}
-  Result := Pointer(InterlockedExchange(DWORD(ATarget), DWORD(ASource)));
-{$ENDIF}
+{$push}
+  {$hints off}
+  {$IFDEF CPUX64}
+    Result := Pointer(InterlockedExchange64(QWORD(ATarget), QWORD(ASource)));
+  {$ELSE}
+    Result := Pointer(InterlockedExchange(DWORD(ATarget), DWORD(ASource)));
+  {$ENDIF}
+{$pop}
 end;
+
 {$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -385,21 +394,21 @@ begin
     Exit('-' + FormatSize(-AValue, AAllowGigaBytes));
 
   if AValue < SIZE_ONE_KILOBYTE then
-    Result := IntToStr(AValue) + ' ' + acLangSizeSuffixB
+    Result := acIntToStr(AValue) + ' ' + acLangSizeSuffixB
   else if AValue < SIZE_ONE_MEGABYTE then
-    Result := FormatFloat('0.00', AValue / SIZE_ONE_KILOBYTE) + ' ' + acLangSizeSuffixKB
+    Result := acFormatFloat('0.00', AValue / SIZE_ONE_KILOBYTE) + ' ' + acLangSizeSuffixKB
   else if not AAllowGigaBytes or (AValue < SIZE_ONE_GIGABYTE)then
-    Result := FormatFloat('0.00', AValue / SIZE_ONE_MEGABYTE) + ' ' + acLangSizeSuffixMB
+    Result := acFormatFloat('0.00', AValue / SIZE_ONE_MEGABYTE) + ' ' + acLangSizeSuffixMB
   else
-    Result := FormatFloat('0.00', AValue / SIZE_ONE_GIGABYTE) + ' ' + acLangSizeSuffixGB;
+    Result := acFormatFloat('0.00', AValue / SIZE_ONE_GIGABYTE) + ' ' + acLangSizeSuffixGB;
 end;
 
 function TrackFormat(ATrack: Integer): UnicodeString;
 begin
   if (ATrack >= 0) and (ATrack < 10) then
-    Result := '0' + IntToStr(ATrack)
+    Result := '0' + acIntToStr(ATrack)
   else
-    Result := IntToStr(ATrack);
+    Result := acIntToStr(ATrack);
 end;
 
 function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString;
@@ -408,12 +417,16 @@ var
 begin
   AFormatSettings := FormatSettings;
   AFormatSettings.DecimalSeparator := ADecimalSeparator;
+{$IFDEF FPC}
+  Result := acStringToUnicode(FormatFloat(acUnicodeToString(AFormat), AValue, AFormatSettings));
+{$ELSE}
   Result := FormatFloat(AFormat, AValue, AFormatSettings);
+{$ENDIF}
 end;
 
 function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; AShowPlusSign: Boolean): UnicodeString;
 const
-  SignsMap: array[Boolean] of string = ('', '+');
+  SignsMap: array[Boolean] of UnicodeString = ('', '+');
 begin
   Result := SignsMap[(AValue >= 0) and AShowPlusSign] + acFormatFloat(AFormat, AValue);
 end;
@@ -430,11 +443,17 @@ begin
   Result := False;
   if (AWindowHandle <> 0) and Assigned(FGetModuleFileNameEx) then
   begin
+  {$IFDEF FPC}
+    AProcessID := 0;
+  {$ENDIF}
     if GetWindowThreadProcessId(AWindowHandle, AProcessID) > 0 then
     begin
       AProcess := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, True, AProcessID);
       if AProcess <> 0 then
       try
+      {$IFDEF FPC}
+        AFileName := EmptyStrU;
+      {$ENDIF}
         SetLength(AFileName, MAX_PATH);
         SetLength(AFileName, FGetModuleFileNameEx(AProcess, 0, PWideChar(AFileName), Length(AFileName)));
         Result := True;
@@ -480,7 +499,7 @@ end;
 
 function acModuleFileName(AModule: HMODULE): UnicodeString;
 begin
-  Result := GetModuleName(AModule);
+  Result := acStringToUnicode(GetModuleName(AModule));
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -492,7 +511,7 @@ begin
   //# https://docs.microsoft.com/ru-ru/windows/win32/api/profileapi/nf-profileapi-queryperformancecounter?redirectedfrom=MSDN
   //# On systems that run Windows XP or later, the function will always succeed and will thus never return zero.
   if not QueryPerformanceCounter(Result) then
-    Result := GetTickCount;
+    Result := GetTickCount64;
 end;
 
 function TickCountToTime(const ATicks: Int64): Cardinal;
@@ -524,6 +543,30 @@ begin
     Result := ATrue
   else
     Result := AFalse;
+end;
+
+function LParamToPointer(const LParam: LPARAM): Pointer;
+begin
+{$IFDEF FPC}
+  {$push}
+  {$hints off}
+{$ENDIF}
+  Result := Pointer(LParam);
+{$IFDEF FPC}
+  {$pop}
+{$ENDIF}
+end;
+
+function PointerToLParam(const Ptr: Pointer): LPARAM;
+begin
+{$IFDEF FPC}
+  {$push}
+  {$hints off}
+{$ENDIF}
+  Result := LPARAM(Ptr);
+{$IFDEF FPC}
+  {$pop}
+{$ENDIF}
 end;
 
 procedure acGetInterface(const Instance: IInterface; const IID: TGUID; out Intf);
@@ -597,7 +640,7 @@ var
   G: TGUID;
 begin
   CreateGUID(G);
-  Result := GUIDToString(G);
+  Result := acStringToUnicode(GUIDToString(G));
 end;
 
 function acObjectUID(AObject: TObject): string;
@@ -625,6 +668,9 @@ end;
 
 function acGetWindowRect(AHandle: HWND): TRect;
 begin
+{$IFDEF FPC}
+  Result := NullRect;
+{$ENDIF}
   if not GetWindowRect(AHandle, Result) then
     Result := NullRect;
 end;
@@ -649,11 +695,11 @@ begin
     if IsWindowUnicode(AHandle) then
       SetWindowTextW(AHandle, PWideChar(AText))
     else
-      DefWindowProcW(AHandle, WM_SETTEXT, 0, LPARAM(PWideChar(AText))); // fix for app handle
+      DefWindowProcW(AHandle, WM_SETTEXT, 0, PointerToLParam(PWideChar(AText))); // fix for app handle
   end;
 end;
 
-procedure SwitchToThisWindow(AHandle: HWND; ABringToTop: BOOL);
+procedure acSwitchToThisWindow(AHandle: HWND);
 var
   AInput: TInput;
 begin
@@ -693,6 +739,7 @@ class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
     AAvailable: Cardinal;
     ATempData: array of Byte;
   begin
+    ATempData := nil;
     if (AInputStream <> nil) and (AOutputStream <> nil) then
     repeat
       AAvailable := 0;
@@ -787,10 +834,10 @@ end;
 class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
   ALog: IStringReceiver; AOptions: TExecuteOptions = [eoShowGUI]): LongBool;
 
-  procedure Log(const S: UnicodeString);
+  procedure Log(const S: string);
   begin
     if ALog <> nil then
-      ALog.Add(S);
+      ALog.Add(acStringToUnicode(S));
   end;
 
 var
@@ -800,7 +847,7 @@ begin
   AErrorData := TStringStream.Create;
   AOutputData := TStringStream.Create;
   try
-    Log('Executing: ' + ACmdLine);
+    Log('Executing: ' + acUnicodeToString(ACmdLine));
     Result := Execute(ACmdLine, AOptions, AOutputData, AErrorData);
     if Result then
     begin
@@ -843,6 +890,9 @@ var
   AProcessHandle: THandle;
 begin
   Result := False;
+{$IFDEF FPC}
+  AProcessID := 0;
+{$ENDIF}
   if GetWindowThreadProcessId(AWindow, AProcessID) <> 0 then
   begin
     AProcessHandle := OpenProcess(PROCESS_QUERY_INFORMATION, True, AProcessID);

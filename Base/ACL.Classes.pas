@@ -16,15 +16,14 @@ unit ACL.Classes;
 interface
 
 uses
-  Messages,
   Windows,
   // System
-  Types,
   TypInfo,
   Classes,
   Contnrs,
   Generics.Collections,
   SyncObjs,
+  StrUtils,
   SysUtils,
   // ACL
   ACL.ObjectLinks,
@@ -358,7 +357,7 @@ function CreateUniqueName(AComponent: TComponent; const APrefixName, ASuffixName
     CheckName(S);
     if ((S = '') or CharInSet(S[1], ['0'..'9'])) and (AClassName <> '') then
     begin
-      if (APrefixName <> '') and acBeginsWith(AClassName, APrefixName) then
+      if (APrefixName <> '') and StartsText(AClassName, APrefixName) then
         S := Copy(AClassName, acStringLength(APrefixName) + 1, acStringLength(AClassName)) + S
       else
       begin

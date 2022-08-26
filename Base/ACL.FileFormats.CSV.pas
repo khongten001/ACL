@@ -18,28 +18,27 @@ interface
 uses
   // System
   Classes,
-  Math,
-  StrUtils,
   SysUtils,
   Variants,
   // ACL
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
-  ACL.Utils.Stream;
+  ACL.Utils.Stream,
+  ACL.Utils.Strings;
 
 type
   TACLCSVDocumentRowProc = reference to procedure (ARowIndex: Integer);
-  TACLCSVDocumentValueProc = reference to procedure (const AValue: string; AIsString: Boolean; AValueIndex: Integer);
+  TACLCSVDocumentValueProc = reference to procedure (const AValue: UnicodeString; AIsString: Boolean; AValueIndex: Integer);
 
   { TACLCSVDocumentSettings }
 
   TACLCSVDocumentSettings = record
     Encoding: TEncoding;
-    Quote: Char;
-    ValueSeparator: Char;
+    Quote: WideChar;
+    ValueSeparator: WideChar;
 
-    class function Create(const AValueSeparator: Char; AEncoding: TEncoding = nil): TACLCSVDocumentSettings; overload; static;
-    class function Create(const AValueSeparator, AQuote: Char; AEncoding: TEncoding = nil): TACLCSVDocumentSettings; overload; static;
+    class function Create(const AValueSeparator: WideChar; AEncoding: TEncoding = nil): TACLCSVDocumentSettings; overload; static;
+    class function Create(const AValueSeparator, AQuote: WideChar; AEncoding: TEncoding = nil): TACLCSVDocumentSettings; overload; static;
     class function Default: TACLCSVDocumentSettings; static;
   end;
 
@@ -47,17 +46,17 @@ type
 
   TACLCSVDocument = class
   public
-    class procedure Read(const AFileName: string;
+    class procedure Read(const AFileName: UnicodeString;
       const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc); overload;
-    class procedure Read(const AFileName: string; const ASettings: TACLCSVDocumentSettings;
+    class procedure Read(const AFileName: UnicodeString; const ASettings: TACLCSVDocumentSettings;
       const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc); overload;
     class procedure Read(const AStream: TStream;
       const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc); overload;
     class procedure Read(const AStream: TStream; const ASettings: TACLCSVDocumentSettings;
       const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc); overload;
-    class procedure ReadData(const S: string;
+    class procedure ReadData(const S: UnicodeString;
       const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc); overload;
-    class procedure ReadData(const S: string; const ASettings: TACLCSVDocumentSettings;
+    class procedure ReadData(const S: UnicodeString; const ASettings: TACLCSVDocumentSettings;
       const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc); overload;
     class procedure ReadData(const C: PWideChar; ACount: Integer; const ASettings: TACLCSVDocumentSettings;
       const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc); overload;
@@ -79,7 +78,7 @@ type
   protected
     procedure DoRowBegin; virtual;
     procedure DoRowEnd; virtual;
-    procedure DoValue(const AValue: string; AIsQuotedValue: Boolean); virtual;
+    procedure DoValue(const AValue: UnicodeString; AIsQuotedValue: Boolean); virtual;
     procedure DoValueBegin; inline;
     procedure DoValueEnd; inline;
   public
@@ -100,10 +99,10 @@ type
     FStream: TStream;
     FStreamOwnership: TStreamOwnership;
 
-    procedure Write(const S: string);
+    procedure Write(const S: UnicodeString);
     procedure WriteSeparatorIfNecessary;
   public
-    constructor Create(const AFileName: string; const ASettings: TACLCSVDocumentSettings); overload;
+    constructor Create(const AFileName: UnicodeString; const ASettings: TACLCSVDocumentSettings); overload;
     constructor Create(const AStream: TStream; const ASettings: TACLCSVDocumentSettings;
       AStreamOwnership: TStreamOwnership = soReference); overload;
     destructor Destroy; override;
@@ -112,14 +111,11 @@ type
     procedure PutValue(const AValue: Double); overload;
     procedure PutValue(const AValue: Integer); overload;
     procedure PutValue(const AValue: Single); overload;
-    procedure PutValue(const AValue: string); overload;
+    procedure PutValue(const AValue: UnicodeString); overload;
     procedure PutValue(const AValue: Variant); overload;
   end;
 
 implementation
-
-uses
-  ACL.Utils.Strings;
 
 type
 
@@ -134,7 +130,7 @@ type
     FOnValue: TACLCSVDocumentValueProc;
   protected
     procedure DoRowBegin; override;
-    procedure DoValue(const AValue: string; AIsQuotedValue: Boolean); override;
+    procedure DoValue(const AValue: UnicodeString; AIsQuotedValue: Boolean); override;
   public
     constructor Create(AChars: PWideChar; ACount: Integer;
       const ASettings: TACLCSVDocumentSettings;
@@ -144,12 +140,12 @@ type
 
 { TACLCSVDocumentSettings }
 
-class function TACLCSVDocumentSettings.Create(const AValueSeparator: Char; AEncoding: TEncoding): TACLCSVDocumentSettings;
+class function TACLCSVDocumentSettings.Create(const AValueSeparator: WideChar; AEncoding: TEncoding): TACLCSVDocumentSettings;
 begin
   Result := Create(AValueSeparator, '"', AEncoding);
 end;
 
-class function TACLCSVDocumentSettings.Create(const AValueSeparator, AQuote: Char; AEncoding: TEncoding): TACLCSVDocumentSettings;
+class function TACLCSVDocumentSettings.Create(const AValueSeparator, AQuote: WideChar; AEncoding: TEncoding): TACLCSVDocumentSettings;
 begin
   if AEncoding = nil then
     AEncoding := TEncoding.UTF8;
@@ -230,7 +226,7 @@ begin
   DoValueEnd;
 end;
 
-procedure TACLCSVDocumentParser.DoValue(const AValue: string; AIsQuotedValue: Boolean);
+procedure TACLCSVDocumentParser.DoValue(const AValue: UnicodeString; AIsQuotedValue: Boolean);
 begin
   // do nothing
 end;
@@ -245,9 +241,9 @@ procedure TACLCSVDocumentParser.DoValueEnd;
 var
   ACount: Integer;
   AIsQuotedValue: Boolean;
-  AValue: string;
+  AValue: UnicodeString;
 begin
-  ACount := (NativeUInt(FChars) - NativeUInt(FValueCursor)) div SizeOf(WideChar);
+  ACount := (PByte(FChars) - PByte(FValueCursor)) div SizeOf(WideChar);
   if ACount > 0 then
   begin
     AIsQuotedValue := (FValueCursor^ = Settings.Quote) and ((FValueCursor + ACount - 1)^ = Settings.Quote);
@@ -314,8 +310,10 @@ end;
 
 { TACLCSVDocument }
 
-class procedure TACLCSVDocument.Read(const AFileName: string;
-  const ASettings: TACLCSVDocumentSettings; const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc);
+class procedure TACLCSVDocument.Read(const AFileName: UnicodeString;
+  const ASettings: TACLCSVDocumentSettings;
+  const OnRow: TACLCSVDocumentRowProc;
+  const OnValue: TACLCSVDocumentValueProc);
 var
   AStream: TACLFileStream;
 begin
@@ -327,7 +325,7 @@ begin
   end;
 end;
 
-class procedure TACLCSVDocument.Read(const AFileName: string; const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc);
+class procedure TACLCSVDocument.Read(const AFileName: UnicodeString; const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc);
 begin
   Read(AFileName, TACLCSVDocumentSettings.Default, OnRow, OnValue);
 end;
@@ -343,12 +341,12 @@ begin
   ReadData(acLoadString(AStream, ASettings.Encoding), ASettings, OnRow, OnValue);
 end;
 
-class procedure TACLCSVDocument.ReadData(const S: string; const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc);
+class procedure TACLCSVDocument.ReadData(const S: UnicodeString; const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc);
 begin
   ReadData(S, TACLCSVDocumentSettings.Default, OnRow, OnValue);
 end;
 
-class procedure TACLCSVDocument.ReadData(const S: string;
+class procedure TACLCSVDocument.ReadData(const S: UnicodeString;
   const ASettings: TACLCSVDocumentSettings; const OnRow: TACLCSVDocumentRowProc; const OnValue: TACLCSVDocumentValueProc);
 begin
   ReadData(PWideChar(S), acStringLength(S), ASettings, OnRow, OnValue);
@@ -384,7 +382,7 @@ begin
   Inc(FRowIndex);
 end;
 
-procedure TACLCSVDocumentWrappedParser.DoValue(const AValue: string; AIsQuotedValue: Boolean);
+procedure TACLCSVDocumentWrappedParser.DoValue(const AValue: UnicodeString; AIsQuotedValue: Boolean);
 begin
   inherited;
   if Assigned(FOnValue) then
@@ -394,7 +392,7 @@ end;
 
 { TACLCSVDocumentWriter }
 
-constructor TACLCSVDocumentWriter.Create(const AFileName: string; const ASettings: TACLCSVDocumentSettings);
+constructor TACLCSVDocumentWriter.Create(const AFileName: UnicodeString; const ASettings: TACLCSVDocumentSettings);
 begin
   Create(TACLFileStream.Create(AFileName, fmCreate), ASettings, soOwned);
 end;
@@ -424,7 +422,7 @@ end;
 procedure TACLCSVDocumentWriter.PutValue(const AValue: Double);
 begin
   WriteSeparatorIfNecessary;
-  Write(FloatToStr(AValue, InvariantFormatSettings));
+  Write(acFloatToStr(AValue, InvariantFormatSettings));
 end;
 
 procedure TACLCSVDocumentWriter.PutValue(const AValue: Boolean);
@@ -435,7 +433,7 @@ end;
 procedure TACLCSVDocumentWriter.PutValue(const AValue: Integer);
 begin
   WriteSeparatorIfNecessary;
-  Write(IntToStr(AValue));
+  Write(acIntToStr(AValue));
 end;
 
 procedure TACLCSVDocumentWriter.PutValue(const AValue: Variant);
@@ -445,10 +443,14 @@ begin
   else if VarIsOrdinal(AValue) then
     PutValue(Integer(AValue))
   else
+  {$IFDEF FPC}
+    PutValue(VarToWideStrDef(AValue, ''));
+  {$ELSE}
     PutValue(VarToStrDef(AValue, EmptyStr));
+  {$ENDIF}
 end;
 
-procedure TACLCSVDocumentWriter.PutValue(const AValue: string);
+procedure TACLCSVDocumentWriter.PutValue(const AValue: UnicodeString);
 begin
   WriteSeparatorIfNecessary;
   Write(FSettings.Quote);
@@ -459,10 +461,10 @@ end;
 procedure TACLCSVDocumentWriter.PutValue(const AValue: Single);
 begin
   WriteSeparatorIfNecessary;
-  Write(FloatToStr(AValue, InvariantFormatSettings));
+  Write(acFloatToStr(AValue, InvariantFormatSettings));
 end;
 
-procedure TACLCSVDocumentWriter.Write(const S: string);
+procedure TACLCSVDocumentWriter.Write(const S: UnicodeString);
 begin
   FStream.WriteString(S, FSettings.Encoding);
 end;

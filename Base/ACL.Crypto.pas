@@ -29,12 +29,12 @@ type
 
   TRC4 = class
   public
-    class function CryptString(const AString, APassword: string): string;
+    class function CryptString(const AString, APassword: UnicodeString): UnicodeString;
 
     class procedure Crypt(var AKey: TRC4Key; AData: PByte; ADataSize: Integer); overload; inline;
     class procedure Crypt(var AKey: TRC4Key; AInData, AOutData: PByte; ADataSize: Integer); overload;
     class procedure Initialize(out AKey: TRC4Key; APassword: PByteArray; APasswordLength: Integer); overload;
-    class procedure Initialize(out AKey: TRC4Key; const APassword: string); overload;
+    class procedure Initialize(out AKey: TRC4Key; const APassword: UnicodeString); overload;
     class procedure Initialize(out AKey: TRC4Key; const APassword: TBytes); overload;
   end;
 
@@ -58,22 +58,23 @@ type
     function Write(const Buffer; Count: Longint): Longint; override;
   end;
 
-function acDecryptString(const S, Key: string): string;
-function acEncryptString(const S, Key: string): string;
+function acDecryptString(const S, Key: UnicodeString): UnicodeString;
+function acEncryptString(const S, Key: UnicodeString): UnicodeString;
 implementation
 
 uses
   Math,
   // ACL
   ACL.FastCode,
+  ACL.Utils.Strings,
   ACL.Utils.Strings.Transcode;
 
-function acDecryptString(const S, Key: string): string;
+function acDecryptString(const S, Key: UnicodeString): UnicodeString;
 begin
   Result := TRC4.CryptString(TEncoding.Unicode.GetString(TACLMimecode.DecodeBytes(S)), Key);
 end;
 
-function acEncryptString(const S, Key: string): string;
+function acEncryptString(const S, Key: UnicodeString): UnicodeString;
 begin
   Result := TACLMimecode.EncodeBytes(TEncoding.Unicode.GetBytes(TRC4.CryptString(S, Key)));
 end;
@@ -111,13 +112,16 @@ begin
   AKey.Y := J;
 end;
 
-class function TRC4.CryptString(const AString, APassword: string): string;
+class function TRC4.CryptString(const AString, APassword: UnicodeString): UnicodeString;
 var
   AKey: TRC4Key;
 begin
   if AString <> '' then
   begin
     Initialize(AKey, APassword);
+  {$IFDEF FPC}
+    Result := EmptyStrU;
+  {$ENDIF}
     SetLength(Result, Length(AString));
     Crypt(AKey, @AString[1], @Result[1], Length(Result) * SizeOf(Char));
   end
@@ -148,7 +152,7 @@ begin
   end;
 end;
 
-class procedure TRC4.Initialize(out AKey: TRC4Key; const APassword: string);
+class procedure TRC4.Initialize(out AKey: TRC4Key; const APassword: UnicodeString);
 begin
   Initialize(AKey, TEncoding.UTF8.GetBytes(APassword));
 end;

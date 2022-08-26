@@ -51,14 +51,14 @@ type
     constructor Create;
     destructor Destroy; override;
     // high-level
-    procedure Add(const ATag: string; const E: Exception); overload;
-    procedure Add(const ATag, AFormatLine: string; const AArgs: array of const); overload;
-    procedure Add(const ATag, AText: string); overload;
+    procedure Add(const ATag: UnicodeString; const E: Exception); overload;
+    procedure Add(const ATag, AFormatLine: UnicodeString; const AArgs: array of const); overload;
+    procedure Add(const ATag, AText: UnicodeString); overload;
     // low-level
     procedure Write(const ABuffer: TBytes); overload;
     procedure Write(const ABuffer; ACount: Integer); overload;
-    procedure Write(const AText: string); overload;
-    procedure WriteHeader(const S: string);
+    procedure Write(const AText: UnicodeString); overload;
+    procedure WriteHeader(const S: UnicodeString);
     procedure WriteLine; overload;
     procedure WriteSeparator;
     // Lock
@@ -88,11 +88,11 @@ type
 
   TACLLogFile = class(TACLLogStream)
   strict private
-    FFileName: string;
+    FFileName: UnicodeString;
   public
-    constructor Create(const AFileName: string; AAppendIfExists: Boolean = True);
+    constructor Create(const AFileName: UnicodeString; AAppendIfExists: Boolean = True);
     //
-    property FileName: string read FFileName;
+    property FileName: UnicodeString read FFileName;
   end;
 
   { TACLMemoryLog }
@@ -100,29 +100,26 @@ type
   TACLMemoryLog = class(TACLLogStream)
   public
     constructor Create;
-    procedure SaveToFile(const AFileName: string);
+    procedure SaveToFile(const AFileName: UnicodeString);
   end;
 
 // Custom log
-procedure AddToLog(const AFileName: string; const ATag: string; const AException: Exception); overload;
-procedure AddToLog(const AFileName: string; const ATag, AFormatLine: string; const AArguments: array of const); overload;
-procedure AddToLog(const AFileName: string; const ATag, AText: string); overload;
+procedure AddToLog(const AFileName: UnicodeString; const ATag: UnicodeString; const AException: Exception); overload;
+procedure AddToLog(const AFileName: UnicodeString; const ATag, AFormatLine: UnicodeString; const AArguments: array of const); overload;
+procedure AddToLog(const AFileName: UnicodeString; const ATag, AText: UnicodeString); overload;
 
 // Debug Log
-procedure AddToDebugLog(const ATag: string; const AException: Exception); overload;
-procedure AddToDebugLog(const ATag, AFormatLine: string; const AArguments: array of const); overload;
-procedure AddToDebugLog(const ATag, AText: string); overload;
-function GetDebugLogFileName: string;
+procedure AddToDebugLog(const ATag: UnicodeString; const AException: Exception); overload;
+procedure AddToDebugLog(const ATag, AFormatLine: UnicodeString; const AArguments: array of const); overload;
+procedure AddToDebugLog(const ATag, AText: UnicodeString); overload;
+function GetDebugLogFileName: UnicodeString;
 implementation
-
-uses
-  StrUtils;
 
 var
   FGeneralLog: TACLCriticalSection;
-  FGeneralLogFileName: string;
+  FGeneralLogFileName: UnicodeString;
 
-procedure AddToLog(const AFileName: string; const AProc: TProc<TACLLog>); overload;
+procedure AddToLog(const AFileName: UnicodeString; const AProc: TProc<TACLLog>); overload;
 var
   ALog: TACLLog;
 begin
@@ -144,7 +141,7 @@ begin
   end;
 end;
 
-procedure AddToLog(const AFileName: string; const ATag: string; const AException: Exception); overload;
+procedure AddToLog(const AFileName: UnicodeString; const ATag: UnicodeString; const AException: Exception); overload;
 begin
   AddToLog(AFileName,
     procedure (ALog: TACLLog)
@@ -153,7 +150,7 @@ begin
     end);
 end;
 
-procedure AddToLog(const AFileName: string; const ATag, AText: string);
+procedure AddToLog(const AFileName: UnicodeString; const ATag, AText: UnicodeString);
 begin
   AddToLog(AFileName,
     procedure (ALog: TACLLog)
@@ -162,27 +159,27 @@ begin
     end);
 end;
 
-procedure AddToLog(const AFileName: string; const ATag, AFormatLine: string; const AArguments: array of const);
+procedure AddToLog(const AFileName: UnicodeString; const ATag, AFormatLine: UnicodeString; const AArguments: array of const);
 begin
   AddToLog(AFileName, ATag, Format(AFormatLine, AArguments));
 end;
 
-procedure AddToDebugLog(const ATag: string; const AException: Exception); overload;
+procedure AddToDebugLog(const ATag: UnicodeString; const AException: Exception); overload;
 begin
   AddToLog(GetDebugLogFileName, ATag, AException);
 end;
 
-procedure AddToDebugLog(const ATag, AText: string); overload;
+procedure AddToDebugLog(const ATag, AText: UnicodeString); overload;
 begin
   AddToLog(GetDebugLogFileName, ATag, AText);
 end;
 
-procedure AddToDebugLog(const ATag, AFormatLine: string; const AArguments: array of const); overload;
+procedure AddToDebugLog(const ATag, AFormatLine: UnicodeString; const AArguments: array of const); overload;
 begin
   AddToLog(GetDebugLogFileName, ATag, AFormatLine, AArguments);
 end;
 
-function GetDebugLogFileName: string;
+function GetDebugLogFileName: UnicodeString;
 begin
   if FGeneralLogFileName = '' then
   begin
@@ -212,14 +209,14 @@ begin
   inherited;
 end;
 
-procedure TACLLog.Add(const ATag: string; const E: Exception);
+procedure TACLLog.Add(const ATag: UnicodeString; const E: Exception);
 var
-  AStackTrace: string;
+  AStackTrace: UnicodeString;
 begin
   Lock.Enter;
   try
     Add(ATag, Format('Error: %s - %s', [E.ClassName, E.ToString]));
-    AStackTrace := {$IFDEF FPC}EmptyStr{$ELSE}E.StackTrace{$ENDIF};
+    AStackTrace := {$IFDEF FPC}EmptyStrU{$ELSE}E.StackTrace{$ENDIF};
     if AStackTrace <> '' then
     begin
       WriteSeparator;
@@ -232,7 +229,7 @@ begin
   end;
 end;
 
-procedure TACLLog.Add(const ATag, AText: string);
+procedure TACLLog.Add(const ATag, AText: UnicodeString);
 begin
   Lock.Enter;
   try
@@ -253,7 +250,7 @@ begin
   end;
 end;
 
-procedure TACLLog.Add(const ATag, AFormatLine: string; const AArgs: array of const);
+procedure TACLLog.Add(const ATag, AFormatLine: UnicodeString; const AArgs: array of const);
 begin
   Add(ATag, Format(AFormatLine, AArgs));
 end;
@@ -277,12 +274,12 @@ begin
     Write(ABuffer[0], ACount);
 end;
 
-procedure TACLLog.Write(const AText: string);
+procedure TACLLog.Write(const AText: UnicodeString);
 begin
   Write(Encoding.GetBytes(AText));
 end;
 
-procedure TACLLog.WriteHeader(const S: string);
+procedure TACLLog.WriteHeader(const S: UnicodeString);
 begin
   Lock.Enter;
   try
@@ -304,7 +301,7 @@ procedure TACLLog.WriteSeparator;
 begin
   Lock.Enter;
   try
-    Write(DupeString('-', 120));
+    Write(acDupeString('-', 120));
     WriteLine;
   finally
     Lock.Leave;
@@ -332,7 +329,7 @@ procedure TACLLog.WriteTimestamp;
 begin
   Lock.Enter;
   try
-    Write(FormatDateTime('[yyyy.MM.dd hh:mm:ss:zzz]', Now));
+    Write(FormatDateTime(_U('[yyyy.MM.dd hh:mm:ss:zzz]'), Now, FormatSettings));
     Write(#9);
   finally
     Lock.Leave;
@@ -379,12 +376,13 @@ end;
 
 { TACLLogFile }
 
-constructor TACLLogFile.Create(const AFileName: string; AAppendIfExists: Boolean);
+constructor TACLLogFile.Create(const AFileName: UnicodeString; AAppendIfExists: Boolean);
 const
   ModeMap: array[Boolean] of Word = (fmCreate, fmOpenReadWrite);
 begin
   FFileName := AFileName;
-  inherited Create(TACLFileStream.Create(FileName, ModeMap[AAppendIfExists and FileExists(AFileName)]));
+  inherited Create(TACLFileStream.Create(FileName,
+    ModeMap[AAppendIfExists and acFileExists(AFileName)]));
   if AAppendIfExists then
     Stream.Position := Stream.Size;
   if IsEmpty then
@@ -398,9 +396,9 @@ begin
   inherited Create(TMemoryStream.Create);
 end;
 
-procedure TACLMemoryLog.SaveToFile(const AFileName: string);
+procedure TACLMemoryLog.SaveToFile(const AFileName: UnicodeString);
 begin
-  TMemoryStream(Stream).SaveToFile(AFileName);
+  StreamSaveToFile(Stream, AFileName);
 end;
 
 initialization

@@ -90,7 +90,7 @@ end;
 
 function SendDataGetTempFileName(ID: Integer): UnicodeString;
 begin
-  Result := acTempPath + IntToHex(ID, 8) + '.tmp';
+  Result := acTempPath + acStringToUnicode(IntToHex(ID, 8)) + '.tmp';
 end;
 
 function SendDataGetData(const AMessage: TMessage): UnicodeString;
@@ -100,7 +100,7 @@ begin
   Result := '';
   if AMessage.Msg = WM_COPYDATA then
   begin
-    M := PCopyDataStruct(AMessage.LParam);
+    M := LParamToPointer(AMessage.LParam);
     if Assigned(M) and (M^.dwData = SendDataID) then
       Result := SendDataGetData(M);
   end;
@@ -173,7 +173,7 @@ begin
       ACopyData.cbData := Length(AData) * SizeOf(WideChar);
       ACopyData.lpData := PWideChar(AData);
     end;
-    SendMessageW(AHandle, WM_COPYDATA, 0, LPARAM(@ACopyData));
+    SendMessageW(AHandle, WM_COPYDATA, 0, PointerToLParam(@ACopyData));
     if ATempFileNameUsed then
       acDeleteFile(ATempFileName);
   end;
@@ -186,7 +186,7 @@ begin
   inherited Create;
   FClients := TACLThreadList<HWND>.CreateMultiReadExclusiveWrite;
   FListeners := TInterfaceList.Create;
-  FHelloMessage := RegisterID(ClassName + ':Hello');
+  FHelloMessage := RegisterID('TACLDataBroadcaster:Hello');
   RunInMainThread(CreateHandle);
 end;
 
@@ -266,7 +266,7 @@ begin
   else
     if AMessage.Msg = WM_COPYDATA then
     begin
-      AStruct := PCopyDataStruct(AMessage.LParam);
+      AStruct := LParamToPointer(AMessage.LParam);
       if AStruct <> nil then
         Receive(AStruct^.dwData, SendDataGetData(AStruct));
     end
@@ -279,7 +279,7 @@ var
   AClientHandle: HWND;
   AClassName: UnicodeString;
 begin
-  AClassName := ClassName;
+  AClassName := acStringToUnicode(ClassName);
   FHandle := WndCreate(WndProc, AClassName);
 
   AClientHandle := 0;
