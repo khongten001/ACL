@@ -450,7 +450,7 @@ var
 begin
   Result := ReadStringEx(AKey, AFontStr);
   if Result then
-    StringToFont(AFontStr, AFont);
+    acStringToFont(AFontStr, AFont);
 end;
 
 procedure TACLIniFileSection.WriteColor(const AKey: UnicodeString; AColor: TColor);
@@ -461,7 +461,7 @@ end;
 
 procedure TACLIniFileSection.WriteFont(const AKey: UnicodeString; AFont: TFont);
 begin
-  WriteString(AKey, FontToString(AFont));
+  WriteString(AKey, acFontToString(AFont));
 end;
 {$ENDIF}
 
