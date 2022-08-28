@@ -17,14 +17,15 @@ interface
 
 uses
   Windows,
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Graphics,
-{$ENDIF}
   // System
   Classes,
   Generics.Collections,
   SysUtils,
   Types,
+  // VCL
+{$IFNDEF ACL_BASE_NOVCL}
+  Graphics,
+{$ENDIF}
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -456,7 +457,10 @@ end;
 procedure TACLIniFileSection.WriteColor(const AKey: UnicodeString; AColor: TColor);
 begin
   AColor := ColorToRGB(AColor);
-  WriteString(AKey, IntToStr(GetRValue(AColor)) + ',' + IntToStr(GetGValue(AColor)) + ',' + IntToStr(GetBValue(AColor)));
+  WriteString(AKey,
+    acIntToStr(GetRValue(AColor)) + ',' +
+    acIntToStr(GetGValue(AColor)) + ',' +
+    acIntToStr(GetBValue(AColor)));
 end;
 
 procedure TACLIniFileSection.WriteFont(const AKey: UnicodeString; AFont: TFont);

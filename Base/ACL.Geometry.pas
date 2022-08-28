@@ -18,16 +18,16 @@ interface
 uses
   // Winapi
   Windows,
-  // Vcl
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Controls,
-{$ENDIF}
   // System
   Types,
   Math,
   Generics.Collections,
   Classes,
   SysUtils,
+  // Vcl
+{$IFNDEF ACL_BASE_NOVCL}
+  Controls,
+{$ENDIF}
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -269,9 +269,9 @@ function acSizeMin(const S1, S2: TSize): TSize; inline;
 function acSizeScale(const S: TSize; ANumerator, ADenominator: Integer): TSize;
 
 // Rects
-{$IFNDEF ACL_BASE_NOVCL}
+{$IF NOT DEFINED(ACL_BASE_NOVCL) AND NOT DEFINED(FPC)}
 procedure acRectToMargins(const R: TRect; Margins: TMargins);
-{$ENDIF}
+{$IFEND}
 function acHalfCoordinate(const ASize: Integer): Integer; inline;
 function acRect(const S: TSize): TRect; overload; inline;
 function acRect(const S: TPoint): TRect; overload; inline;
@@ -800,7 +800,7 @@ begin
   Result := Rect(ARect.Left + dX, ARect.Top + dY, ARect.Right + dX, ARect.Bottom + dY);
 end;
 
-{$IFNDEF ACL_BASE_NOVCL}
+{$IF NOT DEFINED(ACL_BASE_NOVCL) AND NOT DEFINED(FPC)}
 procedure acRectToMargins(const R: TRect; Margins: TMargins);
 begin
   Margins.Left := R.Left;

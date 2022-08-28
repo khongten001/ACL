@@ -26,7 +26,7 @@ uses
   Classes,
   // Vcl
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Forms,
+  Forms,
 {$ENDIF}
   // ACL
   ACL.Classes.Collections;
@@ -123,12 +123,12 @@ function MouseCursorSize: TSize;
 implementation
 
 uses
-  // VCL
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Controls,
-{$ENDIF}
   // System
   SysUtils,
+  // VCL
+{$IFNDEF ACL_BASE_NOVCL}
+  Controls,
+{$ENDIF}
   // ACL
   ACL.Utils.Messaging,
   ACL.Utils.Common,

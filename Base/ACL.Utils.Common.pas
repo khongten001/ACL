@@ -176,13 +176,14 @@ function LParamToPointer(const LParam: LPARAM): Pointer;
 function PointerToLParam(const Ptr: Pointer): LPARAM;
 
 {$IFDEF FPC}
-function InterlockedExchangePointer(var ATarget: Pointer; const ASource: Pointer): Pointer;
+function AtomicExchange(var ATarget: THandle; const ASource: THandle): THandle; overload;
+function AtomicExchange(var ATarget: Pointer; const ASource: Pointer): Pointer; overload;
 {$ENDIF}
 implementation
 
 uses
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Forms,
+  Forms,
 {$ENDIF}
   TypInfo,
   // ACL
@@ -224,7 +225,19 @@ begin
 end;
 
 {$IFDEF FPC}
-function InterlockedExchangePointer(var ATarget: Pointer; const ASource: Pointer): Pointer;
+function AtomicExchange(var ATarget: THandle; const ASource: THandle): THandle; overload;
+begin
+{$push}
+  {$hints off}
+  {$IFDEF CPUX64}
+    Result := THandle(InterlockedExchange64(QWORD(ATarget), QWORD(ASource)));
+  {$ELSE}
+    Result := THandle(InterlockedExchange(DWORD(ATarget), DWORD(ASource)));
+  {$ENDIF}
+{$pop}
+end;
+
+function AtomicExchange(var ATarget: Pointer; const ASource: Pointer): Pointer;
 begin
 {$push}
   {$hints off}

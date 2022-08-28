@@ -25,12 +25,12 @@ uses
   Generics.Collections,
   SyncObjs,
   SysUtils,
-{$IFNDEF ACL_BASE_NOVCL}
-  System.UITypes,
+{$IF NOT DEFINED(ACL_BASE_NOVCL) AND NOT DEFINED(FPC)}
+  System.UITypes, // for inlining
 {$ENDIF}
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Graphics,
+  Graphics,
 {$ENDIF}
   // ACL
   ACL.Utils.Common;
@@ -261,6 +261,7 @@ function acStringFromBytes(B: PByte; Count: Integer): UnicodeString; overload;
 function acStringIsRealUnicode(const S: UnicodeString): Boolean;
 
 // FreePascal Special
+function acIntToHex(const I, Digits: Integer): UnicodeString;
 function acIntToStr(const I: Integer): UnicodeString; overload;
 function acIntToStr(const I: Int64): UnicodeString; overload;
 function acFloatToStr(const Value: Single; const AFormatSettings: TFormatSettings): UnicodeString; overload;
@@ -461,6 +462,11 @@ begin
   Result := acStringToUnicode(SysUtils.FloatToStr(Value, AFormatSettings));
 end;
 
+function acIntToHex(const I, Digits: Integer): UnicodeString;
+begin
+  Result := acStringToUnicode(IntToHex(I, Digits));
+end;
+
 function acIntToStr(const I: Integer): UnicodeString;
 begin
   Result := acStringToUnicode(IntToStr(I));
@@ -557,7 +563,7 @@ end;
 
 function acFontToString(AFont: TFont): UnicodeString; overload;
 begin
-  Result := acFontToString(AFont.Name, AFont.Color, AFont.Height, AFont.Style);
+  Result := acFontToString(acStringToUnicode(AFont.Name), AFont.Color, AFont.Height, AFont.Style);
 end;
 
 procedure acStringToFont(const S: UnicodeString; const Font: TFont);
@@ -565,7 +571,7 @@ var
   AFontData: TACLFontData;
 begin
   acStringToFontData(S, AFontData);
-  Font.Name := AFontData[0];
+  Font.Name := acUnicodeToString(AFontData[0]);
   Font.Color := StrToIntDef(AFontData[1], 0);
   Font.Height := StrToIntDef(AFontData[2], 0);
   Font.Style := acFontStyleEncode(StrToIntDef(AFontData[3], 0));
@@ -585,7 +591,7 @@ begin
   begin
     if (AScan^ = ',') or (ALen = 0) then
     begin
-      SetString(AFontData[APos], AStart, (NativeUInt(AScan) - NativeUInt(AStart)) div SizeOf(WideChar));
+      SetString(AFontData[APos], AStart, (PByte(AScan) - PByte(AStart)) div SizeOf(WideChar));
       AStart := AScan;
       Inc(AStart);
       Inc(APos);
@@ -2238,7 +2244,7 @@ begin
   Result := nil;
   while (Result = nil) and (AIndex < CacheSize) do
   begin
-    Result := InterlockedExchangePointer(Pointer(Cache[AIndex]), nil);
+    Result := AtomicExchange(Pointer(Cache[AIndex]), nil);
     Inc(AIndex);
   end;
 
@@ -2266,7 +2272,7 @@ begin
     AIndex := 0;
     while (ABuilder <> nil) and (AIndex < CacheSize) do
     begin
-      ABuilder := InterlockedExchangePointer(Pointer(Cache[AIndex]), ABuilder);
+      ABuilder := AtomicExchange(Pointer(Cache[AIndex]), Pointer(ABuilder));
       Inc(AIndex);
     end;
   end;

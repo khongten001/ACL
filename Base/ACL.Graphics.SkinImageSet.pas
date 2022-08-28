@@ -16,20 +16,19 @@ unit ACL.Graphics.SkinImageSet;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.GDIPAPI,
+  Windows,
   // System
-  System.UITypes,
-  System.Types,
-  System.Classes,
-  System.Generics.Collections,
+  Classes,
+  Generics.Collections,
+  Types,
+{$IFNDEF FPC}
+  System.UITypes, // for inlining
+{$ENDIF}
   // VCL
-  Vcl.Graphics,
+  Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
-  ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Gdiplus,
   ACL.Graphics.SkinImage,
@@ -87,7 +86,8 @@ type
     procedure SetItem(Index: Integer; AValue: TACLSkinImageSetItem); inline;
     //
     procedure ImageChangeHandler(Sender: TObject);
-    procedure ItemsChangeHandler(Sender: TObject; const Item: TACLSkinImageSetItem; Action: TCollectionNotification);
+    procedure ItemsChangeHandler(Sender: TObject;
+      {$IFDEF FPC}constref{$ELSE}const{$ENDIF} Item: TACLSkinImageSetItem; Action: TCollectionNotification);
     procedure ReleaseItems;
     procedure ReleaseTintedItems;
   protected
@@ -112,7 +112,7 @@ type
     function Get(DPI: Integer): TACLSkinImageSetItem; overload;
     function Get(DPI: Integer; const AColor: TAlphaColor; AMode: TACLSkinImageColorationMode): TACLSkinImageSetItem; overload;
     function Get(DPI: Integer; const AColorScheme: TACLColorSchema): TACLSkinImageSetItem; overload;
-    function GetHashCode: Integer; override;
+    function GetHashCode: {$IFDEF FPC}PtrInt{$ELSE}Integer;{$ENDIF} override;
     function IsEmpty: Boolean;
     procedure MakeUnique;
 
@@ -121,7 +121,7 @@ type
     procedure ImportFromImageFile(const AFileName: string; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageStream(const AStream: TStream; DPI: Integer = acDefaultDPI);
     procedure LoadFromFile(const AFileName: string);
-    procedure LoadFromResource(Inst: HINST; const AName: UnicodeString; AType: PChar);
+    procedure LoadFromResource(Inst: HINST; const AName: string; AType: PChar);
     procedure LoadFromStream(const AStream: TStream);
     procedure SaveToFile(const AFileName: string);
     procedure SaveToStream(const AStream: TStream);
@@ -138,9 +138,9 @@ var
 implementation
 
 uses
-  System.SysUtils,
-  System.Math,
-  System.Generics.Defaults;
+  Math,
+  Generics.Defaults,
+  SysUtils;
 
 const
   sErrorCannotDeleteLastImage = 'You cannot delete the last image';
@@ -419,7 +419,7 @@ begin
   Result := nil;
 end;
 
-function TACLSkinImageSet.GetHashCode: Integer;
+function TACLSkinImageSet.GetHashCode;
 begin
   Result := Count;
 end;
@@ -532,7 +532,7 @@ begin
   end;
 end;
 
-procedure TACLSkinImageSet.LoadFromResource(Inst: HINST; const AName: UnicodeString; AType: PChar);
+procedure TACLSkinImageSet.LoadFromResource(Inst: HINST; const AName: string; AType: PChar);
 var
   AStream: TStream;
 begin
@@ -554,7 +554,9 @@ begin
     Clear;
     repeat
       Items[Count - 1].LoadFromStream(AStream);
-
+    {$IFDEF FPC}
+      ASyncWord := 0;
+    {$ENDIF}
       ASyncWordSize := AStream.Read(ASyncWord, SizeOf(ASyncWord));
       if (ASyncWordSize <> SizeOf(ASyncWord)) or (ASyncWord <> SYNC_WORD) then
       begin
@@ -644,8 +646,7 @@ begin
   Changed;
 end;
 
-procedure TACLSkinImageSet.ItemsChangeHandler(Sender: TObject;
-  const Item: TACLSkinImageSetItem; Action: TCollectionNotification);
+procedure TACLSkinImageSet.ItemsChangeHandler;
 begin
   if Action = cnAdded then
   begin

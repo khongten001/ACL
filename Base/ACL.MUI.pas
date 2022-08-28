@@ -23,8 +23,8 @@ uses
   Classes,
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Forms,
-  Vcl.Graphics,
+  Forms,
+  Graphics,
 {$ENDIF}
   // ACL
   ACL.Classes.Collections,
@@ -164,9 +164,9 @@ uses
   SysUtils,
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Controls,
-  Vcl.Menus,
-  Vcl.ActnList,
+  ActnList,
+  Controls,
+  Menus,
 {$ENDIF}
   // ACL
   ACL.Utils.FileSystem,
@@ -191,7 +191,7 @@ begin
     begin
       Result := LangGetComponentPath(AComponent.Owner);
       if AComponent.Name <> '' then
-        Result := Result + IfThenW(Result <> '', '.') + AComponent.Name;
+        Result := Result + IfThenW(Result <> '', '.') + acStringToUnicode(AComponent.Name);
     end
     else
       Result := '';
@@ -225,7 +225,9 @@ begin
 end;
 
 procedure LangApplyTo(const AParentSection: UnicodeString; AComponent: TComponent);
+
 {$IFNDEF ACL_BASE_NOVCL}
+
   function IsActionAssigned(AObject: TObject): Boolean;
   var
     APropInfo: PPropInfo;
@@ -238,53 +240,69 @@ procedure LangApplyTo(const AParentSection: UnicodeString; AComponent: TComponen
   begin
     Result := not (IsActionAssigned(AComponent) or (AComponent is TMenuItem) and TMenuItem(AComponent).IsLine);
   end;
+
 {$ENDIF}
 
   procedure SetStringValue(APropInfo: PPropInfo; const S: UnicodeString);
   begin
     if APropInfo <> nil then
+    {$IFDEF FPC}
+      SetUnicodeStrProp(AComponent, APropInfo, S);
+    {$ELSE}
       SetStrProp(AComponent, APropInfo, S);
+    {$ENDIF}
   end;
 
 var
   AIntf: IACLLocalizableComponent;
+{$IFNDEF ACL_BASE_NOVCL}
+  ACaption: UnicodeString;
+{$ENDIF}
+  AName: UnicodeString;
+  AValue: UnicodeString;
   I: Integer;
-  S: UnicodeString;
 begin
-  if not LangFile.IsEmpty then
-  begin
-  {$IFNDEF ACL_BASE_NOVCL}
-    if AComponent is TAction then
-    begin
-      TAction(AComponent).Caption := LangFile.ReadString(AParentSection, AComponent.Name);
-      TAction(AComponent).Hint := IfThenW(LangFile.ReadString(AParentSection, AComponent.Name + '.h'), TAction(AComponent).Caption);
-    end
-    else
-      if CanLocalizeCaptionAndHint then
-  {$ENDIF}
-      begin
-        if LangFile.ReadStringEx(AParentSection, AComponent.Name, S) then
-          SetStringValue(GetPropInfo(AComponent, 'Caption'), S);
-        if LangFile.ReadStringEx(AParentSection, AComponent.Name + '.h', S) then
-          SetStringValue(GetPropInfo(AComponent, 'Hint'), S);
-      end;
+  if LangFile.IsEmpty then Exit;
 
-    if Supports(AComponent, IACLLocalizableComponent, AIntf) then
-      AIntf.Localize(AParentSection + '.' + AComponent.Name)
-    else
-      for I := 0 to AComponent.ComponentCount - 1 do
-        LangApplyTo(AParentSection, AComponent.Components[I]);
-  end;
+  AName := acStringToUnicode(AComponent.Name);
+{$IFNDEF ACL_BASE_NOVCL}
+  if AComponent is TAction then
+  begin
+    ACaption := LangFile.ReadString(AParentSection, AName);
+    AValue := LangFile.ReadString(AParentSection, AName + '.h');
+    TAction(AComponent).Caption := acUnicodeToString(ACaption);
+    TAction(AComponent).Hint := acUnicodeToString(IfThenW(AValue, ACaption));
+  end
+  else
+    if CanLocalizeCaptionAndHint then
+{$ENDIF}
+    begin
+      if LangFile.ReadStringEx(AParentSection, AName, AValue) then
+        SetStringValue(GetPropInfo(AComponent, 'Caption'), AValue);
+      if LangFile.ReadStringEx(AParentSection, AName + '.h', AValue) then
+        SetStringValue(GetPropInfo(AComponent, 'Hint'), AValue);
+    end;
+
+  if Supports(AComponent, IACLLocalizableComponent, AIntf) then
+    AIntf.Localize(AParentSection + '.' + AName)
+  else
+    for I := 0 to AComponent.ComponentCount - 1 do
+      LangApplyTo(AParentSection, AComponent.Components[I]);
 end;
 
 procedure LangApplyToItems(const ASection: UnicodeString; AItems: TStrings);
 var
   I: Integer;
+  AValue: UnicodeString;
 begin
   AItems.BeginUpdate;
   try
     for I := 0 to AItems.Count - 1 do
-      AItems.Strings[I] := LangFile.ReadString(ASection, 'i[' + IntToStr(I) + ']', AItems.Strings[I]);
+    begin
+      AValue := LangFile.ReadString(ASection, 'i[' + acIntToStr(I) + ']');
+      if AValue <> '' then
+        AItems.Strings[I] := {$IFDEF FPC}acUnicodeToString{$ENDIF}(AValue);
+    end;
   finally
     AItems.EndUpdate;
   end;
@@ -378,7 +396,16 @@ begin
   AData.VersionID := ALangFile.ReadInteger(sLangMainSection, sLangVersionId, 0);
   if AIcon <> nil then
   begin
+  {$IFDEF FPC}
+    if not ALangFile.ReadObject(sLangMainSection, sLangIcon,
+      procedure (AStream: TStream)
+      begin
+        AIcon.LoadFromStream(AStream);
+      end)
+    then
+  {$ELSE}
     if not ALangFile.ReadObject(sLangMainSection, sLangIcon, AIcon.LoadFromStream) then
+  {$ENDIF}
       AIcon.Handle := 0;
   end;
   Result := True;

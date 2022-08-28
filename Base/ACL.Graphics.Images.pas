@@ -16,18 +16,18 @@ unit ACL.Graphics.Images;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.ActiveX,
-  Winapi.GDIPOBJ,
-  Winapi.GDIPAPI,
+  // Winapi
+{$IFNDEF FPC}
+  ActiveX,
+{$ENDIF}
+  Windows,
   // System
-  System.Types,
-  System.SysUtils,
-  System.Classes,
+  Classes,
+  SysUtils,
+  Types,
   // Vcl
-  Vcl.Graphics,
+  Graphics,
   // ACL
-  ACL.Classes,
   ACL.Classes.ByteBuffer,
   ACL.Geometry,
   ACL.Graphics,
@@ -87,15 +87,15 @@ type
     procedure DestroyHandle;
     procedure LoadFromHandle(AHandle: GpImage; AFormat: TACLImageFormatClass = nil);
 
-    function BeginLock(var AData: TBitmapData): Boolean;
-    function EndLock(var AData: TBitmapData): Boolean;
+    function BeginLock(out AData: TGPBitmapData): Boolean;
+    function EndLock(var AData: TGPBitmapData): Boolean;
 
     property Handle: GpImage read FHandle;
   public
     constructor Create; overload;
     constructor Create(ABitmap: HBITMAP); overload;
     constructor Create(ABitmap: TBitmap; AAlphaFormat: TAlphaFormat = afPremultiplied); overload;
-    constructor Create(AInstance: HINST; const AResName: UnicodeString; AResType: PWideChar); overload;
+    constructor Create(AInstance: HINST; const AResName: string; AResType: PChar); overload;
     constructor Create(AStream: TStream); overload;
     constructor Create(AWidth, AHeight: Integer); overload;
     constructor Create(const ABits: PRGBQuad; AWidth, AHeight: Integer); overload;
@@ -130,7 +130,7 @@ type
     procedure LoadFromBits(ABits: PRGBQuad; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat = afPremultiplied);
     procedure LoadFromFile(const AFileName: UnicodeString);
     procedure LoadFromGraphic(AGraphic: TGraphic);
-    procedure LoadFromResource(AInstance: HINST; const AResName: UnicodeString; AResType: PWideChar);
+    procedure LoadFromResource(AInstance: HINST; const AResName: string; AResType: PChar);
     procedure LoadFromStream(AStream: TStream);
     procedure SaveToFile(const AFileName: UnicodeString); overload;
     procedure SaveToFile(const AFileName: UnicodeString; AFormat: TACLImageFormatClass); overload;
@@ -160,10 +160,10 @@ type
     class procedure Save(AStream: TStream; ABitmap: GpBitmap); virtual;
   public
     class function ClipboardFormat: Word; virtual;
-    class function Description: string; virtual; abstract;
-    class function Ext: string; virtual; abstract;
+    class function Description: UnicodeString; virtual; abstract;
+    class function Ext: UnicodeString; virtual; abstract;
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; virtual; abstract;
-    class function MimeType: string; virtual; abstract;
+    class function MimeType: UnicodeString; virtual; abstract;
   end;
 
   { TACLImageFormatRepository }
@@ -173,7 +173,7 @@ type
     class var FFormats: TList;
     class var FMaxPreamble: Integer;
 
-    class function BuildDialogFilter(const ADescription, AExts: string): string;
+    class function BuildDialogFilter(const ADescription, AExts: UnicodeString): UnicodeString;
   public
     class constructor Create;
     class destructor Destroy;
@@ -183,14 +183,14 @@ type
 
     class function GetFormat(AData: PByte; ADataSize: Integer): TACLImageFormatClass; overload;
     class function GetFormat(const AContainer: IACLDataContainer): TACLImageFormatClass; overload;
-    class function GetFormat(const AMimeType: string): TACLImageFormatClass; overload;
+    class function GetFormat(const AMimeType: UnicodeString): TACLImageFormatClass; overload;
     class function GetFormat(const AStream: TStream): TACLImageFormatClass; overload;
-    class function GetFormatByExt(const AExt: string): TACLImageFormatClass; overload;
+    class function GetFormatByExt(const AExt: UnicodeString): TACLImageFormatClass; overload;
 
     class function GetDialogFilter(const AContainer: IACLDataContainer; out AFilter, AExt: UnicodeString): Boolean; overload;
     class function GetDialogFilter(const AMimeType: UnicodeString; out AFilter, AExt: UnicodeString): Boolean; overload;
-    class function GetDialogFilter: string; overload;
-    class function GetExtList: string;
+    class function GetDialogFilter: UnicodeString; overload;
+    class function GetExtList: UnicodeString;
 
     class function GetMimeType(const AFormat: TACLImageFormatClass): UnicodeString; overload;
     class function GetMimeType(const AContainer: IACLDataContainer): UnicodeString; overload;
@@ -213,10 +213,10 @@ type
     class function GetMaxPreamble: Integer; override;
   public
     class function ClipboardFormat: Word; override;
-    class function Description: string; override;
-    class function Ext: string; override;
+    class function Description: UnicodeString; override;
+    class function Ext: UnicodeString; override;
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; override;
-    class function MimeType: string; override;
+    class function MimeType: UnicodeString; override;
   end;
 
   { TACLImageFormatJPEG }
@@ -226,9 +226,9 @@ type
     class function CheckPreamble(AData: PByte; AMaxSize: Integer): Boolean; override;
     class function GetMaxPreamble: Integer; override;
   public
-    class function Description: string; override;
-    class function Ext: string; override;
-    class function MimeType: string; override;
+    class function Description: UnicodeString; override;
+    class function Ext: UnicodeString; override;
+    class function MimeType: UnicodeString; override;
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; override;
   end;
 
@@ -236,8 +236,8 @@ type
 
   TACLImageFormatJPG = class(TACLImageFormatJPEG)
   public
-    class function Ext: string; override;
-    class function MimeType: string; override;
+    class function Ext: UnicodeString; override;
+    class function MimeType: UnicodeString; override;
   end;
 
   { TACLImageFormatGIF }
@@ -247,9 +247,9 @@ type
     class function CheckPreamble(AData: PByte; AMaxSize: Integer): Boolean; override;
     class function GetMaxPreamble: Integer; override;
   public
-    class function Description: string; override;
-    class function Ext: string; override;
-    class function MimeType: string; override;
+    class function Description: UnicodeString; override;
+    class function Ext: UnicodeString; override;
+    class function MimeType: UnicodeString; override;
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; override;
   end;
 
@@ -263,9 +263,9 @@ type
     class function CheckPreamble(AData: PByte; AMaxSize: Integer): Boolean; override;
   public
     class function ClipboardFormat: Word; override;
-    class function Description: string; override;
-    class function Ext: string; override;
-    class function MimeType: string; override;
+    class function Description: UnicodeString; override;
+    class function Ext: UnicodeString; override;
+    class function MimeType: UnicodeString; override;
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; override;
   end;
 
@@ -275,7 +275,7 @@ type
   TACLImageFormatWebP = class(TACLImageFormat)
   strict private type
     TDecodeFunc = function (const data: PByte; size: Cardinal; width, height: PInteger): PByte; cdecl;
-    TEncodeFunc = function (const rgba: PByte; width, height, stride: Integer; quality: Single; var output: PByte): Cardinal; cdecl;
+    TEncodeFunc = function (const rgba: PByte; width, height, stride: Integer; quality: Single; out output: PByte): Cardinal; cdecl;
     TFreeFunc = procedure (P: Pointer); cdecl;
     TGetInfoFunc = function (const data: PByte; size: Cardinal; width, height: PInteger): Integer; cdecl;
   strict private
@@ -292,9 +292,9 @@ type
     class procedure Save(AStream: TStream; ABitmap: GpBitmap); override;
   public
     class destructor Destroy;
-    class function Description: string; override;
-    class function Ext: string; override;
-    class function MimeType: string; override;
+    class function Description: UnicodeString; override;
+    class function Ext: UnicodeString; override;
+    class function MimeType: UnicodeString; override;
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; override;
   end;
 
@@ -302,21 +302,25 @@ function acGraphicToBitmap(AGraphic: TGraphic): TACLBitmap;
 implementation
 
 uses
-  System.Math,
+  Math,
   // ACL
+{$IFNDEF FPC}
+  ACL.Math, // for inlining
+{$ENDIF}
   ACL.FastCode,
-  ACL.Math,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
 
 function acGraphicToBitmap(AGraphic: TGraphic): TACLBitmap;
 begin
+{$IFNDEF FPC}
   if AGraphic.SupportsPartialTransparency then
   begin
     Result := TACLBitmap.CreateEx(AGraphic.Width, AGraphic.Height, pf32bit, True);
     Result.Canvas.Draw(0, 0, AGraphic);
   end
   else
+{$ENDIF}
     if AGraphic.Transparent then
     begin
       Result := TACLBitmap.CreateEx(AGraphic.Width, AGraphic.Height);
@@ -359,7 +363,7 @@ begin
   LoadFromBitmap(ABitmap, AAlphaFormat);
 end;
 
-constructor TACLImage.Create(AInstance: HINST; const AResName: UnicodeString; AResType: PWideChar);
+constructor TACLImage.Create(AInstance: HINST; const AResName: string; AResType: PChar);
 begin
   Create;
   LoadFromResource(AInstance, AResName, AResType);
@@ -408,7 +412,7 @@ end;
 
 procedure TACLImage.ApplyColorSchema(const AColorSchema: TACLColorSchema);
 var
-  AData: TBitmapData;
+  AData: TGpBitmapData;
 begin
   if AColorSchema.IsAssigned then
   begin
@@ -457,7 +461,7 @@ end;
 
 function TACLImage.ToBitmap(AAlphaFormat: TAlphaFormat = afIgnored): TACLBitmap;
 
-  function CloneAsBitmapCore(const AData: TBitmapData; ASourceAlphaFormat: TAlphaFormat; AMakeOpaque: Boolean): TACLBitmap;
+  function CloneAsBitmapCore(const AData: TGpBitmapData; ASourceAlphaFormat: TAlphaFormat; AMakeOpaque: Boolean): TACLBitmap;
   begin
     Result := TACLBitmap.Create;
     Result.AlphaFormat := ASourceAlphaFormat;
@@ -470,7 +474,7 @@ function TACLImage.ToBitmap(AAlphaFormat: TAlphaFormat = afIgnored): TACLBitmap;
   end;
 
 var
-  AData: TBitmapData;
+  AData: TGpBitmapData;
   AHandle: HBITMAP;
 begin
   Result := nil;
@@ -542,27 +546,19 @@ end;
 
 procedure TACLImage.Draw(Graphics: GpGraphics; const R, ASource: TRect; AAlpha: Byte = $FF; ATile: Boolean = False);
 const
-  PixelOffsetModeMap: array[TACLImagePixelOffsetMode] of TPixelOffsetMode = (
-    PixelOffsetModeDefault, PixelOffsetModeHalf, PixelOffsetModeNone
+  PixelOffsetModeMap: array[TACLImagePixelOffsetMode] of TGpPixelOffsetMode = (
+    pomInvalid, pomHalf, pomNone
   );
-  ComposingModeMap: array[TACLImageCompositingMode] of TCompositingMode = (
-    CompositingModeSourceOver,
-    CompositingModeSourceCopy
+  ComposingModeMap: array[TACLImageCompositingMode] of TGpCompositingMode = (
+    cmSourceOver, cmSourceCopy
   );
-  StretchQualityMap: array[TACLImageStretchQuality] of TInterpolationMode = (
-    InterpolationModeDefault,
-    InterpolationModeLowQuality,
-    InterpolationModeHighQuality,
-    InterpolationModeBilinear,
-    InterpolationModeBicubic,
-    InterpolationModeNearestNeighbor,
-    InterpolationModeHighQualityBilinear,
-    InterpolationModeHighQualityBicubic
+  StretchQualityMap: array[TACLImageStretchQuality] of TGpInterpolationMode = (
+    imDefault, imLowQuality, imHighQuality, imBilinear, imBicubic, imNearestNeighbor, imHighQualityBilinear, imHighQualityBicubic
   );
 var
-  APrevComposingMode: TCompositingMode;
-  APrevInterpolationMode: TInterpolationMode;
-  APrevPixelOffsetMode: TPixelOffsetMode;
+  APrevComposingMode: TGpCompositingMode;
+  APrevInterpolationMode: TGpInterpolationMode;
+  APrevPixelOffsetMode: TGpPixelOffsetMode;
 begin
   if (PixelOffsetMode <> ipomDefault) or (StretchQuality <> sqDefault) or (ComposingMode <> cmOver) then
   begin
@@ -591,7 +587,7 @@ begin
   Draw(Graphics, R, ClientRect, AAlpha, ATile);
 end;
 
-function TACLImage.BeginLock(var AData: TBitmapData): Boolean;
+function TACLImage.BeginLock(out AData: TGpBitmapData): Boolean;
 var
   AFormat: Integer;
 begin
@@ -600,7 +596,7 @@ begin
     (GdipBitmapLockBits(Handle, nil, ImageLockModeRead, AFormat, @AData) = Ok);
 end;
 
-function TACLImage.EndLock(var AData: TBitmapData): Boolean;
+function TACLImage.EndLock(var AData: TGpBitmapData): Boolean;
 begin
   Result := GdipBitmapUnlockBits(Handle, @AData) = Ok;
 end;
@@ -624,7 +620,7 @@ begin
     if AHandle <> nil then
     begin
       GdipGetImageGraphicsContext(AHandle, AGraphics);
-      GdipSetPixelOffsetMode(AGraphics, PixelOffsetModeHalf);
+      GdipSetPixelOffsetMode(AGraphics, pomHalf);
       Draw(AGraphics, Rect(0, 0, AWidth, AHeight), acRectContent(ClientRect, ACropMargins));
       GdipDeleteGraphics(AGraphics);
       SetHandle(AHandle);
@@ -706,7 +702,7 @@ begin
   end;
 end;
 
-procedure TACLImage.LoadFromResource(AInstance: HINST; const AResName: UnicodeString; AResType: PWideChar);
+procedure TACLImage.LoadFromResource(AInstance: HINST; const AResName: string; AResType: PChar);
 var
   AStream: TStream;
 begin
@@ -791,7 +787,7 @@ begin
   else
     FFormat := TACLImageFormatBMP;
 
-  if GdipGetImageRawFormat(AHandle, @ID) = OK then
+  if GdipGetImageRawFormat(AHandle, ID) = OK then
   begin
     if IsEqualGUID(ID, ImageFormatGIF) then
       FFormat := TACLImageFormatGIF
@@ -943,7 +939,7 @@ begin
   Result := nil;
 end;
 
-class function TACLImageFormatRepository.GetFormat(const AMimeType: string): TACLImageFormatClass;
+class function TACLImageFormatRepository.GetFormat(const AMimeType: UnicodeString): TACLImageFormatClass;
 var
   AFormat: TACLImageFormatClass;
   I: Integer;
@@ -966,6 +962,9 @@ var
 begin
   ASavedPosition := AStream.Position;
   try
+  {$IFDEF FPC}
+    ABytes := nil;
+  {$ENDIF}
     SetLength(ABytes, FMaxPreamble);
     if AStream.Read(ABytes, FMaxPreamble) = FMaxPreamble then
       Result := GetFormat(@ABytes[0], FMaxPreamble)
@@ -976,7 +975,7 @@ begin
   end;
 end;
 
-class function TACLImageFormatRepository.GetFormatByExt(const AExt: string): TACLImageFormatClass;
+class function TACLImageFormatRepository.GetFormatByExt(const AExt: UnicodeString): TACLImageFormatClass;
 var
   AFormat: TACLImageFormatClass;
   I: Integer;
@@ -1012,20 +1011,21 @@ begin
   end;
 end;
 
-class function TACLImageFormatRepository.GetDialogFilter: string;
+class function TACLImageFormatRepository.GetDialogFilter: UnicodeString;
 begin
   Result := BuildDialogFilter('All Supported', GetExtList);
 end;
 
-class function TACLImageFormatRepository.GetExtList: string;
+class function TACLImageFormatRepository.GetExtList: UnicodeString;
 var
-  ABuilder: TStringBuilder;
+  ABuilder: TACLStringBuilder;
+  I: Integer;
 begin
   if FFormats <> nil then
   begin
     ABuilder := TACLStringBuilderManager.Get;
     try
-      for var I := 0 to FFormats.Count - 1 do
+      for I := 0 to FFormats.Count - 1 do
         ABuilder.Append('*' + TACLImageFormatClass(FFormats.List[I]).Ext + ';');
       Result := ABuilder.ToString;
     finally
@@ -1033,7 +1033,7 @@ begin
     end;
   end
   else
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
 class function TACLImageFormatRepository.GetMimeType(const AFormat: TACLImageFormatClass): UnicodeString;
@@ -1041,7 +1041,7 @@ begin
   if AFormat <> nil then
     Result := AFormat.MimeType
   else
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
 class function TACLImageFormatRepository.GetMimeType(const AContainer: IACLDataContainer): UnicodeString;
@@ -1096,7 +1096,7 @@ begin
   Result := (AFormat <> nil) and AFormat.GetSize(AStream, ADimensions);
 end;
 
-class function TACLImageFormatRepository.BuildDialogFilter(const ADescription, AExts: string): string;
+class function TACLImageFormatRepository.BuildDialogFilter(const ADescription, AExts: UnicodeString): UnicodeString;
 begin
   Result := Format('%0:s (%1:s)|%1:s', [ADescription, AExts]);
 end;
@@ -1113,12 +1113,12 @@ begin
   Result := CF_BITMAP;
 end;
 
-class function TACLImageFormatBMP.Description: string;
+class function TACLImageFormatBMP.Description: UnicodeString;
 begin
   Result := 'Bitmap Image';
 end;
 
-class function TACLImageFormatBMP.Ext: string;
+class function TACLImageFormatBMP.Ext: UnicodeString;
 begin
   Result := '.bmp';
 end;
@@ -1128,7 +1128,7 @@ begin
   Result := 2;
 end;
 
-class function TACLImageFormatBMP.MimeType: string;
+class function TACLImageFormatBMP.MimeType: UnicodeString;
 begin
   Result := 'image/bmp';
 end;
@@ -1142,6 +1142,9 @@ var
 begin
   Result := False;
   try
+  {$IFDEF FPC}
+    FastZeroStruct(AFileHeader, SizeOf(AFileHeader));
+  {$ENDIF}
     AStream.ReadBuffer(AFileHeader, SizeOf(AFileHeader));
     if AFileHeader.bfType = FormatPreamble then
     begin
@@ -1177,17 +1180,17 @@ begin
   Result := 3;
 end;
 
-class function TACLImageFormatJPEG.Description: string;
+class function TACLImageFormatJPEG.Description: UnicodeString;
 begin
   Result := 'JPEG Image';
 end;
 
-class function TACLImageFormatJPEG.Ext: string;
+class function TACLImageFormatJPEG.Ext: UnicodeString;
 begin
   Result := '.jpeg';
 end;
 
-class function TACLImageFormatJPEG.MimeType: string;
+class function TACLImageFormatJPEG.MimeType: UnicodeString;
 begin
   Result := 'image/jpeg';
 end;
@@ -1215,6 +1218,9 @@ begin
           Break;
         $C0..$C3, $C5..$C7, $C9..$CB, $CD..$CF:
           begin
+          {$IFDEF FPC}
+            FastZeroStruct(AData, SizeOf(AData));
+          {$ENDIF}
             AStream.ReadBuffer(AData, SizeOf(AData));
             ASize.cx := AData[4] or AData[3] shl 8;
             ASize.cy := AData[2] or AData[1] shl 8;
@@ -1232,12 +1238,12 @@ end;
 
 { TACLImageFormatJPG }
 
-class function TACLImageFormatJPG.Ext: string;
+class function TACLImageFormatJPG.Ext: UnicodeString;
 begin
   Result := '.jpg';
 end;
 
-class function TACLImageFormatJPG.MimeType: string;
+class function TACLImageFormatJPG.MimeType: UnicodeString;
 begin
   Result := 'image/jpg';
 end;
@@ -1254,17 +1260,17 @@ begin
   Result := 3;
 end;
 
-class function TACLImageFormatGIF.Description: string;
+class function TACLImageFormatGIF.Description: UnicodeString;
 begin
   Result := 'GIF Image';
 end;
 
-class function TACLImageFormatGIF.Ext: string;
+class function TACLImageFormatGIF.Ext: UnicodeString;
 begin
   Result := '.gif';
 end;
 
-class function TACLImageFormatGIF.MimeType: string;
+class function TACLImageFormatGIF.MimeType: UnicodeString;
 begin
   Result := 'image/gif';
 end;
@@ -1300,17 +1306,17 @@ begin
   Result := FClipboardFormat;
 end;
 
-class function TACLImageFormatPNG.Description: string;
+class function TACLImageFormatPNG.Description: UnicodeString;
 begin
   Result := 'PNG Image';
 end;
 
-class function TACLImageFormatPNG.Ext: string;
+class function TACLImageFormatPNG.Ext: UnicodeString;
 begin
   Result := '.png';
 end;
 
-class function TACLImageFormatPNG.MimeType: string;
+class function TACLImageFormatPNG.MimeType: UnicodeString;
 begin
   Result := 'image/png';
 end;
@@ -1354,12 +1360,12 @@ begin
   @FFreeFunc := acGetProcAddress(FLibHandle, 'WebPFree', Result);
 end;
 
-class function TACLImageFormatWebP.Description: string;
+class function TACLImageFormatWebP.Description: UnicodeString;
 begin
   Result := 'Web Images';
 end;
 
-class function TACLImageFormatWebP.Ext: string;
+class function TACLImageFormatWebP.Ext: UnicodeString;
 begin
   Result := '.webp';
 end;
@@ -1386,7 +1392,7 @@ begin
   end;
 end;
 
-class function TACLImageFormatWebP.MimeType: string;
+class function TACLImageFormatWebP.MimeType: UnicodeString;
 begin
   Result := 'image/webp';
 end;
@@ -1433,7 +1439,7 @@ end;
 
 class procedure TACLImageFormatWebP.Save(AStream: TStream; ABitmap: GpBitmap);
 var
-  AData: TBitmapData;
+  AData: TGpBitmapData;
   AEncodedData: PByte;
   AEncodedSize: Cardinal;
 begin

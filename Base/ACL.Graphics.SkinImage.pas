@@ -17,16 +17,16 @@ unit ACL.Graphics.SkinImage;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.UITypes,
-  System.SysUtils,
-  System.Classes,
-  System.Math,
-  System.Generics.Collections,
-  System.ZLib,
+  Classes,
+  Generics.Collections,
+  Math,
+//  System.UITypes,
+  SysUtils,
+  ZLib,
   // VCL
-  Vcl.Graphics,
+  Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -40,6 +40,17 @@ uses
 const
   sErrorCannotCreateImage = 'Cannot create image handle (%d x %d)';
   sErrorIncorrectDormantData = 'Dormant data has been corrupted';
+
+{$IFDEF FPC}
+type
+  TZCompressionLevel = type Integer;
+
+const
+  zcNone = ZLib.Z_NO_COMPRESSION;
+  zcFastest = ZLib.Z_BEST_SPEED;
+  zcDefault = ZLib.Z_DEFAULT_COMPRESSION;
+  zcMax = ZLib.Z_BEST_COMPRESSION;
+{$ENDIF}
 
 type
   EACLSkinImageException = class(Exception);
@@ -106,7 +117,7 @@ type
     destructor Destroy; override;
     function Clone: TACLSkinImageBitsStorage;
     function Equals(Obj: TObject): Boolean; override;
-    function GetHashCode: Integer; override;
+    function GetHashCode: {$IFDEF FPC}PtrInt{$ELSE}Integer{$ENDIF}; override;
     procedure Restore(ABits: PRGBQuadArray; ACount: Integer; out AHasAlpha: TACLBoolean; out AState: TACLSkinImageBitsState);
     procedure SaveToStream(AStream: TStream);
   end;
@@ -224,7 +235,7 @@ type
     procedure CheckBitsState(ARequiredState: TACLSkinImageBitsState);
     procedure Dormant; virtual;
     function Equals(Obj: TObject): Boolean; override;
-    function GetHashCode: Integer; override;
+    function GetHashCode: {$IFDEF FPC}PtrInt{$ELSE}Integer{$ENDIF}; override;
     function HasFrame(AIndex: Integer): Boolean; inline;
     // Lock
     procedure BeginUpdate;
@@ -249,7 +260,7 @@ type
     procedure LoadFromBitmap(ABitmap: TBitmap);
     procedure LoadFromBits(ABits: PRGBQuad; AWidth, AHeight: Integer);
     procedure LoadFromFile(const AFileName: UnicodeString);
-    procedure LoadFromResource(AInstance: HINST; const AName: UnicodeString; AResRoot: PWideChar);
+    procedure LoadFromResource(AInstance: HINST; const AName: string; AResRoot: PChar);
     procedure LoadFromStream(AStream: TStream);
     procedure SaveToBitmap(ABitmap: TBitmap);
     procedure SaveToFile(const AFileName: UnicodeString); overload;
@@ -303,7 +314,7 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
 implementation
 
 uses
-  System.Types,
+  Types,
   // ACL
   ACL.FastCode,
   ACL.Graphics.Gdiplus,
@@ -358,6 +369,66 @@ var
   FRenderer: TACLSkinImageRenderer;
 {$IFNDEF ACL_DEBUG_SKINIMAGE_STAT}
   FSkinImageCount: Integer = 0;
+{$ENDIF}
+
+procedure ZCheck(code: Integer);
+begin
+  if code < 0 then
+  {$IFDEF FPC}
+    raise EInvalidOperation.CreateFmt('ZLib error (%d)', [code]);
+  {$ELSE}
+    raise EZCompressionError.Create(string(_z_errmsg[2 - code]));
+  {$ENDIF}
+end;
+
+{$IFDEF FPC}
+
+function ZCompressCheckWithoutBufferError(code: Integer): Integer;
+begin
+  Result := code;
+  if code <> Z_BUF_ERROR then
+    ZCheck(code);
+end;
+
+procedure ZCompress(const inBuffer: Pointer; inSize: Integer; out outBuffer: Pointer; out outSize: Integer; level: TZCompressionLevel);
+const
+  delta = 256;
+var
+  zstream: TZStreamRec;
+begin
+  zstream := Default(TZStreamRec);
+
+  outSize := ((inSize + (inSize div 10) + 12) + 255) and not 255;
+  GetMem(outBuffer, outSize);
+
+  try
+    zstream.next_in := inBuffer;
+    zstream.avail_in := inSize;
+    zstream.next_out := outBuffer;
+    zstream.avail_out := outSize;
+
+    ZCheck(DeflateInit(zstream, level));
+
+    try
+      while ZCompressCheckWithoutBufferError(deflate(zstream, Z_FINISH)) <> Z_STREAM_END do
+      begin
+        Inc(outSize, delta);
+        ReallocMem(outBuffer, outSize);
+        zstream.next_out := pBytef(outBuffer) + zstream.total_out;
+        zstream.avail_out := delta;
+      end;
+    finally
+      ZCheck(deflateEnd(zstream));
+    end;
+
+    ReallocMem(outBuffer, zstream.total_out);
+    outSize := zstream.total_out;
+  except
+    FreeMem(outBuffer);
+    raise;
+  end;
+end;
+
 {$ENDIF}
 
 procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTiledAreas;
@@ -447,60 +518,6 @@ begin
     CalculateVerticalMode;
 end;
 
-procedure acAlphaBlend(DC, MemDC: HDC; const R, SrcR: TRect; const AFunc: TBlendFunction); inline;
-begin
-  AlphaBlend(DC, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top, MemDC,
-    SrcR.Left, SrcR.Top, SrcR.Right - SrcR.Left, SrcR.Bottom - SrcR.Top, AFunc);
-end;
-
-procedure acAlphaBlendTile(DC, MemDC: HDC; const R, SrcR: TRect; const AFunc: TBlendFunction);
-var
-  AClipRgn: Integer;
-  ALayer: TACLBitmapLayer;
-  R1: TRect;
-  W, H: Integer;
-  X, Y, XCount, YCount: Integer;
-begin
-  W := SrcR.Right - SrcR.Left;
-  H := SrcR.Bottom - SrcR.Top;
-  R1 := acRectSetHeight(R, H);
-  XCount := acCalcPatternCount(R.Right - R.Left, W);
-  YCount := acCalcPatternCount(R.Bottom - R.Top, H);
-
-  if XCount * YCount > 10 then
-  begin
-    ALayer := TACLBitmapLayer.Create(R);
-    try
-      acTileBlt(ALayer.Handle, MemDC, ALayer.ClientRect, SrcR);
-      acAlphaBlend(DC, ALayer.Handle, R, ALayer.ClientRect, AFunc);
-    finally
-      ALayer.Free;
-    end;
-  end
-  else
-  begin
-    AClipRgn := acSaveClipRegion(DC);
-    try
-      acIntersectClipRegion(DC, R);
-      for Y := 1 to YCount do
-      begin
-        R1.Left := R.Left;
-        R1.Right := R.Left + W;
-        for X := 1 to XCount do
-        begin
-          acAlphaBlend(DC, MemDC, R1, SrcR, AFunc);
-          Inc(R1.Left, W);
-          Inc(R1.Right, W);
-        end;
-        Inc(R1.Top, H);
-        Inc(R1.Bottom, H);
-      end;
-    finally
-      acRestoreClipRegion(DC, AClipRgn);
-    end;
-  end;
-end;
-
 procedure SkinImageAdded;
 begin
   Inc(FSkinImageCount);
@@ -524,12 +541,6 @@ procedure acBitsCopy(ASrc, ADst: PRGBQuadArray; ACount: Integer);
 begin
   if (ASrc <> nil) and (ADst <> nil) and (ACount > 0) then
     FastMove(ASrc^, ADst^, ACount * SizeOf(TRGBQuad));
-end;
-
-procedure ZDecompressCheck(code: Integer); inline;
-begin
-  if code < 0 then
-    raise EZDecompressionError.Create(string(_z_errmsg[2 - code]));
 end;
 
 { TACLSkinImageTiledAreas }
@@ -622,12 +633,12 @@ begin
     (CompareMem(Data, TACLSkinImageBitsStorage(Obj).Data, DataSize));
 end;
 
-function TACLSkinImageBitsStorage.GetHashCode: Integer;
+function TACLSkinImageBitsStorage.GetHashCode;
 var
   AHashValue: Cardinal;
 begin
   AHashValue := TACLHashCRC32.Calculate(Data, DataSize);
-  Result := Integer(AHashValue);
+  Result := {$IFNDEF FPC}Integer{$ENDIF}(AHashValue);
 end;
 
 procedure TACLSkinImageBitsStorage.Restore(ABits: PRGBQuadArray;
@@ -640,12 +651,12 @@ begin
   ZeroMemory(@ZStream, SizeOf(TZStreamRec));
   ZStream.next_in := Data;
   ZStream.avail_in := DataSize;
-  ZStream.next_out := PByte(ABits);
+  ZStream.next_out := {$IFDEF FPC}PBytef{$ELSE}PByte{$ENDIF}(ABits);
   ZStream.avail_out := ASize;
 
-  ZDecompressCheck(InflateInit(ZStream));
-  ZDecompressCheck(inflate(ZStream, Z_NO_FLUSH));
-  ZDecompressCheck(inflateEnd(ZStream));
+  ZCheck(InflateInit(ZStream));
+  ZCheck(inflate(ZStream, Z_NO_FLUSH));
+  ZCheck(inflateEnd(ZStream));
 
   if ZStream.total_out <> ASize then
     raise EACLSkinImageException.Create(sErrorIncorrectDormantData);
@@ -760,7 +771,7 @@ begin
   Result := False;
 end;
 
-function TACLSkinImage.GetHashCode: Integer;
+function TACLSkinImage.GetHashCode;
 var
   AHashValue: Cardinal;
 begin
@@ -770,7 +781,7 @@ begin
     if Bits <> nil then
     begin
       AHashValue := TACLHashCRC32.Calculate(PByte(Bits), BitCount);
-      Result := Integer(AHashValue);
+      Result := {$IFNDEF FPC}Integer{$ENDIF}(AHashValue);
     end
     else
       Result := 0;
@@ -1060,7 +1071,11 @@ begin
 
   if (ABitmap.PixelFormat > pfDevice) and (ABitmap.PixelFormat < pf32bit) then
     TACLColors.MakeTransparent(PRGBQuad(Bits), BitCount, TransparentRGBQuad);
+{$IFDEF FPC}
+  if (ABitmap is TACLBitmap) and (TACLBitmap(ABitmap).AlphaFormat = afPremultiplied) then
+{$ELSE}
   if ABitmap.AlphaFormat = afPremultiplied then
+{$ENDIF}
     FBitsState := ibsPremultiplied;
 
   Changed;
@@ -1078,7 +1093,7 @@ begin
   end;
 end;
 
-procedure TACLSkinImage.LoadFromResource(AInstance: HINST; const AName: UnicodeString; AResRoot: PWideChar);
+procedure TACLSkinImage.LoadFromResource(AInstance: HINST; const AName: string; AResRoot: PChar);
 var
   ABitmap: TBitmap;
   AStream: TStream;
@@ -1129,6 +1144,9 @@ begin
   BeginUpdate;
   try
     Clear;
+  {$IFDEF FPC}
+    FastZeroStruct(AHeader, SizeOf(AHeader));
+  {$ENDIF}
     if AStream.Read(AHeader, SizeOf(AHeader)) = SizeOf(AHeader) then
     begin
       if (AHeader.ID = 'ACLIMG32') and (AHeader.Version = 1) then
@@ -1166,7 +1184,12 @@ begin
 
     DC := GetDC(0);
     try
+    {$IFDEF FPC}
+      if ABitmap is TACLBitmap then
+        TACLBitmap(ABitmap).AlphaFormat := afIgnored;
+    {$ELSE}
       ABitmap.AlphaFormat := afIgnored;
+    {$ENDIF}
       ABitmap.PixelFormat := pf32bit;
       acFillBitmapInfoHeader(AInfo.bmiHeader, Width, Height);
       SetDIBits(DC, ABitmap.Handle, 0, Height, Bits, AInfo, DIB_RGB_COLORS);
@@ -1182,7 +1205,7 @@ procedure TACLSkinImage.SaveToFile(const AFileName: UnicodeString; AFormat: TACL
 var
   AStream: TStream;
 begin
-  AStream := TFileStream.Create(AFileName, fmCreate);
+  AStream := TACLFileStream.Create(AFileName, fmCreate);
   try
     SaveToStream(AStream, AFormat);
   finally
@@ -1528,6 +1551,9 @@ type
 var
   AHeaderData: TACLSkinImageHeaderData;
 begin
+{$IFDEF FPC}
+  FastZeroStruct(AHeaderData, SizeOf(AHeaderData));
+{$ENDIF}
   AStream.ReadBuffer(AHeaderData, SizeOf(AHeaderData));
   if AVersion = 1 then
     AHeaderData.StretchMode := Max(AHeaderData.StretchMode - 1, 0);
@@ -1654,6 +1680,7 @@ begin
     AState := TACLSkinImageAnalyzer.Analyze(PRGBQuad(Bits), BitCount);
     if AState.IsTransparent then // null-alpha
     begin
+      AHasSemiTransparentPixels := False;
       TACLSkinImageAnalyzer.RecoveryAlpha(PRGBQuad(Bits), BitCount, AHasSemiTransparentPixels);
       if AHasSemiTransparentPixels then
         FHasAlpha := TACLBoolean.True
@@ -1909,6 +1936,9 @@ begin
   ContentOffsets := AStream.ReadRect;
 
   TiledAreasMode := TileMap[AStream.ReadBoolean];
+{$IFDEF FPC}
+  FastZeroStruct(ATiledAreas, SizeOf(ATiledAreas));
+{$ENDIF}
   AStream.ReadBuffer(ATiledAreas, SizeOf(ATiledAreas));
   TiledAreas := ATiledAreas;
 end;
@@ -2125,7 +2155,7 @@ begin
   ZeroMemory(@FFunc, SizeOf(FFunc));
   FFunc.BlendOp := AC_SRC_OVER;
   FFunc.AlphaFormat := AC_SRC_ALPHA;
-  FLock := TACLCriticalSection.Create(Self);
+  FLock := TACLCriticalSection.Create;
 end;
 
 destructor TACLSkinImageRenderer.Destroy;
@@ -2162,8 +2192,6 @@ begin
 end;
 
 procedure TACLSkinImageRenderer.Draw(const R, ASource: TRect; AIsTileMode: Boolean);
-const
-  Map: array[Boolean] of TACLStretchMode = (isStretch, isTile);
 begin
   if FOpacue then
   begin

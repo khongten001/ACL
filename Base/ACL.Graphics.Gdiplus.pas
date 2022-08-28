@@ -13,24 +13,280 @@ unit ACL.Graphics.Gdiplus;
 
 {$I ACL.Config.inc}
 
+{$ALIGN ON}
+{$MINENUMSIZE 4}
+
 interface
 
 uses
-  Winapi.ActiveX,
-  Winapi.Windows,
-  Winapi.GDIPOBJ,
-  Winapi.GDIPAPI,
+  ActiveX,
+  Windows,
   // System
-  System.Classes,
-  System.Contnrs,
-  System.SysUtils,
-  System.Types,
-  System.UiTypes,
+  Classes,
+  Contnrs,
+  Types,
+  SysUtils,
   // Vcl
-  Vcl.Graphics,
+  Graphics,
   // ACL
   ACL.Classes.Collections,
-  ACL.Math;
+  ACL.Graphics;
+
+{$REGION 'GDI+ API - Types'}
+
+const
+  GdiPlusDll = 'gdiplus.dll';
+
+const
+  ImageFormatUndefined : TGUID = '{b96b3ca9-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatUndefined}
+  ImageFormatMemoryBMP : TGUID = '{b96b3caa-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatMemoryBMP}
+  ImageFormatBMP       : TGUID = '{b96b3cab-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatBMP}
+  ImageFormatEMF       : TGUID = '{b96b3cac-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatEMF}
+  ImageFormatWMF       : TGUID = '{b96b3cad-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatWMF}
+  ImageFormatJPEG      : TGUID = '{b96b3cae-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatJPEG}
+  ImageFormatPNG       : TGUID = '{b96b3caf-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatPNG}
+  ImageFormatGIF       : TGUID = '{b96b3cb0-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatGIF}
+  ImageFormatTIFF      : TGUID = '{b96b3cb1-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatTIFF}
+  ImageFormatEXIF      : TGUID = '{b96b3cb2-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatEXIF}
+  ImageFormatIcon      : TGUID = '{b96b3cb5-0728-11d3-9d7b-0000f81ef32e}';
+  {$EXTERNALSYM ImageFormatIcon}
+
+  ImageLockModeRead         = 0;
+  ImageLockModeWrite        = 1;
+  ImageLockModeUserInputBuf = 2;
+
+type
+  TGpPixelFormat = Integer;
+  TGPStringFormatFlags = Integer;
+
+const
+  PixelFormatIndexed         = $00010000; // Indexes into a palette
+  PixelFormatGDI             = $00020000; // Is a GDI-supported format
+  PixelFormatAlpha           = $00040000; // Has an alpha component
+  PixelFormatPAlpha          = $00080000; // Pre-multiplied alpha
+  PixelFormatExtended        = $00100000; // Extended color 16 bits/channel
+  PixelFormatCanonical       = $00200000;
+
+  PixelFormatUndefined       = 0;
+  PixelFormatDontCare        = 0;
+
+  PixelFormat1bppIndexed     = ( 1 or ( 1 shl 8) or PixelFormatIndexed or PixelFormatGDI);
+  PixelFormat4bppIndexed     = ( 2 or ( 4 shl 8) or PixelFormatIndexed or PixelFormatGDI);
+  PixelFormat8bppIndexed     = ( 3 or ( 8 shl 8) or PixelFormatIndexed or PixelFormatGDI);
+  PixelFormat16bppGrayScale  = ( 4 or (16 shl 8) or PixelFormatExtended);
+  PixelFormat16bppRGB555     = ( 5 or (16 shl 8) or PixelFormatGDI);
+  PixelFormat16bppRGB565     = ( 6 or (16 shl 8) or PixelFormatGDI);
+  PixelFormat16bppARGB1555   = ( 7 or (16 shl 8) or PixelFormatAlpha or PixelFormatGDI);
+  PixelFormat24bppRGB        = ( 8 or (24 shl 8) or PixelFormatGDI);
+  PixelFormat32bppRGB        = ( 9 or (32 shl 8) or PixelFormatGDI);
+  PixelFormat32bppARGB       = (10 or (32 shl 8) or PixelFormatAlpha or PixelFormatGDI or PixelFormatCanonical);
+  PixelFormat32bppPARGB      = (11 or (32 shl 8) or PixelFormatAlpha or PixelFormatPAlpha or PixelFormatGDI);
+  PixelFormat48bppRGB        = (12 or (48 shl 8) or PixelFormatExtended);
+  PixelFormat64bppARGB       = (13 or (64 shl 8) or PixelFormatAlpha  or PixelFormatCanonical or PixelFormatExtended);
+  PixelFormat64bppPARGB      = (14 or (64 shl 8) or PixelFormatAlpha  or PixelFormatPAlpha or PixelFormatExtended);
+  PixelFormat32bppCMYK       = (15 or (32 shl 8));
+  PixelFormatMax             = 16;
+
+  StringFormatFlagsDirectionRightToLeft        = $00000001;
+  {$EXTERNALSYM StringFormatFlagsDirectionRightToLeft}
+  StringFormatFlagsDirectionVertical           = $00000002;
+  {$EXTERNALSYM StringFormatFlagsDirectionVertical}
+  StringFormatFlagsNoFitBlackBox               = $00000004;
+  {$EXTERNALSYM StringFormatFlagsNoFitBlackBox}
+  StringFormatFlagsDisplayFormatControl        = $00000020;
+  {$EXTERNALSYM StringFormatFlagsDisplayFormatControl}
+  StringFormatFlagsNoFontFallback              = $00000400;
+  {$EXTERNALSYM StringFormatFlagsNoFontFallback}
+  StringFormatFlagsMeasureTrailingSpaces       = $00000800;
+  {$EXTERNALSYM StringFormatFlagsMeasureTrailingSpaces}
+  StringFormatFlagsNoWrap                      = $00001000;
+  {$EXTERNALSYM StringFormatFlagsNoWrap}
+  StringFormatFlagsLineLimit                   = $00002000;
+  {$EXTERNALSYM StringFormatFlagsLineLimit}
+  StringFormatFlagsNoClip                      = $00004000;
+  {$EXTERNALSYM StringFormatFlagsNoClip}
+
+type
+  GpGraphics = Pointer;
+  {$EXTERNALSYM GpGraphics}
+  GpBrush = Pointer;
+  {$EXTERNALSYM GpBrush}
+  GpBitmap = Pointer;
+  {$EXTERNALSYM GpBitmap}
+  GpTexture = Pointer;
+  {$EXTERNALSYM GpTexture}
+  GpSolidFill = Pointer;
+  {$EXTERNALSYM GpSolidFill}
+  GpLineGradient = Pointer;
+  {$EXTERNALSYM GpLineGradient}
+  GpPathGradient = Pointer;
+  {$EXTERNALSYM GpPathGradient}
+  GpHatch = Pointer;
+  {$EXTERNALSYM GpHatch}
+  GpImage = Pointer;
+  {$EXTERNALSYM GpImage}
+  GpImageAttributes = Pointer;
+  {$EXTERNALSYM GpImageAttributes}
+  GpPen = Pointer;
+  {$EXTERNALSYM GpPen}
+  GpFont = Pointer;
+  {$EXTERNALSYM GpFont}
+  GpStringFormat = Pointer;
+  {$EXTERNALSYM GpStringFormat}
+  GpFontFamily = Pointer;
+  {$EXTERNALSYM GpFontFamily}
+
+  TGpDebugEventLevel = (
+    DebugEventLevelFatal,
+    DebugEventLevelWarning
+  );
+
+  TGpDebugEventProc = procedure(level: TGpDebugEventLevel; message: PChar); stdcall;
+
+  PGdiplusStartupInput = ^TGdiplusStartupInput;
+  TGdiplusStartupInput = record
+    GdiplusVersion          : Cardinal;       // Must be 1
+    DebugEventCallback      : TGpDebugEventProc; // Ignored on free builds
+    SuppressBackgroundThread: BOOL;           // FALSE unless you're prepared to call the hook/unhook functions properly
+    SuppressExternalCodecs  : BOOL;           // FALSE unless you want GDI+ only to use its internal image codecs.
+  end;
+
+  TGpStringAlignment = (
+    // Left edge for left-to-right text,
+    // right for right-to-left text,
+    // and top for vertical
+    StringAlignmentNear,
+    StringAlignmentCenter,
+    StringAlignmentFar
+  );
+
+  PGpBitmapData = ^TGpBitmapData;
+  TGpBitmapData = packed record
+    Width       : UINT;
+    Height      : UINT;
+    Stride      : Integer;
+    PixelFormat : TGpPixelFormat;
+    Scan0       : Pointer;
+    Reserved    : UINT_PTR;
+  end;
+
+  TGPImageAbort = function(CallbackData: Pointer): BOOL; stdcall;
+
+  PGpColorMatrix = ^TGpColorMatrix;
+  TGpColorMatrix = packed array[0..4, 0..4] of Single;
+
+  TGpStatus = (
+    Ok,
+    GenericError,
+    InvalidParameter,
+    OutOfMemory,
+    ObjectBusy,
+    InsufficientBuffer,
+    NotImplemented,
+    Win32Error,
+    WrongState,
+    Aborted,
+    FileNotFound,
+    ValueOverflow,
+    AccessDenied,
+    UnknownImageFormat,
+    FontFamilyNotFound,
+    FontStyleNotFound,
+    NotTrueTypeFont,
+    UnsupportedGdiplusVersion,
+    GdiplusNotInitialized,
+    PropertyNotFound,
+    PropertyNotSupported
+  );
+
+  TGPWrapMode = (
+    WrapModeTile,        // 0
+    WrapModeTileFlipX,   // 1
+    WrapModeTileFlipY,   // 2
+    WrapModeTileFlipXY,  // 3
+    WrapModeClamp);      // 4
+
+  TGPUnit = (
+    UnitWorld,       // 0 -- World coordinate (non-physical unit)
+    UnitDisplay,     // 1 -- Variable -- for PageTransform only
+    UnitPixel,       // 2 -- Each unit is one device pixel.
+    UnitPoint,       // 3 -- Each unit is a printer's point, or 1/72 inch.
+    UnitInch,        // 4 -- Each unit is 1 inch.
+    UnitDocument,    // 5 -- Each unit is 1/300 inch.
+    UnitMillimeter); // 6 -- Each unit is 1 millimeter.
+
+  TGPColorAdjustType = (
+    ColorAdjustTypeDefault,
+    ColorAdjustTypeBitmap,
+    ColorAdjustTypeBrush,
+    ColorAdjustTypePen,
+    ColorAdjustTypeText,
+    ColorAdjustTypeCount,
+    ColorAdjustTypeAny);  // Reserved
+
+  TGPColorMatrixFlags = (
+    ColorMatrixFlagsDefault   = 0,
+    ColorMatrixFlagsSkipGrays = 1,
+    ColorMatrixFlagsAltGray   = 2);
+
+  PGpImageCodecInfo = ^TGpImageCodecInfo;
+  TGpImageCodecInfo = record
+    ClsId: TGUID;
+    FormatId: TGUID;
+    CodecName: PWideChar;
+    DllName: PWideChar;
+    FormatDescription: PWideChar;
+    FilenameExtension: PWideChar;
+    MimeType: PWideChar;
+    Flags: DWORD;
+    Version: DWORD;
+    SigCount: DWORD;
+    SigSize: DWORD;
+    SigPattern: PByte;
+    SigMask: PByte;
+  end;
+
+  TGPDashStyle = (
+    DashStyleSolid,          // 0
+    DashStyleDash,           // 1
+    DashStyleDot,            // 2
+    DashStyleDashDot,        // 3
+    DashStyleDashDotDot,     // 4
+    DashStyleCustom);        // 5
+
+  TGPFillMode = (
+    FillModeAlternate,        // 0
+    FillModeWinding);         // 1
+
+  TGPPoint = TPointF;
+  PGPPoint = PPointF;
+
+  PGPRect = ^TGPRect;
+  TGPRect = record
+    X     : Integer;
+    Y     : Integer;
+    Width : Integer;
+    Height: Integer;
+  end;
+
+  PGPRectF = ^TGPRectF;
+  TGPRectF = record
+    X     : Single;
+    Y     : Single;
+    Width : Single;
+    Height: Single;
+  end;
+{$ENDREGION}
 
 type
   GpHandle = type Pointer;
@@ -56,12 +312,12 @@ type
   );
 
   TGpPixelOffsetMode = (
-    pomInvalid     = Ord(QualityModeInvalid),
-    pomDefault     = Ord(QualityModeDefault),
-    pomHighSpeed   = Ord(QualityModeLow),
-    pomHighQuality = Ord(QualityModeHigh),
-    pomNone        = Ord(QualityModeHigh) + 1, // No pixel offset
-    pomHalf        = Ord(QualityModeHigh) + 2  // Offset by -0.5, -0.5 for fast anti-alias perf
+    pomInvalid     = -1,
+    pomDefault     = 0,
+    pomHighSpeed   = 1,
+    pomHighQuality = 2,
+    pomNone        = 3, // No pixel offset
+    pomHalf        = 4  // Offset by -0.5, -0.5 for fast anti-alias perf
   );
 
   TGpCompositingMode = (
@@ -91,11 +347,11 @@ type
 
   EGdipException = class(Exception)
   strict private
-    FStatus: GpStatus;
+    FStatus: TGPStatus;
   public
-    constructor Create(AStatus: GpStatus);
+    constructor Create(AStatus: TGPStatus);
     //
-    property Status: GpStatus read FStatus;
+    property Status: TGPStatus read FStatus;
   end;
 
   { TACLGdiplusObject }
@@ -270,7 +526,7 @@ type
     class function GetOrCreate(AColor: TAlphaColor): GpBrush;
   end;
 
-procedure GdipCheck(AStatus: GpStatus);
+procedure GdipCheck(AStatus: TGPStatus);
 function GpPaintCanvas: TACLGdiplusPaintCanvas;
 
 function GpCreateBitmap(AWidth, AHeight: Integer; ABits: PByte = nil; APixelFormat: Integer = PixelFormat32bppPARGB): GpImage;
@@ -282,26 +538,103 @@ procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage; AImageAttributes: 
   const ADestRect, ASourceRect: TRect; ATileDrawingMode: Boolean); overload;
 procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage;
   const ADestRect, ASourceRect: TRect; ATileDrawingMode: Boolean; const AAlpha: Byte = $FF); overload;
+
+{$REGION 'GDI+ API - Functions'}
+var
+  GdiplusStartupInput: TGDIPlusStartupInput;
+  GdiplusToken: ULONG_PTR;
+
+function GdipAlloc(Size: Integer): Pointer; stdcall; external GdiPlusDll;
+procedure GdipFree(Ptr: Pointer); stdcall; external GdiPlusDll;
+function GdiplusStartup(out token: ULONG_PTR; input: PGdiplusStartupInput; output: {PGdiplusStartupOutput}Pointer): TGpStatus; stdcall; external GdiPlusDll;
+procedure GdiplusShutdown(token: ULONG_PTR); stdcall; external GdiPlusDll;
+
+function GdipCloneImage(Image: GpImage; out CloneImage: GpImage): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreateFromHDC(Hdc: HDC; out Graphics: GpGraphics): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreateHBITMAPFromBitmap(Bitmap: GpBitmap; out HbmReturn: HBitmap; Background: TAlphaColor): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDeleteGraphics(Graphics: GpGraphics): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetImageGraphicsContext(Image: GpImage; out Graphics: GpGraphics): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetImageHeight(Image: GpImage; out Height: Cardinal): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetImageWidth(Image: GpImage; out Width: Cardinal): TGPStatus; stdcall; external GdiPlusDll;
+function GdipBitmapUnlockBits(Bitmap: GpBitmap; LockedBitmapData: PGPBitmapData): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetPixelOffsetMode(Graphics: GpGraphics; PixelOffsetMode: TGpPixelOffsetMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreateBitmapFromHBITMAP(Hbm: HBitmap; Hpal: HPalette; out Bitmap: GpBitmap): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDisposeImage(Image: GpImage): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetImageRawFormat(Image: GpImage; out Format: TGUID): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetImageDimension(Image: GpImage; out Width: Single; out Height: Single): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreateBitmapFromStream(const Stream: IStream; out Bitmap: GpBitmap): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSaveImageToStream(image: GPIMAGE; stream: ISTREAM;  clsidEncoder: PGUID; EncoderParams: Pointer): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreateBitmapFromScan0(Width: Integer; Height: Integer; Stride: Integer; Format: TGPPixelFormat; Scan0: PByte; out Bitmap: GpBitmap): TGPStatus; stdcall; external GdiPlusDll;
+function GdipFillRectangleI(graphics: GPGRAPHICS; brush: GPBRUSH; x, y, width, height: Integer): TGpStatus; stdcall; external GdiPlusDll;
+function GdipIsVisibleRectI(Graphics: GpGraphics; X, Y, Width, Height: Integer; out Result: Bool): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreateTexture2I(Image: GpImage; Wrapmode: TGPWrapMode; X, Y, Width, Height: Integer; out Texture: GpTexture): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetPixelOffsetMode(Graphics: GpGraphics; out PixelOffsetMode: TGPPixelOffsetMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawImageRectRectI(Graphics: GpGraphics; Image: GpImage;
+  Dstx: Integer; Dsty: Integer; Dstwidth: Integer; Dstheight: Integer;
+  Srcx: Integer; Srcy: Integer; Srcwidth: Integer; Srcheight: Integer;
+  SrcUnit: TGPUnit; const ImageAttributes: GpImageAttributes;
+  Callback: TGPImageAbort; CallbackData: Pointer): TGPStatus; stdcall; external GdiPlusDll;
+
+function GdipCreateImageAttributes(out Imageattr: GpImageAttributes): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetImageAttributesColorMatrix(Imageattr: GpImageAttributes; AType: TGPColorAdjustType; EnableFlag: Bool;
+  const ColorMatrix: PGPColorMatrix; const GrayMatrix: PGPColorMatrix; Flags: TGPColorMatrixFlags): TGPStatus; stdcall; external GdiPlusDll;
+
+function GdipCreateStringFormat(FormatAttributes: TGPStringFormatFlags; Language: LANGID; out Format: GpStringFormat): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreateLineBrushFromRectI(const Rect: PGPRect; Color1, Color2: TAlphaColor; Mode: TGPLinearGradientMode; WrapMode: TGPWrapMode; out LineGradient: GpLineGradient): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreatePen1(Color: TAlphaColor; Width: Single; AUnit: TGPUnit; out Pen: GpPen): TGPStatus; stdcall; external GdiPlusDll;
+function GdipCreateSolidFill(Color: TAlphaColor; out Brush: GpSolidFill): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDeleteBrush(Brush: GpBrush): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDeletePen(Pen: GpPen): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDisposeImageAttributes(Imageattr: GpImageAttributes): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawClosedCurve2I(Graphics: GpGraphics; Pen: GpPen; const Points: PGPPoint; Count: Integer; Tension: Single): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawCurve2I(Graphics: GpGraphics; Pen: GpPen; const Points: PGPPoint; Count: Integer; Tension: Single): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawEllipseI(Graphics: GpGraphics; Pen: GpPen; X, Y, W, H: Integer): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawImageRectI(Graphics: GpGraphics; Image: GpImage; X, Y, W, H: Integer): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawLineI(Graphics: GpGraphics; Pen: GpPen; X1, Y1, X2, Y2: Integer): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawLinesI(Graphics: GpGraphics; Pen: GpPen; const Points: PGPPoint; Count: Integer): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawRectangleI(Graphics: GpGraphics; Pen: GpPen; X, Y, W, H: Integer): TGPStatus; stdcall; external GdiPlusDll;
+function GdipFillClosedCurve2I(Graphics: GpGraphics; Brush: GpBrush; const Points: PGPPoint; Count: Integer; Tension: Single; FillMode: TGPFillMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipFillEllipseI(Graphics: GpGraphics; Brush: GpBrush; X, Y, W, H: Integer): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetCompositingMode(Graphics: GpGraphics; out CompositingMode: TGPCompositingMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetImageEncoders(NumEncoders: Cardinal; Size: Cardinal; Encoders: PGpImageCodecInfo): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetImageEncodersSize(out NumEncoders: Cardinal; out Size: Cardinal): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetInterpolationMode(Graphics: GpGraphics; out InterpolationMode: TGPInterpolationMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetSmoothingMode(Graphics: GpGraphics; out SmoothingMode: TGPSmoothingMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetCompositingMode(Graphics: GpGraphics; CompositingMode: TGPCompositingMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetInterpolationMode(Graphics: GpGraphics; InterpolationMode: TGPInterpolationMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetPenColor(Pen: GpPen; Argb: TAlphaColor): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetPenDashStyle(Pen: GpPen; Dashstyle: TGPDashStyle): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetPenWidth(Pen: GpPen; Width: Single): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetSmoothingMode(Graphics: GpGraphics; SmoothingMode: TGPSmoothingMode): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetSolidFillColor(Brush: GpSolidFill; Color: TAlphaColor): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetTextRenderingHint(Graphics: GpGraphics; Mode: TGPTextRenderingHint): TGPStatus; stdcall; external GdiPlusDll;
+
+function GdipCreateFontFromLogfontW(Hdc: HDC; const Logfont: PLogFontW; out Font: GpFont): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetStringFormatAlign(Format: GpStringFormat; Align: TGPStringAlignment): TGPStatus; stdcall; external GdiPlusDll;
+function GdipSetStringFormatLineAlign(Format: GpStringFormat; Align: TGPStringAlignment): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDrawString(Graphics: GpGraphics; const Str: PWideChar; Length: Integer; const Font: GpFont;
+  const LayoutRect: PGPRectF; const StringFormat: GpStringFormat; const Brush: GpBrush): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDeleteStringFormat(Format: GpStringFormat): TGPStatus; stdcall; external GdiPlusDll;
+function GdipDeleteFont(Font: GpFont): TGPStatus; stdcall; external GdiPlusDll;
+function GdipGetImagePixelFormat(Image: GpImage; out Format: TGPPixelFormat): TGPStatus; stdcall; external GdiPlusDll;
+function GdipBitmapLockBits(Bitmap: GpBitmap; const Rect: PGPRect; Flags: DWORD; Format: TGPPixelFormat; LockedBitmapData: PGPBitmapData): TGPStatus; stdcall; external GdiPlusDll;
+{$ENDREGION}
 implementation
 
 uses
-  System.Math,
+  Math,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.FastCode,
   ACL.Geometry,
-  ACL.Graphics,
   ACL.Utils.Common,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Strings,
-  ACL.Utils.Stream;
+  ACL.Utils.Strings;
 
 const
   sErrorInvalidGdipOperation = 'Invalid operation in GDI+ (Code: %d)';
   sErrorPaintCanvasAlreadyBusy = 'PaintCanvas is already busy!';
 
-  GpDefaultColorMatrix: TColorMatrix = (
+  GpDefaultColorMatrix: TGpColorMatrix = (
     (1.0, 0.0, 0.0, 0.0, 0.0),
     (0.0, 1.0, 0.0, 0.0, 0.0),
     (0.0, 0.0, 1.0, 0.0, 0.0),
@@ -312,7 +645,7 @@ const
 var
   FPaintCanvas: TACLGdiplusPaintCanvas;
 
-procedure GdipCheck(AStatus: GpStatus);
+procedure GdipCheck(AStatus: TGPStatus);
 begin
   if AStatus <> Ok then
     raise EGdipException.Create(AStatus);
@@ -371,6 +704,9 @@ var
 begin
   if AColor <> TAlphaColor.None then
   begin
+  {$IFDEF FPC}
+    AOrg := NullPoint;
+  {$ENDIF}
     GetWindowOrgEx(DC, AOrg);
     SetBrushOrgEx(DC, AOrg.X, AOrg.Y, @APrevOrg);
     try
@@ -405,7 +741,7 @@ procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage; AImageAttributes: 
 
   procedure StretchPart(const ADstRect, ASrcRect: TRect);
   var
-    APixelOffsetMode: TPixelOffsetMode;
+    APixelOffsetMode: TGpPixelOffsetMode;
     SW, SH, DW, DH: Integer;
   begin
     if GpIsRectVisible(AGraphics, ADstRect) then
@@ -416,7 +752,7 @@ procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage; AImageAttributes: 
       DH := ADstRect.Bottom - ADstRect.Top;
 
       GdipCheck(GdipGetPixelOffsetMode(AGraphics, APixelOffsetMode));
-      if APixelOffsetMode <> PixelOffsetModeHalf then
+      if APixelOffsetMode <> pomHalf then
       begin
         if (DH > SH) and (SH > 1) then Dec(SH);
         if (DW > SW) and (SW > 1) then Dec(SW);
@@ -497,7 +833,7 @@ end;
 procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage;
   const ADestRect, ASourceRect: TRect; ATileDrawingMode: Boolean; const AAlpha: Byte = $FF); overload;
 var
-  AColorMatrix: PColorMatrix;
+  AColorMatrix: PGpColorMatrix;
   AImageAttributes: GpImageAttributes;
 begin
   if AAlpha = $FF then
@@ -508,7 +844,7 @@ begin
 
   GdipCreateImageAttributes(AImageAttributes);
   try
-    AColorMatrix := GdipAlloc(SizeOf(TColorMatrix));
+    AColorMatrix := GdipAlloc(SizeOf(TGpColorMatrix));
     try
       AColorMatrix^ := GpDefaultColorMatrix;
       AColorMatrix[3, 3] := AAlpha / $FF;
@@ -528,7 +864,7 @@ end;
 
 function GpGetCodecByMimeType(const AMimeType: UnicodeString; out ACodecID: TGUID): Boolean;
 var
-  ACodecInfo, AStartInfo: PImageCodecInfo;
+  ACodecInfo, AStartInfo: PGpImageCodecInfo;
   ACount: Cardinal;
   ASize, I: Cardinal;
 begin
@@ -553,14 +889,14 @@ begin
     finally
       FreeMem(AStartInfo, ASize);
     end;
-    if acSameText(AMimeType, 'image/jpg') then
+    if acSameText(AMimeType, _U('image/jpg')) then
       Result := GpGetCodecByMimeType('image/jpeg', ACodecID)
   end;
 end;
 
 { EGdipException }
 
-constructor EGdipException.Create(AStatus: GpStatus);
+constructor EGdipException.Create(AStatus: TGPStatus);
 begin
   CreateFmt(sErrorInvalidGdipOperation, [Ord(AStatus)]);
   FStatus := AStatus;
@@ -677,7 +1013,7 @@ end;
 
 procedure TACLGdiplusPen.DoSetDashStyle(AHandle: GpHandle);
 const
-  Map: array[TACLGdiplusPenStyle] of TDashStyle = (
+  Map: array[TACLGdiplusPenStyle] of TGpDashStyle = (
     DashStyleSolid, DashStyleDash, DashStyleDot, DashStyleDashDot, DashStyleDashDotDot
   );
 begin
@@ -837,13 +1173,13 @@ end;
 
 procedure TACLGdiplusCanvas.FillRectangle(ABrush: TACLGdiplusBrush; const R: TRect; AMode: TGpCompositingMode = cmSourceOver);
 var
-  APrevMode: TCompositingMode;
+  APrevMode: TGpCompositingMode;
 begin
   if not acRectIsEmpty(R) then
   begin
     GdipGetCompositingMode(Handle, APrevMode);
     try
-      GdipSetCompositingMode(Handle, TCompositingMode(AMode));
+      GdipSetCompositingMode(Handle, AMode);
       GdipFillRectangleI(Handle, ABrush.Handle, R.Left, R.Top, R.Width, R.Height);
     finally
       GdipSetCompositingMode(Handle, APrevMode);
@@ -869,7 +1205,7 @@ begin
   ABrushRect.Y := R.Top - 1;
   ABrushRect.Width := acRectWidth(R) + 2;
   ABrushRect.Height := acRectHeight(R) + 2;
-  GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2, TLinearGradientMode(AMode), WrapModeTile, ABrush));
+  GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2, AMode, WrapModeTile, ABrush));
   GdipCheck(GdipFillRectangleI(Handle, ABrush, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top));
   GdipCheck(GdipDeleteBrush(ABrush));
 end;
@@ -893,8 +1229,8 @@ procedure TACLGdiplusCanvas.TextOut(const AText: UnicodeString; const R: TRect; 
   AHorzAlign: TAlignment; AVertAlign: TVerticalAlignment; AWordWrap: Boolean; ATextColor: TAlphaColor;
   ARendering: TGpTextRenderingHint = trhSystemDefault);
 const
-  HorzAlignMap: array[TAlignment] of TStringAlignment = (StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter);
-  VertAlignMap: array[TVerticalAlignment] of TStringAlignment = (StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter);
+  HorzAlignMap: array[TAlignment] of TGpStringAlignment = (StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter);
+  VertAlignMap: array[TVerticalAlignment] of TGpStringAlignment = (StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter);
   WordWrapMap: array[Boolean] of Integer = (StringFormatFlagsNoWrap, 0);
 var
   ABrush: GpBrush;
@@ -912,7 +1248,7 @@ begin
   GetObjectW(AFont.Handle, SizeOf(AFontInfo), @AFontInfo);
   GdipCheck(GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @AFontInfo, AFontHandle));
   try
-    GdipCheck(GdipSetTextRenderingHint(Handle, TTextRenderingHint(ARendering)));
+    GdipCheck(GdipSetTextRenderingHint(Handle, ARendering));
     GdipCheck(GdipCreateStringFormat(WordWrapMap[AWordWrap], LANG_NEUTRAL, AStringFormat));
     try
       GdipCheck(GdipSetStringFormatAlign(AStringFormat, HorzAlignMap[AHorzAlign]));
@@ -923,7 +1259,7 @@ begin
         ARect.Y := R.Top;
         ARect.Width := R.Width;
         ARect.Height := R.Height;
-        GdipCheck(GdipDrawString(Handle, PWideChar(AText), Length(AText), AFontHandle, @ARect, AStringFormat, ABrush));
+        GdipCheck(GdipDrawString(Handle, PWideChar(AText), acStringLength(AText), AFontHandle, @ARect, AStringFormat, ABrush));
       finally
         GdipCheck(GdipDeleteBrush(ABrush));
       end;
@@ -936,42 +1272,33 @@ begin
 end;
 
 function TACLGdiplusCanvas.GetInterpolationMode: TGpInterpolationMode;
-var
-  M: TInterpolationMode;
 begin
-  GdipCheck(GdipGetInterpolationMode(Handle, M));
-  Result := TGpInterpolationMode(M);
+  GdipCheck(GdipGetInterpolationMode(Handle, Result));
 end;
 
 function TACLGdiplusCanvas.GetPixelOffsetMode: TGpPixelOffsetMode;
-var
-  AMode: TPixelOffsetMode;
 begin
-  GdipCheck(GdipGetPixelOffsetMode(Handle, AMode));
-  Result := TGpPixelOffsetMode(AMode);
+  GdipCheck(GdipGetPixelOffsetMode(Handle, Result));
 end;
 
 function TACLGdiplusCanvas.GetSmoothingMode: TGpSmoothingMode;
-var
-  M: TSmoothingMode;
 begin
-  GdipCheck(GdipGetSmoothingMode(Handle, M));
-  Result := TGpSmoothingMode(M);
+  GdipCheck(GdipGetSmoothingMode(Handle, Result));
 end;
 
 procedure TACLGdiplusCanvas.SetInterpolationMode(const Value: TGpInterpolationMode);
 begin
-  GdipCheck(GdipSetInterpolationMode(Handle, TInterpolationMode(Value)));
+  GdipCheck(GdipSetInterpolationMode(Handle, Value));
 end;
 
 procedure TACLGdiplusCanvas.SetPixelOffsetMode(const Value: TGpPixelOffsetMode);
 begin
-  GdipCheck(GdipSetPixelOffsetMode(Handle, TPixelOffsetMode(Value)));
+  GdipCheck(GdipSetPixelOffsetMode(Handle, Value));
 end;
 
 procedure TACLGdiplusCanvas.SetSmoothingMode(const Value: TGpSmoothingMode);
 begin
-  GdipCheck(GdipSetSmoothingMode(Handle, TSmoothingMode(Value)));
+  GdipCheck(GdipSetSmoothingMode(Handle, Value));
 end;
 
 { TACLGdiplusPaintCanvas }
@@ -1048,7 +1375,18 @@ begin
 end;
 
 initialization
+  if not IsLibrary then
+  begin
+    GdiplusStartupInput.GdiplusVersion := 1;
+    GdiplusStartupInput.DebugEventCallback := nil;
+    GdiplusStartupInput.SuppressBackgroundThread := False;
+    GdiplusStartupInput.SuppressExternalCodecs := False;
+    GdiplusStartup(GdiplusToken, @GdiplusStartupInput, nil);
+  end;
 
 finalization
   FreeAndNil(FPaintCanvas);
+  TACLGdiplusSolidBrushCache.Flush;
+  if not IsLibrary then
+    GdiplusShutdown(GdiplusToken);
 end.

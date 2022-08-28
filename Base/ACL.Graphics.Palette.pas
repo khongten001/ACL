@@ -22,16 +22,16 @@ unit ACL.Graphics.Palette;
 interface
 
 uses
-  Winapi.Windows,
+  Windows,
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  Classes,
+  Generics.Collections,
+  Generics.Defaults,
+  Math,
+  SysUtils,
+  Types,
   // VCL
-  Vcl.Graphics,
+  Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Graphics,
@@ -302,6 +302,7 @@ var
   AForegroundDominant: TACLPaletteSwatch;
   AIsLight: Boolean;
 begin
+  FastZeroStruct(AForegroundDominant, SizeOf(AForegroundDominant));
   if IsBlackOrWhite(FSwatches[pstBackground]) then
     CalculateDominant(ASwatches, AForegroundDominant, IsBlackOrWhite)
   else
@@ -342,8 +343,8 @@ begin
 
     AScore :=
       0.24 * (AIndex.Population / AMaxPopulation) +
-      0.52 * (MaxByte - FastAbs(AIndex.L - ATarget.LTarget)) +
-      0.24 * (MaxByte - FastAbs(AIndex.S - ATarget.STarget));
+      0.52 * (MaxByte - FastAbs(Integer(AIndex.L - ATarget.LTarget))) +
+      0.24 * (MaxByte - FastAbs(Integer(AIndex.S - ATarget.STarget)));
 
     if AScore > AMaxScore then
     begin
@@ -420,7 +421,7 @@ end;
 
 function TACLPalette.IsContrastWithBackground(const ASwatch: TACLPaletteSwatch): Boolean;
 begin
-  Result := not IsBlackOrWhite(ASwatch) and (FastAbs(ASwatch.H - FSwatches[pstBackground].H) > 7); // 7 = 10°/360° * 255
+  Result := not IsBlackOrWhite(ASwatch) and (FastAbs(Integer(ASwatch.H - FSwatches[pstBackground].H)) > 7); // 7 = 10°/360° * 255
 end;
 
 function TACLPalette.SelectMutedCandidate(const S1, S2: TACLPaletteSwatch): TACLPaletteSwatch;

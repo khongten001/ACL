@@ -394,7 +394,6 @@ end;
 procedure TFastFourierTransformUniversal.Transform(AInverse: Boolean);
 var
   B, T, O: PComplex;
-  C: TComplex;
   I: Integer;
   K: TComplexArgument;
 begin

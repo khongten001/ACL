@@ -16,23 +16,21 @@ unit ACL.Graphics.Layers;
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
+  // Winapi
+  Windows,
   // System
-  System.Classes,
-  System.Math,
-  System.SysUtils,
-  System.Types,
-  System.UITypes,
+  Classes,
+  Math,
+  SysUtils,
+  Types,
   // VCL
-  Vcl.Graphics,
+  Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Graphics,
   ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Common;
 
 type
   // Refer to following articles for more information:
@@ -205,7 +203,7 @@ begin
     RS := AWidth * SizeOf(TRGBQuad);
     Q3 := AllocMem(RS);
     try
-      while NativeUInt(Q1) < NativeUInt(Q2) do
+      while PByte(Q1) < PByte(Q2) do
       begin
         FastMove(Q2^, Q3^, RS);
         FastMove(Q1^, Q2^, RS);
@@ -223,7 +221,7 @@ begin
     begin
       Q1 := @AColors^[I * AWidth];
       Q2 := @AColors^[I * AWidth + AWidth - 1];
-      while NativeUInt(Q1) < NativeUInt(Q2) do
+      while PByte(Q1) < PByte(Q2) do
       begin
         Q4  := Q2^;
         Q2^ := Q1^;
@@ -344,6 +342,9 @@ var
 begin
   if ASmoothStretch and not (Empty or acRectIsEqualSizes(R, ClientRect)) then
   begin
+  {$IFDEF FPC}
+    AClipBox := NullRect;
+  {$ENDIF}
     if (GetClipBox(DC, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
     begin
       AImage := TACLImage.Create(PRGBQuad(Colors), Width, Height);

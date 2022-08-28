@@ -20,7 +20,7 @@ uses
   Windows,
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Graphics,
+  Graphics,
 {$ENDIF}
   // ACL
   ACL.Geometry;
@@ -135,7 +135,7 @@ begin
         MeasureCanvas.Font := AFont;
         MeasureCanvas.Font.PixelsPerInch := acDefaultDPI;
         MeasureCanvas.Font.Height := AHeight;
-        GetTextMetrics(MeasureCanvas.Handle, ATextMetric);
+        GetTextMetricsW(MeasureCanvas.Handle, {$IFDEF FPC}@{$ENDIF}ATextMetric);
       finally
         MeasureCanvas.Font.PixelsPerInch := APrevPixelsPerInch;
       end;
