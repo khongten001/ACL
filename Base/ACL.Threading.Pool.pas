@@ -34,6 +34,7 @@ uses
 type
   TACLTaskCancelCallback = function: Boolean of object;
   TACLTaskProc = reference to procedure (CheckCanceled: TACLTaskCancelCallback);
+  TACLTaskProc2 = procedure (CheckCanceled: TACLTaskCancelCallback) of object;
 
   TACLTaskDispatcher = class;
 
@@ -137,8 +138,11 @@ type
     procedure BeforeDestruction; override;
 
     function Run(AProc: TACLTaskProc): THandle; overload;
-    function Run(AProc: TThreadMethod; ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
     function Run(AProc: TACLTaskProc; ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
+  {$IFDEF FPC}
+    function Run(AProc: TACLTaskProc2; ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
+  {$ENDIF}
+    function Run(AProc: TThreadMethod; ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
     function Run(ATask: TACLTask): THandle; overload;
     function Run(ATask: TACLTask; ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
     function RunInCurrentThread(ATask: TACLTask): THandle;
@@ -382,6 +386,20 @@ begin
   Result := Run(TACLSimpleTask.Create(AProc), ACompleteEvent, ACompleteEventCallMode);
 end;
 
+{$IFDEF FPC}
+function TACLTaskDispatcher.Run(AProc: TACLTaskProc2;
+  ACompleteEvent: TThreadMethod;
+  ACompleteEventCallMode: TACLThreadMethodCallMode): THandle;
+begin
+  Result := Run(
+    procedure (CancelCallback: TACLTaskCancelCallback)
+    begin
+      AProc(CancelCallback);
+    end,
+    ACompleteEvent, ACompleteEventCallMode);
+end;
+{$ENDIF}
+
 function TACLTaskDispatcher.Run(ATask: TACLTask): THandle;
 begin
   Result := Run(ATask, TThreadMethod(nil), tmcmAsync);
@@ -548,7 +566,7 @@ begin
     Result := wrAbandoned;
 end;
 
-class function TACLTaskDispatcher.ThreadProc(ATask: TACLTask): Integer;
+class function TACLTaskDispatcher.ThreadProc(ATask: TACLTask): Integer; stdcall;
 begin
 {$IFDEF DEBUG}
   TThread.NameThreadForDebugging('ThreadPool - ' + ATask.ClassName);

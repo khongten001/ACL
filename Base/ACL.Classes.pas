@@ -704,7 +704,7 @@ procedure TACLComponent.BeforeDestruction;
 begin
   inherited BeforeDestruction;
 {$IFNDEF FPC}
-  RemoveFreeNotifications; // TODO, find alternative
+  RemoveFreeNotifications;
 {$ENDIF}
   TACLObjectLinks.Release(Self);
 end;

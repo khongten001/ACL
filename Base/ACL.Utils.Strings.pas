@@ -51,6 +51,7 @@ type
 {$IFDEF FPC}
   TUnicodeStringDynArray = array of UnicodeString;
 {$ELSE}
+  TUnicodeCharArray = TCharArray;
   TUnicodeStringDynArray = TStringDynArray;
 {$ENDIF}
 
@@ -215,9 +216,14 @@ type
   end;
 
 {$IFDEF FPC}
+
+  { TACLCharHelper }
+
   TACLCharHelper = record helper for WideChar
   public
     function IsDigit: Boolean;
+    function IsSurrogate: Boolean;
+    class function IsSurrogatePair(const C1, C2: WideChar): Boolean; static;
     function ToLower: WideChar;
     function ToUpper: WideChar;
   end;
@@ -240,6 +246,7 @@ function Format(const Template: UnicodeString; const Args: array of const): Unic
 function FormatDateTime(const Template: UnicodeString;
   const DateTime: TDateTime; const FormatSettings: TFormatSettings): UnicodeString; overload;
 function StrToFloat(const S: UnicodeString; const AFormatSettings: TFormatSettings): Double; overload;
+function StrToFloatDef(const S : UnicodeString; const ADefault: Single; const AFormatSettings: TFormatSettings): Single; overload;
 function StrToIntDef(const S: UnicodeString; ADefault: Integer): Integer; overload;
 function StrToInt64Def(const S: UnicodeString; ADefault: Int64): Int64; overload;
 function TryStrToInt(const S: UnicodeString; out AValue: Integer): Boolean; overload;
@@ -421,6 +428,11 @@ end;
 function StrToFloat(const S: UnicodeString; const AFormatSettings: TFormatSettings): Double;
 begin
   Result := SysUtils.StrToFloat(acUnicodeToString(S), AFormatSettings);
+end;
+
+function StrToFloatDef(const S : UnicodeString; const ADefault: Single; const AFormatSettings: TFormatSettings): Single;
+begin
+  Result := SysUtils.StrToFloatDef(acUnicodeToString(S), ADefault, AFormatSettings);
 end;
 
 function StrToIntDef(const S: UnicodeString; ADefault: Integer): Integer;
@@ -2368,9 +2380,19 @@ end;
 
 { TACLCharHelper }
 
+class function TACLCharHelper.IsSurrogatePair(const C1, C2: WideChar): Boolean;
+begin
+  Result := TCharacter.IsSurrogatePair(C1, C2);
+end;
+
 function TACLCharHelper.IsDigit: Boolean;
 begin
   Result := TCharacter.IsDigit(Self);
+end;
+
+function TACLCharHelper.IsSurrogate: Boolean;
+begin
+  Result := TCharacter.IsSurrogate(Self);
 end;
 
 function TACLCharHelper.ToLower: WideChar;

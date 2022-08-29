@@ -17,14 +17,18 @@ unit ACL.Graphics.FontCache;
 interface
 
 uses
-  Winapi.Windows,
+  // Winapi
+  ActiveX,
+  Windows,
   // System
+  Classes,
+  Generics.Defaults,
+  Generics.Collections,
+{$IFNDEF FPC}
   System.UITypes,
-  System.Generics.Defaults,
-  System.Generics.Collections,
-  System.Classes,
+{$ENDIF}
   // Vcl
-  Vcl.Graphics,
+  Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Graphics,
@@ -56,9 +60,13 @@ type
     class function GetDefault: IEqualityComparer<TACLFontData>; static;
   public
     // IEqualityComparer
+  {$IFDEF FPC}
+    function Equals(constref Left, Right: TACLFontData): Boolean; reintroduce;
+    function GetHashCode(constref Value: TACLFontData): Cardinal; reintroduce;
+  {$ELSE}
     function Equals(const Left, Right: TACLFontData): Boolean; reintroduce;
     function GetHashCode(const Value: TACLFontData): Integer; reintroduce;
-    //
+  {$ENDIF}
     class property Default: IEqualityComparer<TACLFontData> read GetDefault;
   end;
 
@@ -167,10 +175,10 @@ type
     class constructor Create;
     class destructor Destroy;
   public
-    constructor Create(DC: HDC; AFont: TFont; const AText: string); overload;
-    constructor Create(DC: HDC; AFont: TFont; const AText: PChar; ALength: Integer); overload;
-    constructor Create(DC: HDC; AFont: TACLFontInfo; const AText: PChar; ALength: Integer); overload;
-    constructor Create(DC: HDC; AFont: TACLFontInfo; const AText: string); overload;
+    constructor Create(DC: HDC; AFont: TFont; const AText: UnicodeString); overload;
+    constructor Create(DC: HDC; AFont: TFont; const AText: PWideChar; ALength: Integer); overload;
+    constructor Create(DC: HDC; AFont: TACLFontInfo; const AText: PWideChar; ALength: Integer); overload;
+    constructor Create(DC: HDC; AFont: TACLFontInfo; const AText: UnicodeString); overload;
     destructor Destroy; override;
     procedure AdjustToWidth(AWidth: Integer; out AReducedCharacters, AReducedWidth: Integer);
     procedure Draw(DC: HDC; X, Y: Integer; AMaxLength: Integer = MaxInt); inline;
@@ -182,13 +190,11 @@ type
 implementation
 
 uses
-  Winapi.ActiveX,
   // System
-  System.SysUtils,
-  System.Math,
+  Math,
+  SysUtils,
   // ACL
   ACL.FastCode,
-  ACL.Parsers,
   ACL.Hashes,
   ACL.Utils.Strings;
 
@@ -217,6 +223,30 @@ type
     function ResetFontMapping: HResult; stdcall;
   end;
 
+{$IFDEF FPC}
+const
+  ETO_IGNORELANGUAGE = $1000;
+
+type
+  PWCRange = ^TWCRange;
+  TWCRange = record
+    wcLow: WCHAR;
+    cGlyphs: SHORT;
+  end;
+
+  PGlyphSet = ^TGlyphSet;
+  TGlyphSet = record
+    cbThis: DWORD;
+    flAccel: DWORD;
+    cGlyphsSupported: DWORD;
+    cRanges: DWORD;
+    ranges: array[0..0] of TWCRange;
+  end;
+
+function GetCharacterPlacementW(DC: HDC; p2: LPCWSTR; p3, p4: Integer; var p5: TGCPResultsW; p6: DWORD): DWORD; stdcall; external gdi32;
+function GetFontUnicodeRanges(DC: HDC; lpgs: PGlyphSet): DWORD; stdcall; external gdi32;
+{$ENDIF}
+
 function CreateFontLink: IMLangFontLink;
 begin
 {$IFDEF CPUX86}
@@ -234,7 +264,7 @@ end;
 
 { TACLFontDataComparer }
 
-function TACLFontDataComparer.Equals(const Left, Right: TACLFontData): Boolean;
+function TACLFontDataComparer.Equals;
 begin
   Result :=
     (Left.Charset = Right.Charset) and
@@ -247,13 +277,13 @@ begin
     AnsiSameText(Left.Name, Right.Name);
 end;
 
-function TACLFontDataComparer.GetHashCode(const Value: TACLFontData): Integer;
+function TACLFontDataComparer.GetHashCode;
 var
   AState: Pointer;
 begin
   TACLHashBobJenkins.Initialize(AState);
   TACLHashBobJenkins.Update(AState, @Value, SizeOf(Value) - SizeOf(Value.Name));
-  TACLHashBobJenkins.Update(AState, Value.Name, TEncoding.UTF8);
+  TACLHashBobJenkins.Update(AState, Value.Name{$IFNDEF FPC}, TEncoding.UTF8{$ENDIF});
   Result := TACLHashBobJenkins.Finalize(AState);
 end;
 
@@ -280,7 +310,7 @@ begin
   if GetOutlineTextMetricsW(DC, SizeOf(AOutlineTextMetrics), @AOutlineTextMetrics) <> 0 then
     FPanose := AOutlineTextMetrics.otmPanoseNumber;
 
-  ASize := Winapi.Windows.GetFontUnicodeRanges(DC, nil);
+  ASize := GetFontUnicodeRanges(DC, nil);
   if ASize = 0 then //# "Roboto Bk"
     Exit;
 
@@ -373,15 +403,14 @@ begin
 end;
 
 class procedure TACLFontCache.EnumFonts(AProc: TACLStringEnumProc);
+var
+  AFontName: TFontName;
 begin
   WaitForLoader;
   FLock.Enter;
   try
-    FNameToGlyphSet.Enum(
-      procedure (const Key: TFontName; const Value: TACLFontGlyphSet)
-      begin
-        AProc(Key);
-      end);
+    for AFontName in FNameToGlyphSet.GetKeys do
+      AProc(acStringToUnicode(AFontName));
   finally
     FLock.Leave;
   end;
@@ -488,7 +517,7 @@ begin
     try
       ZeroMemory(@ALogFont, SizeOf(ALogFont));
       ALogFont.lfCharset := DEFAULT_CHARSET;
-      EnumFontFamiliesEx(ADC, ALogFont, @AsyncFontLoaderEnumProc, NativeInt(@AData), 0);
+      EnumFontFamiliesExW(ADC, ALogFont, @AsyncFontLoaderEnumProc, PointerToLParam(@AData), 0);
     finally
       AData.TempFont.Free;
     end;
@@ -557,7 +586,7 @@ begin
   ALogFont.lfItalic := Byte(fsItalic in AFontData.Style);
   ALogFont.lfUnderline := Byte(fsUnderline in AFontData.Style);
   ALogFont.lfStrikeOut := Byte(fsStrikeOut in AFontData.Style);
-  StrPLCopy(ALogFont.lfFaceName, AFontData.Name, Length(ALogFont.lfFaceName) - 1);
+  StrPLCopy(ALogFont.lfFaceName, AFontData.Name, acStringLength(ALogFont.lfFaceName) - 1);
 
   if AFontData.CharSet <> DEFAULT_CHARSET then
     ALogFont.lfCharSet := Byte(AFontData.Charset)
@@ -580,7 +609,7 @@ begin
     begin
       Result := CreateFontIndirect(ALogFont);
       APrevFont := SelectObject(MeasureCanvas.Handle, Result);
-      GetTextMetrics(MeasureCanvas.Handle, ATextMetric);
+      GetTextMetricsW(MeasureCanvas.Handle, {$IFDEF FPC}@{$ENDIF}ATextMetric);
       ALogFont.lfHeight := -(ATextMetric.tmHeight - ATextMetric.tmInternalLeading);
       SelectObject(MeasureCanvas.Handle, APrevFont);
       DeleteObject(Result);
@@ -644,22 +673,22 @@ end;
 
 { TACLTextViewInfo }
 
-constructor TACLTextViewInfo.Create(DC: HDC; AFont: TFont; const AText: string);
+constructor TACLTextViewInfo.Create(DC: HDC; AFont: TFont; const AText: UnicodeString);
 begin
-  Create(DC, AFont, PChar(AText), Length(AText));
+  Create(DC, AFont, PWideChar(AText), acStringLength(AText));
 end;
 
-constructor TACLTextViewInfo.Create(DC: HDC; AFont: TFont; const AText: PChar; ALength: Integer);
+constructor TACLTextViewInfo.Create(DC: HDC; AFont: TFont; const AText: PWideChar; ALength: Integer);
 begin
   Create(DC, TACLFontCache.GetInfo(AFont), AText, ALength);
 end;
 
-constructor TACLTextViewInfo.Create(DC: HDC; AFont: TACLFontInfo; const AText: string);
+constructor TACLTextViewInfo.Create(DC: HDC; AFont: TACLFontInfo; const AText: UnicodeString);
 begin
-  Create(DC, AFont, PChar(AText), Length(AText));
+  Create(DC, AFont, PWideChar(AText), acStringLength(AText));
 end;
 
-constructor TACLTextViewInfo.Create(DC: HDC; AFont: TACLFontInfo; const AText: PChar; ALength: Integer);
+constructor TACLTextViewInfo.Create(DC: HDC; AFont: TACLFontInfo; const AText: PWideChar; ALength: Integer);
 begin
   CreateSpans(DC, AFont, AText, ALength);
   CalculateSize;
@@ -746,7 +775,7 @@ begin
   while (ASpan <> nil) and (AMaxLength > 0) do
   begin
     SelectObject(DC, ASpan^.FontHandle);
-    ExtTextOut(DC, X, Y, ETO_GLYPH_INDEX or ETO_IGNORELANGUAGE, nil,
+    ExtTextOutW(DC, X, Y, ETO_GLYPH_INDEX or ETO_IGNORELANGUAGE, nil,
       @ASpan^.Glyphs^, Min(ASpan^.GlyphCount, AMaxLength), @ASpan^.CharacterWidths[0]);
     Dec(AMaxLength, ASpan^.GlyphCount);
     Inc(X, ASpan^.Width);
@@ -801,7 +830,7 @@ function TACLTextViewInfo.CreateSpan(DC: HDC; AFontInfo: TACLFontInfo; ABuffer: 
       ReallocMem(AGcpResults.lpGlyphs, SizeOf(Word) * AExtraLength);
       if ALength > 0 then
         PWord(AGcpResults.lpGlyphs)^ := 0;
-      Result := GetCharacterPlacement(DC, ABuffer, ALength, 0, AGcpResults, GCP_USEKERNING or GCP_LIGATE);
+      Result := GetCharacterPlacementW(DC, ABuffer, ALength, 0, AGcpResults, GCP_USEKERNING or GCP_LIGATE);
       if Result <> 0 then
         Exit;
       Inc(AAdd, AStep);
@@ -836,7 +865,7 @@ begin
       AGcpResults.nGlyphs := ALength;
     end;
 
-    ASize := GetCharacterPlacement(DC, ABuffer, ALength, 0, AGcpResults, GCP_USEKERNING or GCP_LIGATE);
+    ASize := GetCharacterPlacementW(DC, ABuffer, ALength, 0, AGcpResults, GCP_USEKERNING or GCP_LIGATE);
     if (ASize = 0) and (ALength > 0) then
       ASize := GetCharacterPlacementSlow(DC, ABuffer, ALength, AGcpResults);
     AWidth := LongRec(ASize).Lo;

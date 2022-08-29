@@ -11,23 +11,25 @@
 
 unit ACL.FileFormats.XML.Writer;
 
-{$I ACL.Config.inc}
-{$SCOPEDENUMS ON}
-
 // Ported from .NET platform:
 // https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
+
+{$I ACL.Config.inc}
+{$SCOPEDENUMS ON}
 
 interface
 
 uses
-  Rtti,
-  Types,
+  // System
   Classes,
   SysUtils,
   Generics.Defaults,
   Generics.Collections,
-  ACL.Classes,
-  ACL.FileFormats.XML.Types;
+  // ACL
+  ACL.Classes.Collections,
+  ACL.FileFormats.XML.Types,
+  ACL.Utils.Common,
+  ACL.Utils.Strings;
 
 type
   //# NewLineHandling specifies what will XmlWriter do with new line characters. The options are:
@@ -71,10 +73,10 @@ type
     FConformanceLevel: TACLXMLConformanceLevel;
     FEncodeInvalidXmlCharAsUCS2: Boolean;
     FIndent: Boolean;
-    FIndentChars: string;
+    FIndentChars: UnicodeString;
     FMergeCDataSections: Boolean;
     FNamespaceHandling: TACLXMLNamespaceHandling;
-    FNewLineChars: string;
+    FNewLineChars: UnicodeString;
     FNewLineHandling: TACLXMLNewLineHandling;
     FNewLineOnAttributes: Boolean;
     FNewLineOnNode: Boolean;
@@ -90,10 +92,10 @@ type
     property ConformanceLevel: TACLXMLConformanceLevel read FConformanceLevel write FConformanceLevel;
     property EncodeInvalidXmlCharAsUCS2: Boolean read FEncodeInvalidXmlCharAsUCS2 write FEncodeInvalidXmlCharAsUCS2;
     property Indent: Boolean read FIndent write FIndent;
-    property IndentChars: string read FIndentChars write FIndentChars;
+    property IndentChars: UnicodeString read FIndentChars write FIndentChars;
     property MergeCDataSections: Boolean read FMergeCDataSections write FMergeCDataSections;
     property NamespaceHandling: TACLXMLNamespaceHandling read FNamespaceHandling write FNamespaceHandling;
-    property NewLineChars: string read FNewLineChars write FNewLineChars;
+    property NewLineChars: UnicodeString read FNewLineChars write FNewLineChars;
     property NewLineHandling: TACLXMLNewLineHandling read FNewLineHandling write FNewLineHandling;
     property NewLineOnAttributes: Boolean read FNewLineOnAttributes write FNewLineOnAttributes;
     property NewLineOnNode: Boolean read FNewLineOnNode write FNewLineOnNode;
@@ -115,9 +117,9 @@ type
     function GetWriteState: TACLXMLWriteState; virtual; abstract;
     function GetSettings: TACLXMLWriterSettings; virtual;
     function GetXmlSpace: TACLXMLSpace; virtual;
-    function GetXmlLang: string; virtual;
-    procedure Write(const ABuffer: string); overload; virtual;
-    procedure Write(const ABuffer: TCharArray; AIndex, ALength: Integer); overload; virtual;
+    function GetXmlLang: UnicodeString; virtual;
+    procedure Write(const ABuffer: UnicodeString); overload; virtual;
+    procedure Write(const ABuffer: TUnicodeCharArray; AIndex, ALength: Integer); overload; virtual;
 
     property AttrEndPos: Integer read FAttrEndPos write FAttrEndPos;
     property ContentPosition: Integer read FContentPosition write FContentPosition;
@@ -127,62 +129,65 @@ type
     procedure WriteStartDocument; overload; virtual; abstract;
     procedure WriteStartDocument(AStandalone: Boolean); overload; virtual; abstract;
     procedure WriteEndDocument; virtual; abstract;
-    procedure WriteStartElement(const ALocalName, ANs: string); overload;
-    procedure WriteStartElement(APrefix: string; const ALocalName: string; ANs: string); overload; virtual;
-    procedure WriteStartElement(const ALocalName: string); overload;
+    procedure WriteStartElement(const ALocalName, ANs: UnicodeString); overload;
+    procedure WriteStartElement(APrefix: UnicodeString; const ALocalName: UnicodeString; ANs: UnicodeString); overload; virtual;
+    procedure WriteStartElement(const ALocalName: UnicodeString); overload;
     procedure WriteEndElement; overload; virtual; abstract;
     procedure WriteFullEndElement; overload; virtual; abstract;
-    procedure WriteAttributeBoolean(const ALocalName: string; AValue: Boolean); overload;
-    procedure WriteAttributeBoolean(const APrefix, ALocalName, ANs: string; AValue: Boolean); overload;
-    procedure WriteAttributeFloat(const ALocalName: string; AValue: Single); overload;
-    procedure WriteAttributeFloat(const APrefix, ALocalName, ANs: string; AValue: Single); overload;
-    procedure WriteAttributeInteger(const ALocalName: string; AValue: Integer); overload;
-    procedure WriteAttributeInteger(const APrefix, ALocalName, ANs: string; AValue: Integer); overload;
-    procedure WriteAttributeInt64(const ALocalName: string; const AValue: Int64); overload;
-    procedure WriteAttributeInt64(const APrefix, ALocalName, ANs: string; const AValue: Int64); overload;
-    procedure WriteAttributeString(const ALocalName, ANs, AValue: string); overload;
-    procedure WriteAttributeString(const ALocalName, AValue: string); overload;
-    procedure WriteAttributeString(const APrefix, ALocalName, ANs, AValue: string); overload;
-    procedure WriteAttributeString(const APrefix, ALocalName, ANs: string; const AValue: AnsiString); overload;
-    procedure WriteAttributeString(const ALocalName: string; const AValue: AnsiString); overload;
-    procedure WriteStartAttribute(const ALocalName, ANs: string); overload;
-    procedure WriteStartAttribute(APrefix: string; ALocalName: string; ANs: string); overload; virtual; abstract;
-    procedure WriteStartAttribute(const ALocalName: string); overload;
+    procedure WriteAttributeBoolean(const ALocalName: UnicodeString; AValue: Boolean); overload;
+    procedure WriteAttributeBoolean(const APrefix, ALocalName, ANs: UnicodeString; AValue: Boolean); overload;
+    procedure WriteAttributeFloat(const ALocalName: UnicodeString; AValue: Single); overload;
+    procedure WriteAttributeFloat(const APrefix, ALocalName, ANs: UnicodeString; AValue: Single); overload;
+    procedure WriteAttributeInteger(const ALocalName: UnicodeString; AValue: Integer); overload;
+    procedure WriteAttributeInteger(const APrefix, ALocalName, ANs: UnicodeString; AValue: Integer); overload;
+    procedure WriteAttributeInt64(const ALocalName: UnicodeString; const AValue: Int64); overload;
+    procedure WriteAttributeInt64(const APrefix, ALocalName, ANs: UnicodeString; const AValue: Int64); overload;
+    procedure WriteAttributeString(const ALocalName, ANs, AValue: UnicodeString); overload;
+    procedure WriteAttributeString(const ALocalName, AValue: UnicodeString); overload;
+    procedure WriteAttributeString(const APrefix, ALocalName, ANs, AValue: UnicodeString); overload;
+    procedure WriteAttributeString(const APrefix, ALocalName, ANs: UnicodeString; const AValue: AnsiString); overload;
+    procedure WriteAttributeString(const ALocalName: UnicodeString; const AValue: AnsiString); overload;
+    procedure WriteStartAttribute(const ALocalName, ANs: UnicodeString); overload;
+    procedure WriteStartAttribute(APrefix: UnicodeString; ALocalName: UnicodeString; ANs: UnicodeString); overload; virtual; abstract;
+    procedure WriteStartAttribute(const ALocalName: UnicodeString); overload;
     procedure WriteEndAttribute; virtual;
-    procedure WriteCData(const AText: string); virtual; abstract;
-    procedure WriteComment(const AText: string); virtual; abstract;
-    procedure WriteProcessingInstruction(const AName, AText: string); virtual; abstract;
-    procedure WriteEntityRef(const AName: string); virtual; abstract;
-    procedure WriteCharEntity(ACh: Char); virtual; abstract;
-    procedure WriteWhitespace(const AWs: string); virtual; abstract;
-    procedure WriteString(const AText: string); overload; virtual;
+    procedure WriteCData(const AText: UnicodeString); virtual; abstract;
+    procedure WriteComment(const AText: UnicodeString); virtual; abstract;
+    procedure WriteProcessingInstruction(const AName, AText: UnicodeString); virtual; abstract;
+    procedure WriteEntityRef(const AName: UnicodeString); virtual; abstract;
+    procedure WriteCharEntity(ACh: WideChar); virtual; abstract;
+    procedure WriteWhitespace(const AWs: UnicodeString); virtual; abstract;
+    procedure WriteString(const AText: UnicodeString); overload; virtual;
     procedure WriteString(const AText: AnsiString); overload; virtual;
-    procedure WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char); virtual; abstract;
-    procedure WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); virtual; abstract;
-    procedure WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); overload; virtual; abstract;
-    procedure WriteRaw(const AData: string); overload; virtual; abstract;
+    procedure WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar); virtual; abstract;
+    procedure WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); virtual; abstract;
+    procedure WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); overload; virtual; abstract;
+    procedure WriteRaw(const AData: UnicodeString); overload; virtual; abstract;
     procedure WriteBinHex(const ABuffer: TBytes; AIndex: Integer; ACount: Integer); virtual;
     procedure Close; virtual;
     procedure Flush; virtual;
-    function LookupPrefix(const ANs: string): string; virtual; abstract;
-    procedure WriteQualifiedName(const ALocalName, ANs: string); overload; virtual;
-    procedure WriteValue(const AValue: string); overload; virtual;
-    procedure WriteElementString(const ALocalName, AValue: string); overload;
-    procedure WriteElementString(const ALocalName, ANs, AValue: string); overload;
-    procedure WriteElementString(const APrefix, ALocalName, ANs, AValue: string); overload;
-    procedure WriteElementString(const ALocalName: string; const AValue: AnsiString); overload;
+    function LookupPrefix(const ANs: UnicodeString): UnicodeString; virtual; abstract;
+    procedure WriteQualifiedName(const ALocalName, ANs: UnicodeString); overload; virtual;
+    procedure WriteValue(const AValue: UnicodeString); overload; virtual;
+    procedure WriteElementString(const ALocalName, AValue: UnicodeString); overload;
+    procedure WriteElementString(const ALocalName, ANs, AValue: UnicodeString); overload;
+    procedure WriteElementString(const APrefix, ALocalName, ANs, AValue: UnicodeString); overload;
+    procedure WriteElementString(const ALocalName: UnicodeString; const AValue: AnsiString); overload;
 
     property Encoding: TEncoding read FEncoding;
     property Settings: TACLXMLWriterSettings read GetSettings;
     property WriteState: TACLXMLWriteState read GetWriteState;
     property XmlSpace: TACLXMLSpace read GetXmlSpace;
-    property XmlLang: string read GetXmlLang;
+    property XmlLang: UnicodeString read GetXmlLang;
   end;
 
 implementation
 
 uses
-  Windows, Character;
+{$IFNDEF FPC}
+  Character,
+{$ENDIF}
+  Windows;
 
 const
   SXmlInvalidSurrogatePair =
@@ -196,8 +201,8 @@ const
     'ConformanceLevel.Auto if you want to write an XML fragment.';
   SXmlDupXmlDecl = 'Cannot write XML declaration. WriteStartDocument method has already written it.';
   SXmlDupAttributeName = '"%s" is a duplicate attribute name.';
-  SXmlEmptyLocalName = 'The empty string is not a valid local name.';
-  SXmlEmptyName = 'The empty string is not a valid name.';
+  SXmlEmptyLocalName = 'The empty UnicodeString is not a valid local name.';
+  SXmlEmptyName = 'The empty UnicodeString is not a valid name.';
   SXmlIndentCharsNotWhitespace = 'XmlWriterSettings.%s can contain only valid XML white space characters when ' +
     'XmlWriterSettings.CheckCharacters and XmlWriterSettings.NewLineOnAttributes are true.';
   SXmlInvalidCharacter = '%s, hexadecimal value %s, is an invalid character.';
@@ -227,14 +232,14 @@ type
 
   EACLXMLInvalidSurrogatePairException = class(EACLXMLArgumentException)
   public
-    constructor Create(const ALowChar, AHighChar: Char);
+    constructor Create(const ALowChar, AHighChar: WideChar);
   end;
 
   { TACLFastHex }
 
   TACLFastHex = class
   strict private const
-    ByteToHexMap: array[Byte] of string = (
+    ByteToHexMap: array[Byte] of UnicodeString = (
       '00','01','02','03','04','05','06','07','08','09','0a','0b','0c','0d','0e','0f',
       '10','11','12','13','14','15','16','17','18','19','1a','1b','1c','1d','1e','1f',
       '20','21','22','23','24','25','26','27','28','29','2a','2b','2c','2d','2e','2f',
@@ -253,10 +258,10 @@ type
       'f0','f1','f2','f3','f4','f5','f6','f7','f8','f9','fa','fb','fc','fd','fe','ff'
     );
   public
-    class function Encode(B: Byte): string; overload; static;
-    class function Encode(C: Char): string; overload; static;
-    class function Encode(C: Char; P: PChar): PChar; overload; static;
-    class function Encode(const ASource: TBytes; AOffset, ACount: Integer; var ADest: TCharArray): Integer; overload; static;
+    class function Encode(B: Byte): UnicodeString; overload; static;
+    class function Encode(C: WideChar): UnicodeString; overload; static;
+    class function Encode(C: WideChar; P: PWideChar): PWideChar; overload; static;
+    class function Encode(const ASource: TBytes; AOffset, ACount: Integer; var ADest: TUnicodeCharArray): Integer; overload; static;
   end;
 
   { TACLXMLRawWriter }
@@ -265,40 +270,40 @@ type
   strict private
     FResolver: IGSXMLNamespaceResolver;
 
-    function MakeString(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer): string;
-  strict protected
+    function MakeString(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer): UnicodeString;
+  protected
     function GetNamespaceResolver: IGSXMLNamespaceResolver; virtual;
     function GetSupportsNamespaceDeclarationInChunks: Boolean; virtual;
     function GetWriteState: TACLXMLWriteState; override;
-    function GetXmlLang: string; override;
+    function GetXmlLang: UnicodeString; override;
     function GetXmlSpace: TACLXMLSpace; override;
     procedure SetNamespaceResolver(const AValue: IGSXMLNamespaceResolver); virtual;
   public
-    function LookupPrefix(const ANs: string): string; override;
+    function LookupPrefix(const ANs: UnicodeString): UnicodeString; override;
     procedure OnRootElement(AConformanceLevel: TACLXMLConformanceLevel); virtual;
     procedure StartElementContent; virtual;
-    procedure WriteCData(const AText: string); override;
-    procedure WriteCharEntity(ACh: Char); override;
-    procedure WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); override;
+    procedure WriteCData(const AText: UnicodeString); override;
+    procedure WriteCharEntity(ACh: WideChar); override;
+    procedure WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); override;
     procedure WriteEndDocument; override;
-    procedure WriteEndElement(const APrefix, ALocalName, ANs: string); overload; virtual;
+    procedure WriteEndElement(const APrefix, ALocalName, ANs: UnicodeString); overload; virtual;
     procedure WriteEndElement; overload; override;
     procedure WriteEndNamespaceDeclaration; virtual;
-    procedure WriteFullEndElement(const APrefix, ALocalName, ANs: string); overload; virtual;
+    procedure WriteFullEndElement(const APrefix, ALocalName, ANs: UnicodeString); overload; virtual;
     procedure WriteFullEndElement; overload; override;
-    procedure WriteNamespaceDeclaration(const APrefix, ANs: string); virtual; abstract;
-    procedure WriteQualifiedName(const ALocalName, ANs: string); overload; override;
-    procedure WriteQualifiedName(const APrefix, ALocalName, ANs: string); overload; virtual;
-    procedure WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); override;
-    procedure WriteRaw(const AData: string); override;
+    procedure WriteNamespaceDeclaration(const APrefix, ANs: UnicodeString); virtual; abstract;
+    procedure WriteQualifiedName(const ALocalName, ANs: UnicodeString); overload; override;
+    procedure WriteQualifiedName(const APrefix, ALocalName, ANs: UnicodeString); overload; virtual;
+    procedure WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); override;
+    procedure WriteRaw(const AData: UnicodeString); override;
     procedure WriteStartDocument(AStandalone: Boolean); override;
     procedure WriteStartDocument; override;
-    procedure WriteStartNamespaceDeclaration(const APrefix: string); virtual;
-    procedure WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char); override;
-    procedure WriteValue(const AValue: string); override;
-    procedure WriteWhitespace(const AWs: string); override;
+    procedure WriteStartNamespaceDeclaration(const APrefix: UnicodeString); virtual;
+    procedure WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar); override;
+    procedure WriteValue(const AValue: UnicodeString); override;
+    procedure WriteWhitespace(const AWs: UnicodeString); override;
     procedure WriteXmlDeclaration(AStandalone: TACLXMLStandalone); overload; virtual;
-    procedure WriteXmlDeclaration(const AXmldecl: string); overload; virtual;
+    procedure WriteXmlDeclaration(const AXmldecl: UnicodeString); overload; virtual;
 
     property NamespaceResolver: IGSXMLNamespaceResolver read GetNamespaceResolver write SetNamespaceResolver;
     property SupportsNamespaceDeclarationInChunks: Boolean read GetSupportsNamespaceDeclarationInChunks;
@@ -312,7 +317,7 @@ type
     BufferOverflowSize = 32; //# Allow overflow in order to reduce checks when writing out constant size markup
   strict private
     FAttrEndPos: Integer; //# end of the last attribute
-    FBufChars: TCharArray;
+    FBufChars: TUnicodeCharArray;
     FBufLen: Integer;
     FBufPos: Integer;
     FCdataPos: Integer;   //# cdata end position
@@ -328,7 +333,7 @@ type
     FCheckCharacters: Boolean;
     FEncodeInvalidXmlCharAsUCS2: Boolean;
     FMergeCDataSections: Boolean;
-    FNewLineChars: string;
+    FNewLineChars: UnicodeString;
     FNewLineHandling: TACLXMLNewLineHandling;
     FNewLineOnAttributes: Boolean;
     FNewLineOnNode: Boolean;
@@ -337,55 +342,55 @@ type
   protected
     function GetSupportsNamespaceDeclarationInChunks: Boolean; override;
     procedure FlushBuffer; virtual;
-    procedure WriteAttributeTextBlock(ASrc: PChar; ASrcEnd: PChar);
-    procedure WriteElementTextBlock(ASrc: PChar; ASrcEnd: PChar);
+    procedure WriteAttributeTextBlock(ASrc: PWideChar; ASrcEnd: PWideChar);
+    procedure WriteElementTextBlock(ASrc: PWideChar; ASrcEnd: PWideChar);
     procedure WriteNewLineAndAlignment(ANestingLevelCorrection: Integer = 0);
-    procedure RawText(const S: string); overload;
-    procedure RawText(ASrcBegin: PChar; ASrcEnd: PChar); overload;
-    procedure WriteRawWithCharChecking(APSrcBegin: PChar; APSrcEnd: PChar);
-    procedure WriteCommentOrPi(const AText: string; AStopChar: Char);
-    procedure WriteCDataSection(const AText: string);
-    class function EncodeSurrogate(ASrc: PChar; ASrcEnd: PChar; ADst: PChar): PChar; static;
-    function InvalidXmlChar(ACh: Char; ADst: PChar; AEntitize: Boolean): PChar;
-    procedure EncodeChar(var ASrc: PChar; APSrcEnd: PChar; var ADst: PChar);
-    function WriteNewLine(ADst: PChar): PChar;
-    class function LtEntity(ADst: PChar): PChar; static;
-    class function GtEntity(ADst: PChar): PChar; static;
-    class function AmpEntity(ADst: PChar): PChar; static;
-    class function QuoteEntity(ADst: PChar): PChar; static;
-    class function TabEntity(ADst: PChar): PChar; static;
-    class function LineFeedEntity(ADst: PChar): PChar; static;
-    class function CarriageReturnEntity(ADst: PChar): PChar; static;
-    class function CharEntity(ADst: PChar; ACh: Char): PChar; static;
-    class function UCS2Entity(ADst: PChar; ACh: Char): PChar; static;
-    class function RawStartCData(ADst: PChar): PChar; static;
-    class function RawEndCData(ADst: PChar): PChar; static;
-    procedure ValidateContentChars(const AChars: string; const APropertyName: string; AAllowOnlyWhitespace: Boolean);
+    procedure RawText(const S: UnicodeString); overload;
+    procedure RawText(ASrcBegin: PWideChar; ASrcEnd: PWideChar); overload;
+    procedure WriteRawWithCharChecking(APSrcBegin: PWideChar; APSrcEnd: PWideChar);
+    procedure WriteCommentOrPi(const AText: UnicodeString; AStopChar: WideChar);
+    procedure WriteCDataSection(const AText: UnicodeString);
+    class function EncodeSurrogate(ASrc: PWideChar; ASrcEnd: PWideChar; ADst: PWideChar): PWideChar; static;
+    function InvalidXmlChar(ACh: WideChar; ADst: PWideChar; AEntitize: Boolean): PWideChar;
+    procedure EncodeChar(var ASrc: PWideChar; APSrcEnd: PWideChar; var ADst: PWideChar);
+    function WriteNewLine(ADst: PWideChar): PWideChar;
+    class function LtEntity(ADst: PWideChar): PWideChar; static;
+    class function GtEntity(ADst: PWideChar): PWideChar; static;
+    class function AmpEntity(ADst: PWideChar): PWideChar; static;
+    class function QuoteEntity(ADst: PWideChar): PWideChar; static;
+    class function TabEntity(ADst: PWideChar): PWideChar; static;
+    class function LineFeedEntity(ADst: PWideChar): PWideChar; static;
+    class function CarriageReturnEntity(ADst: PWideChar): PWideChar; static;
+    class function CharEntity(ADst: PWideChar; ACh: WideChar): PWideChar; static;
+    class function UCS2Entity(ADst: PWideChar; ACh: WideChar): PWideChar; static;
+    class function RawStartCData(ADst: PWideChar): PWideChar; static;
+    class function RawEndCData(ADst: PWideChar): PWideChar; static;
+    procedure ValidateContentChars(const AChars: UnicodeString; const APropertyName: UnicodeString; AAllowOnlyWhitespace: Boolean);
   public
     constructor CreateEx(AStream: TStream; ASettings: TACLXMLWriterSettings); overload;
 
     procedure WriteXmlDeclaration(AStandalone: TACLXMLStandalone); override;
-    procedure WriteXmlDeclaration(const AXmldecl: string); override;
-    procedure WriteStartElement(APrefix: string; const ALocalName: string; ANs: string); override;
+    procedure WriteXmlDeclaration(const AXmldecl: UnicodeString); override;
+    procedure WriteStartElement(APrefix: UnicodeString; const ALocalName: UnicodeString; ANs: UnicodeString); override;
     procedure StartElementContent; override;
-    procedure WriteEndElement(const APrefix, ALocalName, ANs: string); override;
-    procedure WriteFullEndElement(const APrefix, ALocalName, ANs: string); override;
-    procedure WriteStartAttribute(APrefix: string; ALocalName: string; ANs: string); override;
+    procedure WriteEndElement(const APrefix, ALocalName, ANs: UnicodeString); override;
+    procedure WriteFullEndElement(const APrefix, ALocalName, ANs: UnicodeString); override;
+    procedure WriteStartAttribute(APrefix: UnicodeString; ALocalName: UnicodeString; ANs: UnicodeString); override;
     procedure WriteEndAttribute; override;
-    procedure WriteNamespaceDeclaration(const APrefix, ANamespaceName: string); override;
-    procedure WriteStartNamespaceDeclaration(const APrefix: string); override;
+    procedure WriteNamespaceDeclaration(const APrefix, ANamespaceName: UnicodeString); override;
+    procedure WriteStartNamespaceDeclaration(const APrefix: UnicodeString); override;
     procedure WriteEndNamespaceDeclaration; override;
-    procedure WriteCData(const AText: string); override;
-    procedure WriteComment(const AText: string); override;
-    procedure WriteProcessingInstruction(const AName, AText: string); override;
-    procedure WriteEntityRef(const AName: string); override;
-    procedure WriteCharEntity(C: Char); override;
-    procedure WriteWhitespace(const AWhitespace: string); override;
-    procedure WriteString(const AText: string); override;
-    procedure WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char); override;
-    procedure WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); override;
-    procedure WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); overload; override;
-    procedure WriteRaw(const AData: string); overload; override;
+    procedure WriteCData(const AText: UnicodeString); override;
+    procedure WriteComment(const AText: UnicodeString); override;
+    procedure WriteProcessingInstruction(const AName, AText: UnicodeString); override;
+    procedure WriteEntityRef(const AName: UnicodeString); override;
+    procedure WriteCharEntity(C: WideChar); override;
+    procedure WriteWhitespace(const AWhitespace: UnicodeString); override;
+    procedure WriteString(const AText: UnicodeString); override;
+    procedure WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar); override;
+    procedure WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); override;
+    procedure WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); overload; override;
+    procedure WriteRaw(const AData: UnicodeString); overload; override;
     procedure Close; override;
     procedure Flush; override;
   end;
@@ -475,51 +480,51 @@ type
 
     TElementScope = record
     strict private
-      FLocalName: string;
-      FNamespaceUri: string;
-      FPrefix: string;
+      FLocalName: UnicodeString;
+      FNamespaceUri: UnicodeString;
+      FPrefix: UnicodeString;
       FPrevNSTop: Integer;
-      FXmlLang: string;
+      FXmlLang: UnicodeString;
       FXmlSpace: TACLXMLSpace;
     public
-      procedure &Set(const APrefix, ALocalName, ANamespaceUri: string; APrevNSTop: Integer);
+      procedure &Set(const APrefix, ALocalName, ANamespaceUri: UnicodeString; APrevNSTop: Integer);
       procedure WriteEndElement(ARawWriter: TACLXMLRawWriter);
       procedure WriteFullEndElement(ARawWriter: TACLXMLRawWriter);
 
       property PrevNSTop: Integer read FPrevNSTop;
       property XmlSpace: TACLXMLSpace read FXmlSpace write FXmlSpace;
-      property XmlLang: string read FXmlLang write FXmlLang;
+      property XmlLang: UnicodeString read FXmlLang write FXmlLang;
     end;
 
     TNamespace = record
     strict private
       FKind: TNamespaceKind;
-      FNamespaceUri: string;
-      FPrefix: string;
+      FNamespaceUri: UnicodeString;
+      FPrefix: UnicodeString;
       FPrevNsIndex: Integer;
     public
-      procedure &Set(const APrefix, ANamespaceUri: string; AKind: TNamespaceKind);
+      procedure &Set(const APrefix, ANamespaceUri: UnicodeString; AKind: TNamespaceKind);
       procedure WriteDecl(AWriter: TACLXMLWriter; ARawWriter: TACLXMLRawWriter);
 
-      property NamespaceUri: string read FNamespaceUri;
+      property NamespaceUri: UnicodeString read FNamespaceUri;
       property Kind: TNamespaceKind read FKind write FKind;
-      property Prefix: string read FPrefix;
+      property Prefix: UnicodeString read FPrefix;
       property PrevNsIndex: Integer read FPrevNsIndex write FPrevNsIndex;
     end;
 
     TAttrName = record
     strict private
-      FLocalName: string;
-      FNamespaceUri: string;
-      FPrefix: string;
+      FLocalName: UnicodeString;
+      FNamespaceUri: UnicodeString;
+      FPrefix: UnicodeString;
       FPrev: Integer;
     public
-      procedure &Set(const APrefix, ALocalName, ANamespaceUri: string);
-      function IsDuplicate(const APrefix, ALocalName, ANamespaceUri: string): Boolean;
+      procedure &Set(const APrefix, ALocalName, ANamespaceUri: UnicodeString);
+      function IsDuplicate(const APrefix, ALocalName, ANamespaceUri: UnicodeString): Boolean;
 
-      property LocalName: string read FLocalName;
-      property NamespaceUri: string read FNamespaceUri;
-      property Prefix: string read FPrefix;
+      property LocalName: UnicodeString read FLocalName;
+      property NamespaceUri: UnicodeString read FNamespaceUri;
+      property Prefix: UnicodeString read FPrefix;
       property Prev: Integer read FPrev write FPrev;
     end;
 
@@ -538,59 +543,65 @@ type
         ValueString
       );
 
+      TBufferChunk = record
+        Buffer: TUnicodeCharArray;
+        Index: Integer;
+        Count: Integer;
+        constructor Create(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
+      end;
+
       TItem = class
       strict private
         FType: TItemType;
-        FData: TValue;
+        FData0: WideChar;
+        FData1: UnicodeString;
+        FData2: WideChar;
+        FData3: TBufferChunk;
       public
-        procedure &Set(AType: TItemType; const AData: TValue);
-
-        property Data: TValue read FData write FData;
-        property &Type: TItemType read FType;
+        property AsBufferChunk: TBufferChunk read FData3 write FData3;
+        property AsUnicodeChar: WideChar read FData0 write FData0;
+        property AsUnicodeChar2: WideChar read FData2 write FData2;
+        property AsUnicodeString: UnicodeString read FData1 write FData1;
+        property &Type: TItemType read FType write FType;
       end;
 
-      TBufferChunk = record
-        Buffer: TCharArray;
-        Index: Integer;
-        Count: Integer;
-        constructor Create(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
-      end;
     {$ENDREGION}
     strict private
       FFirstItem: Integer;
       FItems: TArray<TItem>;
       FLastItem: Integer;
-      FSingleStringValue: string;
-      FStringValue: TStringBuilder;
+      FSingleStringValue: UnicodeString;
+      FStringValue: TACLStringBuilder;
 
-      function GetStringValue: string;
+      function GetStringValue: UnicodeString;
     public
       constructor Create;
       destructor Destroy; override;
-      procedure WriteEntityRef(const AName: string);
-      procedure WriteCharEntity(ACh: Char);
-      procedure WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char);
-      procedure WriteWhitespace(const AWs: string);
-      procedure WriteString(const AText: string);
-      procedure WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
-      procedure WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); overload;
-      procedure WriteRaw(const AData: string); overload;
-      procedure WriteValue(const AValue: string);
+      function AddItem(AType: TItemType): TItem;
+
+      procedure WriteEntityRef(const AName: UnicodeString);
+      procedure WriteCharEntity(ACh: WideChar);
+      procedure WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar);
+      procedure WriteWhitespace(const AWs: UnicodeString);
+      procedure WriteString(const AText: UnicodeString);
+      procedure WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
+      procedure WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); overload;
+      procedure WriteRaw(const AData: UnicodeString); overload;
+      procedure WriteValue(const AValue: UnicodeString);
       procedure Replay(AWriter: TACLXMLWriter);
       procedure Trim;
       procedure Clear;
       procedure StartComplexValue;
-      procedure AddItem(AType: TItemType; AData: TValue);
 
-      property StringValue: string read GetStringValue;
+      property StringValue: UnicodeString read GetStringValue;
     end;
 
     TNamespaceResolverProxy = class(TInterfacedObject, IGSXMLNamespaceResolver)
     strict private
       FWfWriter: TACLXMLWellFormedWriter;
 
-      function LookupNamespace(const APrefix: string): string;
-      function LookupPrefix(const ANamespaceName: string): string;
+      function LookupNamespace(const APrefix: UnicodeString): UnicodeString;
+      function LookupPrefix(const ANamespaceName: UnicodeString): UnicodeString;
     public
       constructor Create(AWfWriter: TACLXMLWellFormedWriter);
     end;
@@ -601,16 +612,16 @@ type
     class var FStateToWriteState: TArray<TACLXMLWriteState>;
   strict private
     FAttrCount: Integer;
-    FAttrHashTable: TDictionary<string, Integer>;
+    FAttrHashTable: TACLDictionary<UnicodeString, Integer>;
     FAttrStack: TArray<TAttrName>;
     FAttrValueCache: TAttributeValueCache;
     FCheckCharacters: Boolean;
     FConformanceLevel: TACLXMLConformanceLevel;
-    FCurDeclPrefix: string;
+    FCurDeclPrefix: UnicodeString;
     FCurrentState: TState;
     FElemScopeStack: TArray<TElementScope>;
     FElemTop: Integer;
-    FNsHashTable: TDictionary<string, Integer>;
+    FNsHashTable: TACLDictionary<UnicodeString, Integer>;
     FNsStack: TArray<TNamespace>;
     FNsTop: Integer;
     FOmitDuplNamespaces: Boolean;
@@ -631,56 +642,56 @@ type
     function GetWriteState: TACLXMLWriteState; override;
     function GetSettings: TACLXMLWriterSettings; override;
     function GetXmlSpace: TACLXMLSpace; override;
-    function GetXmlLang: string; override;
+    function GetXmlLang: UnicodeString; override;
     procedure ThrowInvalidStateTransition(AToken: TToken; ACurrentState: TState);
   public
     constructor Create(AWriter: TACLXMLRawWriter; ASettings: TACLXMLWriterSettings);
     destructor Destroy; override;
-    class function DupAttrException(const APrefix, ALocalName: string): EACLXMLException; static;
-    class function InvalidCharsException(const AName: string; ABadCharIndex: Integer): EACLXMLException; static;
+    class function DupAttrException(const APrefix, ALocalName: UnicodeString): EACLXMLException; static;
+    class function InvalidCharsException(const AName: UnicodeString; ABadCharIndex: Integer): EACLXMLException; static;
 
-    procedure AddAttribute(const APrefix, ALocalName, ANamespaceName: string);
-    procedure AddNamespace(const APrefix, ANs: string; AKind: TNamespaceKind);
+    procedure AddAttribute(const APrefix, ALocalName, ANamespaceName: UnicodeString);
+    procedure AddNamespace(const APrefix, ANs: UnicodeString; AKind: TNamespaceKind);
     procedure AddToAttrHashTable(AAttributeIndex: Integer);
     procedure AddToNamespaceHashtable(ANamespaceIndex: Integer);
     procedure AdvanceState(AToken: TToken);
-    procedure CheckNCName(const ANcname: string);
+    procedure CheckNCName(const ANcname: UnicodeString);
     procedure Close; override;
     procedure Flush; override;
-    function GeneratePrefix: string;
-    function LookupLocalNamespace(const APrefix: string): string;
-    function LookupNamespace(const APrefix: string): string;
-    function LookupNamespaceIndex(const APrefix: string): Integer;
-    function LookupPrefix(const ANs: string): string; override;
+    function GeneratePrefix: UnicodeString;
+    function LookupLocalNamespace(const APrefix: UnicodeString): UnicodeString;
+    function LookupNamespace(const APrefix: UnicodeString): UnicodeString;
+    function LookupNamespaceIndex(const APrefix: UnicodeString): Integer;
+    function LookupPrefix(const ANs: UnicodeString): UnicodeString; override;
     procedure PopNamespaces(AIndexFrom: Integer; AIndexTo: Integer);
-    function PushNamespaceExplicit(const APrefix, ANs: string): Boolean;
-    procedure PushNamespaceImplicit(const APrefix, ANs: string);
+    function PushNamespaceExplicit(const APrefix, ANs: UnicodeString): Boolean;
+    procedure PushNamespaceImplicit(const APrefix, ANs: UnicodeString);
     procedure SetSpecialAttribute(ASpecial: TSpecialAttribute);
     procedure StartElementContent;
     procedure StartFragment;
     procedure WriteBinHex(const ABuffer: TBytes; AIndex: Integer; ACount: Integer); override;
-    procedure WriteCData(const AText: string); override;
-    procedure WriteCharEntity(ACh: Char); override;
-    procedure WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); override;
-    procedure WriteComment(const AText: string); override;
+    procedure WriteCData(const AText: UnicodeString); override;
+    procedure WriteCharEntity(ACh: WideChar); override;
+    procedure WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); override;
+    procedure WriteComment(const AText: UnicodeString); override;
     procedure WriteEndAttribute; override;
     procedure WriteEndDocument; override;
     procedure WriteEndElement; override;
-    procedure WriteEntityRef(const AName: string); override;
+    procedure WriteEntityRef(const AName: UnicodeString); override;
     procedure WriteFullEndElement; override;
-    procedure WriteProcessingInstruction(const AName, AText: string); override;
-    procedure WriteQualifiedName(const ALocalName, ANs: string); override;
-    procedure WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer); override;
-    procedure WriteRaw(const AData: string); override;
-    procedure WriteStartAttribute(APrefix: string; ALocalName: string; ANamespaceName: string); override;
+    procedure WriteProcessingInstruction(const AName, AText: UnicodeString); override;
+    procedure WriteQualifiedName(const ALocalName, ANs: UnicodeString); override;
+    procedure WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer); override;
+    procedure WriteRaw(const AData: UnicodeString); override;
+    procedure WriteStartAttribute(APrefix: UnicodeString; ALocalName: UnicodeString; ANamespaceName: UnicodeString); override;
     procedure WriteStartDocument(AStandalone: Boolean); override;
     procedure WriteStartDocument; override;
     procedure WriteStartDocumentImpl(AStandalone: TACLXMLStandalone);
-    procedure WriteStartElement(APrefix: string; const ALocalName: string; ANs: string); override;
-    procedure WriteString(const AText: string); override;
-    procedure WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char); override;
-    procedure WriteValue(const AValue: string); override;
-    procedure WriteWhitespace(const AWs: string); override;
+    procedure WriteStartElement(APrefix: UnicodeString; const ALocalName: UnicodeString; ANs: UnicodeString); override;
+    procedure WriteString(const AText: UnicodeString); override;
+    procedure WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar); override;
+    procedure WriteValue(const AValue: UnicodeString); override;
+    procedure WriteWhitespace(const AWs: UnicodeString); override;
 
     property InnerWriter: TACLXMLRawWriter read FWriter;
     property SaveAttrValue: Boolean read GetSaveAttrValue;
@@ -690,7 +701,7 @@ type
 
 { EACLXMLInvalidSurrogatePairException }
 
-constructor EACLXMLInvalidSurrogatePairException.Create(const ALowChar, AHighChar: Char);
+constructor EACLXMLInvalidSurrogatePairException.Create(const ALowChar, AHighChar: WideChar);
 begin
   CreateFmt(SXmlInvalidSurrogatePair, [TACLFastHex.Encode(ALowChar), TACLFastHex.Encode(AHighChar)]);
 end;
@@ -744,112 +755,112 @@ begin
   Result := nil;
 end;
 
-procedure TACLXMLWriter.WriteStartElement(const ALocalName, ANs: string);
+procedure TACLXMLWriter.WriteStartElement(const ALocalName, ANs: UnicodeString);
 begin
   WriteStartElement('', ALocalName, ANs);
 end;
 
-procedure TACLXMLWriter.WriteStartElement(const ALocalName: string);
+procedure TACLXMLWriter.WriteStartElement(const ALocalName: UnicodeString);
 begin
   WriteStartElement('', ALocalName, '');
 end;
 
-procedure TACLXMLWriter.WriteString(const AText: string);
+procedure TACLXMLWriter.WriteString(const AText: UnicodeString);
 begin
   Write(AText);
 end;
 
 procedure TACLXMLWriter.WriteString(const AText: AnsiString);
 begin
-  WriteString(string(AText));
+  WriteString(UnicodeString(AText));
 end;
 
-procedure TACLXMLWriter.WriteAttributeBoolean(const ALocalName: string; AValue: Boolean);
+procedure TACLXMLWriter.WriteAttributeBoolean(const ALocalName: UnicodeString; AValue: Boolean);
 begin
-  WriteAttributeString(ALocalName, sGSXMLBoolValues[AValue]);
+  WriteAttributeString(ALocalName, sXMLBoolValues[AValue]);
 end;
 
-procedure TACLXMLWriter.WriteAttributeBoolean(const APrefix, ALocalName, ANs: string; AValue: Boolean);
+procedure TACLXMLWriter.WriteAttributeBoolean(const APrefix, ALocalName, ANs: UnicodeString; AValue: Boolean);
 begin
-  WriteAttributeString(APrefix, ALocalName, ANs, sGSXMLBoolValues[AValue]);
+  WriteAttributeString(APrefix, ALocalName, ANs, sXMLBoolValues[AValue]);
 end;
 
-procedure TACLXMLWriter.WriteAttributeFloat(const APrefix, ALocalName, ANs: string; AValue: Single);
+procedure TACLXMLWriter.WriteAttributeFloat(const APrefix, ALocalName, ANs: UnicodeString; AValue: Single);
 begin
-  WriteAttributeString(APrefix, ALocalName, ANs, FloatToStr(AValue, TFormatSettings.Invariant));
+  WriteAttributeString(APrefix, ALocalName, ANs, acFloatToStr(AValue, InvariantFormatSettings));
 end;
 
-procedure TACLXMLWriter.WriteAttributeFloat(const ALocalName: string; AValue: Single);
+procedure TACLXMLWriter.WriteAttributeFloat(const ALocalName: UnicodeString; AValue: Single);
 begin
-  WriteAttributeString(ALocalName, FloatToStr(AValue, TFormatSettings.Invariant));
+  WriteAttributeString(ALocalName, acFloatToStr(AValue, InvariantFormatSettings));
 end;
 
-procedure TACLXMLWriter.WriteAttributeInteger(const ALocalName: string; AValue: Integer);
-begin
-  WriteAttributeString(ALocalName, IntToStr(AValue));
-end;
-
-procedure TACLXMLWriter.WriteAttributeInteger(const APrefix, ALocalName, ANs: string; AValue: Integer);
-begin
-  WriteAttributeString(APrefix, ALocalName, ANs, IntToStr(AValue));
-end;
-
-procedure TACLXMLWriter.WriteAttributeInt64(const ALocalName: string; const AValue: Int64);
+procedure TACLXMLWriter.WriteAttributeInteger(const ALocalName: UnicodeString; AValue: Integer);
 begin
   WriteAttributeString(ALocalName, IntToStr(AValue));
 end;
 
-procedure TACLXMLWriter.WriteAttributeInt64(const APrefix, ALocalName, ANs: string; const AValue: Int64);
+procedure TACLXMLWriter.WriteAttributeInteger(const APrefix, ALocalName, ANs: UnicodeString; AValue: Integer);
 begin
   WriteAttributeString(APrefix, ALocalName, ANs, IntToStr(AValue));
 end;
 
-procedure TACLXMLWriter.WriteAttributeString(const ALocalName, ANs, AValue: string);
+procedure TACLXMLWriter.WriteAttributeInt64(const ALocalName: UnicodeString; const AValue: Int64);
+begin
+  WriteAttributeString(ALocalName, IntToStr(AValue));
+end;
+
+procedure TACLXMLWriter.WriteAttributeInt64(const APrefix, ALocalName, ANs: UnicodeString; const AValue: Int64);
+begin
+  WriteAttributeString(APrefix, ALocalName, ANs, IntToStr(AValue));
+end;
+
+procedure TACLXMLWriter.WriteAttributeString(const ALocalName, ANs, AValue: UnicodeString);
 begin
   WriteStartAttribute('', ALocalName, ANs);
   WriteString(AValue);
   WriteEndAttribute;
 end;
 
-procedure TACLXMLWriter.WriteAttributeString(const ALocalName, AValue: string);
+procedure TACLXMLWriter.WriteAttributeString(const ALocalName, AValue: UnicodeString);
 begin
   WriteStartAttribute('', ALocalName, '');
   WriteString(AValue);
   WriteEndAttribute;
 end;
 
-procedure TACLXMLWriter.WriteAttributeString(const APrefix, ALocalName, ANs, AValue: string);
+procedure TACLXMLWriter.WriteAttributeString(const APrefix, ALocalName, ANs, AValue: UnicodeString);
 begin
   WriteStartAttribute(APrefix, ALocalName, ANs);
   WriteString(AValue);
   WriteEndAttribute;
 end;
 
-procedure TACLXMLWriter.WriteAttributeString(const APrefix, ALocalName, ANs: string; const AValue: AnsiString);
+procedure TACLXMLWriter.WriteAttributeString(const APrefix, ALocalName, ANs: UnicodeString; const AValue: AnsiString);
 begin
   WriteStartAttribute(APrefix, ALocalName, ANs);
   WriteString(AValue);
   WriteEndAttribute;
 end;
 
-procedure TACLXMLWriter.WriteAttributeString(const ALocalName: string; const AValue: AnsiString);
+procedure TACLXMLWriter.WriteAttributeString(const ALocalName: UnicodeString; const AValue: AnsiString);
 begin
   WriteStartAttribute(ALocalName);
   WriteString(AValue);
   WriteEndAttribute;
 end;
 
-procedure TACLXMLWriter.WriteStartAttribute(const ALocalName, ANs: string);
+procedure TACLXMLWriter.WriteStartAttribute(const ALocalName, ANs: UnicodeString);
 begin
   WriteStartAttribute('', ALocalName, ANs);
 end;
 
-procedure TACLXMLWriter.WriteStartAttribute(const ALocalName: string);
+procedure TACLXMLWriter.WriteStartAttribute(const ALocalName: UnicodeString);
 begin
   WriteStartAttribute('', ALocalName, '');
 end;
 
-procedure TACLXMLWriter.WriteStartElement(APrefix: string; const ALocalName: string; ANs: string);
+procedure TACLXMLWriter.WriteStartElement(APrefix: UnicodeString; const ALocalName: UnicodeString; ANs: UnicodeString);
 begin
   if APrefix <> '' then
     Write('<' + APrefix + ':' + ALocalName)
@@ -862,13 +873,17 @@ procedure TACLXMLWriter.WriteBinHex(const ABuffer: TBytes; AIndex: Integer; ACou
 const
   CharsChunkSize = 128;
 var
-  AChars: TCharArray;
+  AChars: TUnicodeCharArray;
   AEndIndex, AChunkSize, ACharCount: Integer;
 begin
   if ACount * 2 < CharsChunkSize then
     ACharCount := ACount * 2
   else
     ACharCount := CharsChunkSize;
+
+{$IFDEF FPC}
+  AChars := nil;
+{$ENDIF}
   SetLength(AChars,  ACharCount);
 
   AEndIndex := AIndex + ACount;
@@ -895,14 +910,14 @@ begin
   Result := TACLXMLSpace.Default;
 end;
 
-function TACLXMLWriter.GetXmlLang: string;
+function TACLXMLWriter.GetXmlLang: UnicodeString;
 begin
   Result := '';
 end;
 
-procedure TACLXMLWriter.WriteQualifiedName(const ALocalName, ANs: string);
+procedure TACLXMLWriter.WriteQualifiedName(const ALocalName, ANs: UnicodeString);
 var
-  APrefix: string;
+  APrefix: UnicodeString;
 begin
   if ANs <> '' then
   begin
@@ -915,18 +930,18 @@ begin
   WriteString(ALocalName);
 end;
 
-procedure TACLXMLWriter.WriteValue(const AValue: string);
+procedure TACLXMLWriter.WriteValue(const AValue: UnicodeString);
 begin
   if AValue <> '' then
     WriteString(AValue);
 end;
 
-procedure TACLXMLWriter.WriteElementString(const ALocalName, AValue: string);
+procedure TACLXMLWriter.WriteElementString(const ALocalName, AValue: UnicodeString);
 begin
   WriteElementString(ALocalName, '', AValue);
 end;
 
-procedure TACLXMLWriter.WriteElementString(const ALocalName, ANs, AValue: string);
+procedure TACLXMLWriter.WriteElementString(const ALocalName, ANs, AValue: UnicodeString);
 begin
   WriteStartElement(ALocalName, ANs);
   if AValue <> '' then
@@ -934,7 +949,7 @@ begin
   WriteEndElement;
 end;
 
-procedure TACLXMLWriter.WriteElementString(const APrefix, ALocalName, ANs, AValue: string);
+procedure TACLXMLWriter.WriteElementString(const APrefix, ALocalName, ANs, AValue: UnicodeString);
 begin
   WriteStartElement(APrefix, ALocalName, ANs);
   if AValue <> '' then
@@ -942,7 +957,7 @@ begin
   WriteEndElement;
 end;
 
-procedure TACLXMLWriter.WriteElementString(const ALocalName: string; const AValue: AnsiString);
+procedure TACLXMLWriter.WriteElementString(const ALocalName: UnicodeString; const AValue: AnsiString);
 begin
   WriteStartElement(ALocalName);
   if AValue <> '' then
@@ -956,7 +971,7 @@ begin
   FAttrEndPos := Stream.Position;
 end;
 
-procedure TACLXMLWriter.Write(const ABuffer: string);
+procedure TACLXMLWriter.Write(const ABuffer: UnicodeString);
 var
   ABytes: TBytes;
   ALength: Integer;
@@ -967,7 +982,7 @@ begin
     Stream.WriteBuffer(ABytes[0], Length(ABytes));
 end;
 
-procedure TACLXMLWriter.Write(const ABuffer: TCharArray; AIndex, ALength: Integer);
+procedure TACLXMLWriter.Write(const ABuffer: TUnicodeCharArray; AIndex, ALength: Integer);
 var
   ABytes: TBytes;
 begin
@@ -979,23 +994,23 @@ end;
 
 { TACLFastHex }
 
-class function TACLFastHex.Encode(B: Byte): string;
+class function TACLFastHex.Encode(B: Byte): UnicodeString;
 begin
   Result := ByteToHexMap[B];
 end;
 
-class function TACLFastHex.Encode(C: Char): string;
+class function TACLFastHex.Encode(C: WideChar): UnicodeString;
 var
   ABuffer: array[0..1] of Cardinal;
 begin
-  Assert(SizeOf(Char) = 2);
+  Assert(SizeOf(WideChar) = 2);
   //# optimized version
   ABuffer[1] := PCardinal(ByteToHexMap[Byte(Ord(C))])^;
   ABuffer[0] := PCardinal(ByteToHexMap[Ord(C) shr 8])^;
-  SetString(Result, PChar(@ABuffer), 4);
+  SetString(Result, PWideChar(@ABuffer), 4);
 end;
 
-class function TACLFastHex.Encode(C: Char; P: PChar): PChar;
+class function TACLFastHex.Encode(C: WideChar; P: PWideChar): PWideChar;
 var
   ABuffer: PCardinal absolute P;
 begin
@@ -1007,7 +1022,7 @@ begin
   Result := P;
 end;
 
-class function TACLFastHex.Encode(const ASource: TBytes; AOffset, ACount: Integer; var ADest: TCharArray): Integer;
+class function TACLFastHex.Encode(const ASource: TBytes; AOffset, ACount: Integer; var ADest: TUnicodeCharArray): Integer;
 var
   AHex: PCardinal;
   P: PByte;
@@ -1047,7 +1062,7 @@ begin
   raise EACLXMLInvalidOperationException.Create(SXmlInvalidOperation);
 end;
 
-procedure TACLXMLRawWriter.WriteEndElement(const APrefix, ALocalName, ANs: string);
+procedure TACLXMLRawWriter.WriteEndElement(const APrefix, ALocalName, ANs: UnicodeString);
 begin
   if ContentPosition <> Stream.Position then
   begin
@@ -1073,72 +1088,84 @@ begin
   raise EACLXMLInvalidOperationException.Create(SXmlInvalidOperation);
 end;
 
-function TACLXMLRawWriter.LookupPrefix(const ANs: string): string;
+function TACLXMLRawWriter.LookupPrefix(const ANs: UnicodeString): UnicodeString;
 begin
+{$IFDEF FPC}
+  Result := EmptyStrU;
+{$ENDIF}
   raise EACLXMLInvalidOperationException.Create(SXmlInvalidOperation);
 end;
 
-function TACLXMLRawWriter.MakeString(const ABuffer: TCharArray; AIndex, ACount: Integer): string;
+function TACLXMLRawWriter.MakeString(const ABuffer: TUnicodeCharArray; AIndex, ACount: Integer): UnicodeString;
 begin
-  SetString(Result, PChar(@ABuffer[AIndex]), ACount);
+  SetString(Result, PWideChar(@ABuffer[AIndex]), ACount);
 end;
 
 function TACLXMLRawWriter.GetWriteState: TACLXMLWriteState;
 begin
+{$IFDEF FPC}
+  Result := TACLXMLWriteState.Closed;
+{$ENDIF}
   raise EACLXMLInvalidOperationException.Create(SXmlInvalidOperation);
 end;
 
 function TACLXMLRawWriter.GetXmlSpace: TACLXMLSpace;
 begin
+{$IFDEF FPC}
+  Result := TACLXMLSpace.None;
+{$ENDIF}
   raise EACLXMLInvalidOperationException.Create(SXmlInvalidOperation);
 end;
 
-function TACLXMLRawWriter.GetXmlLang: string;
+function TACLXMLRawWriter.GetXmlLang: UnicodeString;
+begin
+{$IFDEF FPC}
+  Result := EmptyStrU;
+{$ENDIF}
+  raise EACLXMLInvalidOperationException.Create(SXmlInvalidOperation);
+end;
+
+procedure TACLXMLRawWriter.WriteQualifiedName(const ALocalName, ANs: UnicodeString);
 begin
   raise EACLXMLInvalidOperationException.Create(SXmlInvalidOperation);
 end;
 
-procedure TACLXMLRawWriter.WriteQualifiedName(const ALocalName, ANs: string);
-begin
-  raise EACLXMLInvalidOperationException.Create(SXmlInvalidOperation);
-end;
-
-procedure TACLXMLRawWriter.WriteCData(const AText: string);
+procedure TACLXMLRawWriter.WriteCData(const AText: UnicodeString);
 begin
   WriteString(AText);
 end;
 
-procedure TACLXMLRawWriter.WriteCharEntity(ACh: Char);
+procedure TACLXMLRawWriter.WriteCharEntity(ACh: WideChar);
 begin
   WriteString(ACh);
 end;
 
-procedure TACLXMLRawWriter.WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char);
+procedure TACLXMLRawWriter.WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar);
 begin
   WriteString(ALowChar + AHighChar);
 end;
 
-procedure TACLXMLRawWriter.WriteWhitespace(const AWs: string);
+procedure TACLXMLRawWriter.WriteWhitespace(const AWs: UnicodeString);
 begin
   WriteString(AWs);
 end;
 
-procedure TACLXMLRawWriter.WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
+procedure TACLXMLRawWriter.WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
 begin
   WriteString(MakeString(ABuffer, AIndex, ACount));
 end;
 
-procedure TACLXMLRawWriter.WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
+procedure TACLXMLRawWriter.WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
 begin
   WriteString(MakeString(ABuffer, AIndex, ACount));
 end;
 
-procedure TACLXMLRawWriter.WriteRaw(const AData: string);
+procedure TACLXMLRawWriter.WriteRaw(const AData: UnicodeString);
 begin
   WriteString(AData);
 end;
 
-procedure TACLXMLRawWriter.WriteValue(const AValue: string);
+procedure TACLXMLRawWriter.WriteValue(const AValue: UnicodeString);
 begin
   WriteString(AValue);
 end;
@@ -1165,7 +1192,7 @@ begin
   Write('<?xml version="1.0" encoding="utf-8"?>');
 end;
 
-procedure TACLXMLRawWriter.WriteXmlDeclaration(const AXmldecl: string);
+procedure TACLXMLRawWriter.WriteXmlDeclaration(const AXmldecl: UnicodeString);
 begin
   //# do nothing
 end;
@@ -1175,12 +1202,12 @@ begin
   //# do nothing
 end;
 
-procedure TACLXMLRawWriter.WriteFullEndElement(const APrefix, ALocalName, ANs: string);
+procedure TACLXMLRawWriter.WriteFullEndElement(const APrefix, ALocalName, ANs: UnicodeString);
 begin
   WriteEndElement(APrefix, ALocalName, ANs);
 end;
 
-procedure TACLXMLRawWriter.WriteQualifiedName(const APrefix, ALocalName, ANs: string);
+procedure TACLXMLRawWriter.WriteQualifiedName(const APrefix, ALocalName, ANs: UnicodeString);
 begin
   if APrefix <> '' then
   begin
@@ -1195,7 +1222,7 @@ begin
   Result := False;
 end;
 
-procedure TACLXMLRawWriter.WriteStartNamespaceDeclaration(const APrefix: string);
+procedure TACLXMLRawWriter.WriteStartNamespaceDeclaration(const APrefix: UnicodeString);
 begin
   raise EACLXMLException.Create(SXmlNotSupported);
 end;
@@ -1264,14 +1291,14 @@ begin
 end;
 
 //# Output xml declaration only if user allows it and it was not already output
-procedure TACLXMLEncodedRawTextWriter.WriteXmlDeclaration(const AXmldecl: string);
+procedure TACLXMLEncodedRawTextWriter.WriteXmlDeclaration(const AXmldecl: UnicodeString);
 begin
   if not FOmitXmlDeclaration and not FAutoXmlDeclaration then
     WriteProcessingInstruction('xml', AXmldecl);
 end;
 
 //# Serialize the beginning of an element start tag: "<prefix:localName"
-procedure TACLXMLEncodedRawTextWriter.WriteStartElement(APrefix: string; const ALocalName: string; ANs: string);
+procedure TACLXMLEncodedRawTextWriter.WriteStartElement(APrefix: UnicodeString; const ALocalName: UnicodeString; ANs: UnicodeString);
 begin
   Assert(ALocalName <> '');
   if FNewLineOnNode then
@@ -1309,7 +1336,7 @@ end;
 
 //# Serialize an element end tag: "</prefix:localName>", if content was output.  Otherwise, serialize
 //# the shortcut syntax: " />".
-procedure TACLXMLEncodedRawTextWriter.WriteEndElement(const APrefix, ALocalName, ANs: string);
+procedure TACLXMLEncodedRawTextWriter.WriteEndElement(const APrefix, ALocalName, ANs: UnicodeString);
 begin
   Assert(ALocalName <> '');
   Dec(FNestingLevel);
@@ -1352,7 +1379,7 @@ begin
 end;
 
 //# Serialize a full element end tag: "</prefix:localName>"
-procedure TACLXMLEncodedRawTextWriter.WriteFullEndElement(const APrefix, ALocalName, ANs: string);
+procedure TACLXMLEncodedRawTextWriter.WriteFullEndElement(const APrefix, ALocalName, ANs: UnicodeString);
 begin
   Assert(ALocalName <> '');
   Dec(FNestingLevel);
@@ -1380,7 +1407,7 @@ begin
 end;
 
 //# Serialize an attribute tag using double quotes around the attribute value: 'prefix:localName="'
-procedure TACLXMLEncodedRawTextWriter.WriteStartAttribute(APrefix: string; ALocalName: string; ANs: string);
+procedure TACLXMLEncodedRawTextWriter.WriteStartAttribute(APrefix: UnicodeString; ALocalName: UnicodeString; ANs: UnicodeString);
 begin
   Assert(ALocalName <> '');
 
@@ -1417,7 +1444,7 @@ begin
   FAttrEndPos := FBufPos;
 end;
 
-procedure TACLXMLEncodedRawTextWriter.WriteNamespaceDeclaration(const APrefix, ANamespaceName: string);
+procedure TACLXMLEncodedRawTextWriter.WriteNamespaceDeclaration(const APrefix, ANamespaceName: UnicodeString);
 begin
   WriteStartNamespaceDeclaration(APrefix);
   WriteString(ANamespaceName);
@@ -1429,7 +1456,7 @@ begin
   Result := True;
 end;
 
-procedure TACLXMLEncodedRawTextWriter.WriteStartNamespaceDeclaration(const APrefix: string);
+procedure TACLXMLEncodedRawTextWriter.WriteStartNamespaceDeclaration(const APrefix: UnicodeString);
 begin
   //# VSTFDEVDIV bug #583965: Inconsistency between Silverlight 2 and Dev10 in the way a single xmlns attribute is serialized
   //# Resolved as: Won't fix (breaking change)
@@ -1458,7 +1485,7 @@ begin
 end;
 
 //# Serialize a CData section.  If the "]]>" pattern is found within the text, replace it with "]]><![CDATA[>".
-procedure TACLXMLEncodedRawTextWriter.WriteCData(const AText: string);
+procedure TACLXMLEncodedRawTextWriter.WriteCData(const AText: UnicodeString);
 begin
   Assert(AText <> '');
 
@@ -1505,7 +1532,7 @@ begin
 end;
 
 //# Serialize a comment.
-procedure TACLXMLEncodedRawTextWriter.WriteComment(const AText: string);
+procedure TACLXMLEncodedRawTextWriter.WriteComment(const AText: UnicodeString);
 begin
   Assert(AText <> '');
 
@@ -1529,7 +1556,7 @@ begin
 end;
 
 //# Serialize a processing instruction.
-procedure TACLXMLEncodedRawTextWriter.WriteProcessingInstruction(const AName, AText: string);
+procedure TACLXMLEncodedRawTextWriter.WriteProcessingInstruction(const AName, AText: UnicodeString);
 begin
   Assert(AName <> '');
 
@@ -1553,7 +1580,7 @@ begin
 end;
 
 //# Serialize an entity reference.
-procedure TACLXMLEncodedRawTextWriter.WriteEntityRef(const AName: string);
+procedure TACLXMLEncodedRawTextWriter.WriteEntityRef(const AName: UnicodeString);
 begin
   Assert(AName <> '');
 
@@ -1570,9 +1597,9 @@ begin
 end;
 
 //# Serialize a character entity reference.
-procedure TACLXMLEncodedRawTextWriter.WriteCharEntity(C: Char);
+procedure TACLXMLEncodedRawTextWriter.WriteCharEntity(C: WideChar);
 var
-  AValue: string;
+  AValue: UnicodeString;
 begin
   AValue := TACLFastHex.Encode(C);
 
@@ -1597,14 +1624,14 @@ begin
 end;
 
 //# Serialize a whitespace node.
-procedure TACLXMLEncodedRawTextWriter.WriteWhitespace(const AWhitespace: string);
+procedure TACLXMLEncodedRawTextWriter.WriteWhitespace(const AWhitespace: UnicodeString);
 var
-  AStart, AEnd: PChar;
+  AStart, AEnd: PWideChar;
 begin
   Assert(AWhitespace <> '');
 
-  AStart := PChar(AWhitespace);
-  AEnd := AStart + Length(AWhitespace);
+  AStart := PWideChar(AWhitespace);
+  AEnd := AStart + acStringLength(AWhitespace);
   if FInAttributeValue then
     WriteAttributeTextBlock(AStart, AEnd)
   else
@@ -1612,14 +1639,14 @@ begin
 end;
 
 //# Serialize either attribute or element text using XML rules.
-procedure TACLXMLEncodedRawTextWriter.WriteString(const AText: string);
+procedure TACLXMLEncodedRawTextWriter.WriteString(const AText: UnicodeString);
 var
-  AStart, AEnd: PChar;
+  AStart, AEnd: PWideChar;
 begin
   Assert(AText <> '');
 
-  AStart := PChar(AText);
-  AEnd := AStart + Length(AText);
+  AStart := PWideChar(AText);
+  AEnd := AStart + acStringLength(AText);
   if FInAttributeValue then
     WriteAttributeTextBlock(AStart, AEnd)
   else
@@ -1627,7 +1654,7 @@ begin
 end;
 
 //# Serialize surrogate character entity.
-procedure TACLXMLEncodedRawTextWriter.WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char);
+procedure TACLXMLEncodedRawTextWriter.WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar);
 var
   ASurrogateChar: Integer;
 begin
@@ -1639,16 +1666,16 @@ begin
   Inc(FBufPos);
   FBufChars[FBufPos] := 'x';
   Inc(FBufPos);
-  RawText(TACLFastHex.Encode(Char(ASurrogateChar)));
+  RawText(TACLFastHex.Encode(WideChar(ASurrogateChar)));
   FBufChars[FBufPos] := ';';
   Inc(FBufPos);
   FTextPos := FBufPos;
 end;
 
 //# Serialize either attribute or element text using XML rules. Arguments are validated in the XmlWellformedWriter layer.
-procedure TACLXMLEncodedRawTextWriter.WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
+procedure TACLXMLEncodedRawTextWriter.WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
 var
-  AStart: PChar;
+  AStart: PWideChar;
 begin
   Assert(ABuffer <> nil);
   Assert(AIndex >= 0);
@@ -1662,9 +1689,9 @@ begin
 end;
 
 //# Serialize raw data. Arguments are validated in the XmlWellformedWriter layer
-procedure TACLXMLEncodedRawTextWriter.WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
+procedure TACLXMLEncodedRawTextWriter.WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
 var
-  AStart: PChar;
+  AStart: PWideChar;
 begin
   Assert(ABuffer <> nil);
   Assert(AIndex >= 0);
@@ -1676,14 +1703,14 @@ begin
 end;
 
 //# Serialize raw data.
-procedure TACLXMLEncodedRawTextWriter.WriteRaw(const AData: string);
+procedure TACLXMLEncodedRawTextWriter.WriteRaw(const AData: UnicodeString);
 var
-  AStart, AEnd: PChar;
+  AStart, AEnd: PWideChar;
 begin
   Assert(AData <> '');
 
-  AStart := PChar(AData);
-  AEnd := AStart + Length(AData);
+  AStart := PWideChar(AData);
+  AEnd := AStart + acStringLength(AData);
   WriteRawWithCharChecking(AStart, AEnd);
   FTextPos := FBufPos;
 end;
@@ -1739,10 +1766,10 @@ begin
 end;
 
 //# Serialize text that is part of an attribute value.  The '&', '<', '>', and '"' characters are entitized.
-procedure TACLXMLEncodedRawTextWriter.WriteAttributeTextBlock(ASrc: PChar; ASrcEnd: PChar);
+procedure TACLXMLEncodedRawTextWriter.WriteAttributeTextBlock(ASrc: PWideChar; ASrcEnd: PWideChar);
 var
-  ADstBegin, ADstEnd, ADst: PChar;
-  C: Char;
+  ADstBegin, ADstEnd, ADst: PWideChar;
+  C: WideChar;
 begin
   ADstBegin := @FBufChars[0];
 
@@ -1853,10 +1880,10 @@ begin
 end;
 
 //# Serialize text that is part of element content.  The '&', '<', and '>' characters are entitized.
-procedure TACLXMLEncodedRawTextWriter.WriteElementTextBlock(ASrc: PChar; ASrcEnd: PChar);
+procedure TACLXMLEncodedRawTextWriter.WriteElementTextBlock(ASrc: PWideChar; ASrcEnd: PWideChar);
 var
-  ADst, ADstEnd, ADstBegin: PChar;
-  C: Char;
+  ADst, ADstEnd, ADstBegin: PWideChar;
+  C: WideChar;
 begin
   ADstBegin := @FBufChars[0];
   ADst := ADstBegin + FBufPos;
@@ -1971,20 +1998,20 @@ begin
     RawText(#9);
 end;
 
-procedure TACLXMLEncodedRawTextWriter.RawText(const S: string);
+procedure TACLXMLEncodedRawTextWriter.RawText(const S: UnicodeString);
 var
-  AStart, AEnd: PChar;
+  AStart, AEnd: PWideChar;
 begin
   Assert(S <> '');
-  AStart := PChar(S);
-  AEnd := AStart + Length(S);
+  AStart := PWideChar(S);
+  AEnd := AStart + acStringLength(S);
   RawText(AStart, AEnd);
 end;
 
-procedure TACLXMLEncodedRawTextWriter.RawText(ASrcBegin: PChar; ASrcEnd: PChar);
+procedure TACLXMLEncodedRawTextWriter.RawText(ASrcBegin: PWideChar; ASrcEnd: PWideChar);
 var
-  ADstBegin, ADst, ASrc, ADstEnd: PChar;
-  C: Char;
+  ADstBegin, ADst, ASrc, ADstEnd: PWideChar;
+  C: WideChar;
 begin
   ADstBegin := @FBufChars[0];
   ADst := ADstBegin + FBufPos;
@@ -2039,10 +2066,10 @@ begin
   FBufPos := ADst - ADstBegin;
 end;
 
-procedure TACLXMLEncodedRawTextWriter.WriteRawWithCharChecking(APSrcBegin: PChar; APSrcEnd: PChar);
+procedure TACLXMLEncodedRawTextWriter.WriteRawWithCharChecking(APSrcBegin: PWideChar; APSrcEnd: PWideChar);
 var
-  ADstBegin, ASrc, ADst, ADstEnd: PChar;
-  C: Char;
+  ADstBegin, ASrc, ADst, ADstEnd: PWideChar;
+  C: WideChar;
 begin
   ADstBegin := @FBufChars[0];
   ASrc := APSrcBegin;
@@ -2129,10 +2156,10 @@ begin
   FBufPos := ADst - ADstBegin;
 end;
 
-procedure TACLXMLEncodedRawTextWriter.WriteCommentOrPi(const AText: string; AStopChar: Char);
+procedure TACLXMLEncodedRawTextWriter.WriteCommentOrPi(const AText: UnicodeString; AStopChar: WideChar);
 var
-  ASrcBegin, ADstBegin, ASrc, ASrcEnd, ADst, ADstEnd: PChar;
-  C: Char;
+  ASrcBegin, ADstBegin, ASrc, ASrcEnd, ADst, ADstEnd: PWideChar;
+  C: WideChar;
 begin
   if AText = '' then
   begin
@@ -2141,10 +2168,10 @@ begin
     Exit;
   end;
 
-  ASrcBegin := PChar(AText);
+  ASrcBegin := PWideChar(AText);
   ADstBegin := @FBufChars[0];
   ASrc := ASrcBegin;
-  ASrcEnd := ASrcBegin + Length(AText);
+  ASrcEnd := ASrcBegin + acStringLength(AText);
   ADst := ADstBegin + FBufPos;
   C := #$0000;
   while True do
@@ -2263,10 +2290,10 @@ begin
   FBufPos := ADst - ADstBegin;
 end;
 
-procedure TACLXMLEncodedRawTextWriter.WriteCDataSection(const AText: string);
+procedure TACLXMLEncodedRawTextWriter.WriteCDataSection(const AText: UnicodeString);
 var
-  ASrcBegin, ADstBegin, ASrc, ASrcEnd, ADst, ADstEnd: PChar;
-  C: Char;
+  ASrcBegin, ADstBegin, ASrc, ASrcEnd, ADst, ADstEnd: PWideChar;
+  C: WideChar;
 begin
   if AText = '' then
   begin
@@ -2275,10 +2302,10 @@ begin
     Exit;
   end;
 
-  ASrcBegin := PChar(AText);
+  ASrcBegin := PWideChar(AText);
   ADstBegin := @FBufChars[0];
   ASrc := ASrcBegin;
-  ASrcEnd := ASrcBegin + Length(AText);
+  ASrcEnd := ASrcBegin + acStringLength(AText);
   ADst := ADstBegin + FBufPos;
 
   C := #$000;
@@ -2382,9 +2409,9 @@ begin
   FBufPos := ADst - ADstBegin;
 end;
 
-class function TACLXMLEncodedRawTextWriter.EncodeSurrogate(ASrc: PChar; ASrcEnd: PChar; ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.EncodeSurrogate(ASrc: PWideChar; ASrcEnd: PWideChar; ADst: PWideChar): PWideChar;
 var
-  ACh, ALowChar: Char;
+  ACh, ALowChar: WideChar;
 begin
   ACh := ASrc^;
   Assert(TACLXMLCharType.IsSurrogate(ACh));
@@ -2407,7 +2434,7 @@ begin
   raise EACLXMLArgumentException.CreateFmt(SXmlInvalidHighSurrogateChar, [TACLFastHex.Encode(ACh)]);
 end;
 
-function TACLXMLEncodedRawTextWriter.InvalidXmlChar(ACh: Char; ADst: PChar; AEntitize: Boolean): PChar;
+function TACLXMLEncodedRawTextWriter.InvalidXmlChar(ACh: WideChar; ADst: PWideChar; AEntitize: Boolean): PWideChar;
 begin
   Assert(not TACLXMLCharType.IsWhiteSpace(ACh));
   Assert(not TACLXMLCharType.IsAttributeValueChar(ACh));
@@ -2430,9 +2457,9 @@ begin
   end;
 end;
 
-procedure TACLXMLEncodedRawTextWriter.EncodeChar(var ASrc: PChar; APSrcEnd: PChar; var ADst: PChar);
+procedure TACLXMLEncodedRawTextWriter.EncodeChar(var ASrc: PWideChar; APSrcEnd: PWideChar; var ADst: PWideChar);
 var
-  C: Char;
+  C: WideChar;
 begin
   C := ASrc^;
   if TACLXMLCharType.IsSurrogate(C) then
@@ -2455,9 +2482,9 @@ begin
 end;
 
 //# Write NewLineChars to the specified buffer position and return an updated position.
-function TACLXMLEncodedRawTextWriter.WriteNewLine(ADst: PChar): PChar;
+function TACLXMLEncodedRawTextWriter.WriteNewLine(ADst: PWideChar): PWideChar;
 var
-  ADstBegin: PChar;
+  ADstBegin: PWideChar;
 begin
   ADstBegin := @FBufChars[0];
   FBufPos := ADst - ADstBegin;
@@ -2467,10 +2494,10 @@ begin
 end;
 
 //# Following methods do not check whether pDst is beyond the bufSize because the buffer was allocated with a BufferOverflowSize to accommodate
-//# for the writes of small constant-length string as below.
+//# for the writes of small constant-length UnicodeString as below.
 
 //# Entitize '<' as "&lt;".  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.LtEntity(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.LtEntity(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := '&';
   ADst[1] := 'l';
@@ -2480,7 +2507,7 @@ begin
 end;
 
 //# Entitize '>' as "&gt;".  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.GtEntity(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.GtEntity(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := '&';
   ADst[1] := 'g';
@@ -2490,7 +2517,7 @@ begin
 end;
 
 //# Entitize '&' as "&amp;".  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.AmpEntity(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.AmpEntity(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := '&';
   ADst[1] := 'a';
@@ -2501,7 +2528,7 @@ begin
 end;
 
 //# Entitize '"' as "&quot;".  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.QuoteEntity(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.QuoteEntity(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := '&';
   ADst[1] := 'q';
@@ -2513,7 +2540,7 @@ begin
 end;
 
 //# Entitize '\t' as "&#x9;".  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.TabEntity(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.TabEntity(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := '&';
   ADst[1] := '#';
@@ -2524,7 +2551,7 @@ begin
 end;
 
 //# Entitize 0xa as "&#xA;".  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.LineFeedEntity(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.LineFeedEntity(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := '&';
   ADst[1] := '#';
@@ -2535,7 +2562,7 @@ begin
 end;
 
 //# Entitize 0xd as "&#xD;".  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.CarriageReturnEntity(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.CarriageReturnEntity(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := '&';
   ADst[1] := '#';
@@ -2545,7 +2572,7 @@ begin
   Result := ADst + 5;
 end;
 
-class function TACLXMLEncodedRawTextWriter.CharEntity(ADst: PChar; ACh: Char): PChar;
+class function TACLXMLEncodedRawTextWriter.CharEntity(ADst: PWideChar; ACh: WideChar): PWideChar;
 begin
   //# VCL refactored
   ADst[0] := '&';
@@ -2559,7 +2586,7 @@ begin
 end;
 
 //# https://msdn.microsoft.com/en-us/library/system.xml.xmlconvert.decodename(v=vs.110).aspx
-class function TACLXMLEncodedRawTextWriter.UCS2Entity(ADst: PChar; ACh: Char): PChar;
+class function TACLXMLEncodedRawTextWriter.UCS2Entity(ADst: PWideChar; ACh: WideChar): PWideChar;
 begin
   ADst[0] := '_';
   ADst[1] := 'x';
@@ -2571,7 +2598,7 @@ begin
 end;
 
 //# Write "<![CDATA[" to the specified buffer.  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.RawStartCData(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.RawStartCData(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := '<';
   ADst[1] := '!';
@@ -2586,7 +2613,7 @@ begin
 end;
 
 //# Write "]]>" to the specified buffer.  Return an updated pointer.
-class function TACLXMLEncodedRawTextWriter.RawEndCData(ADst: PChar): PChar;
+class function TACLXMLEncodedRawTextWriter.RawEndCData(ADst: PWideChar): PWideChar;
 begin
   ADst[0] := ']';
   ADst[1] := ']';
@@ -2594,7 +2621,7 @@ begin
   Result := ADst + 3;
 end;
 
-procedure TACLXMLEncodedRawTextWriter.ValidateContentChars(const AChars: string; const APropertyName: string; AAllowOnlyWhitespace: Boolean);
+procedure TACLXMLEncodedRawTextWriter.ValidateContentChars(const AChars: UnicodeString; const APropertyName: UnicodeString; AAllowOnlyWhitespace: Boolean);
 var
   I: Integer;
 begin
@@ -2607,7 +2634,7 @@ begin
   begin
     //# VCL refactored
     I := 1;
-    while I <= Length(AChars) do
+    while I <= acStringLength(AChars) do
     begin
       if not TACLXMLCharType.IsTextChar(AChars[I]) then
       begin
@@ -2620,7 +2647,7 @@ begin
           begin
             if TACLXMLCharType.IsHighSurrogate(AChars[I]) then
             begin
-              if I + 1 <= Length(AChars) then
+              if I + 1 <= acStringLength(AChars) then
               begin
                 if TACLXMLCharType.IsLowSurrogate(AChars[I + 1]) then
                 begin
@@ -2644,13 +2671,13 @@ end;
 
 { TACLXMLWellFormedWriter.TElementScope }
 
-procedure TACLXMLWellFormedWriter.TElementScope.&Set(const APrefix, ALocalName, ANamespaceUri: string; APrevNSTop: Integer);
+procedure TACLXMLWellFormedWriter.TElementScope.&Set(const APrefix, ALocalName, ANamespaceUri: UnicodeString; APrevNSTop: Integer);
 begin
   FPrevNSTop := APrevNSTop;
   FPrefix := APrefix;
   FNamespaceUri := ANamespaceUri;
   FLocalName := ALocalName;
-  FXmlSpace := TACLXMLSpace(-1);
+  FXmlSpace := TACLXMLSpace.Invalid;
   FXmlLang := '';
 end;
 
@@ -2666,7 +2693,7 @@ end;
 
 { TACLXMLWellFormedWriter.TNamespace }
 
-procedure TACLXMLWellFormedWriter.TNamespace.&Set(const APrefix, ANamespaceUri: string; AKind: TNamespaceKind);
+procedure TACLXMLWellFormedWriter.TNamespace.&Set(const APrefix, ANamespaceUri: UnicodeString; AKind: TNamespaceKind);
 begin
   FPrefix := APrefix;
   FNamespaceUri := ANamespaceUri;
@@ -2692,7 +2719,7 @@ end;
 
 { TACLXMLWellFormedWriter.TAttrName }
 
-procedure TACLXMLWellFormedWriter.TAttrName.&Set(const APrefix, ALocalName, ANamespaceUri: string);
+procedure TACLXMLWellFormedWriter.TAttrName.&Set(const APrefix, ALocalName, ANamespaceUri: UnicodeString);
 begin
   FPrefix := APrefix;
   FNamespaceUri := ANamespaceUri;
@@ -2700,22 +2727,14 @@ begin
   FPrev := 0;
 end;
 
-function TACLXMLWellFormedWriter.TAttrName.IsDuplicate(const APrefix, ALocalName, ANamespaceUri: string): Boolean;
+function TACLXMLWellFormedWriter.TAttrName.IsDuplicate(const APrefix, ALocalName, ANamespaceUri: UnicodeString): Boolean;
 begin
   Result := (FLocalName = ALocalName) and ((FPrefix = APrefix) or (FNamespaceUri = ANamespaceUri));
 end;
 
-{ TACLXMLWellFormedWriter.TAttributeValueCache.TItem }
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.TItem.&Set(AType: TItemType; const AData: TValue);
-begin
-  FType := AType;
-  FData := AData;
-end;
-
 { TACLXMLWellFormedWriter.TAttributeValueCache.TBufferChunk }
 
-constructor TACLXMLWellFormedWriter.TAttributeValueCache.TBufferChunk.Create(const ABuffer: TCharArray;
+constructor TACLXMLWellFormedWriter.TAttributeValueCache.TBufferChunk.Create(const ABuffer: TUnicodeCharArray;
   AIndex: Integer; ACount: Integer);
 begin
   Buffer := ABuffer;
@@ -2727,17 +2746,17 @@ end;
 
 constructor TACLXMLWellFormedWriter.TAttributeValueCache.Create;
 begin
-  FStringValue := TStringBuilder.Create;
+  FStringValue := TACLStringBuilder.Create;
   FLastItem := -1;
 end;
 
 destructor TACLXMLWellFormedWriter.TAttributeValueCache.Destroy;
 begin
-  FStringValue.Free;
+  FreeAndNil(FStringValue);
   inherited Destroy;
 end;
 
-function TACLXMLWellFormedWriter.TAttributeValueCache.GetStringValue: string;
+function TACLXMLWellFormedWriter.TAttributeValueCache.GetStringValue: UnicodeString;
 begin
   if FSingleStringValue <> '' then
     Result := FSingleStringValue
@@ -2745,7 +2764,7 @@ begin
     Result := FStringValue.ToString;
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteEntityRef(const AName: string);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteEntityRef(const AName: UnicodeString);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue;
@@ -2767,35 +2786,40 @@ begin
     FStringValue.Append(';');
   end;
 
-  AddItem(TItemType.EntityRef, AName);
+  AddItem(TItemType.EntityRef).AsUnicodeString := AName;
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteCharEntity(ACh: Char);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteCharEntity(ACh: WideChar);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue;
   FStringValue.Append(ACh);
-  AddItem(TItemType.CharEntity, TValue.From<Char>(ACh));
+  AddItem(TItemType.CharEntity).AsUnicodeChar := ACh;
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue;
   FStringValue.Append(AHighChar);
   FStringValue.Append(ALowChar);
-  AddItem(TItemType.SurrogateCharEntity, ALowChar + AHighChar);
+
+  with AddItem(TItemType.CharEntity) do
+  begin
+    AsUnicodeChar := ALowChar;
+    AsUnicodeChar2 := AHighChar;
+  end;
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteWhitespace(const AWs: string);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteWhitespace(const AWs: UnicodeString);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue;
   FStringValue.Append(AWs);
-  AddItem(TItemType.Whitespace, AWs);
+  AddItem(TItemType.Whitespace).AsUnicodeString := AWs;
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteString(const AText: string);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteString(const AText: UnicodeString);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue
@@ -2809,47 +2833,46 @@ begin
   end;
 
   FStringValue.Append(AText);
-  AddItem(TItemType.String, AText);
+  AddItem(TItemType.&String).AsUnicodeString := AText;
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue;
   FStringValue.Append(ABuffer, AIndex, ACount);
-  AddItem(TItemType.StringChars, TValue.From<TBufferChunk>(TBufferChunk.Create(ABuffer, AIndex, ACount)));
+  AddItem(TItemType.StringChars).AsBufferChunk := TBufferChunk.Create(ABuffer, AIndex, ACount);
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue;
   FStringValue.Append(ABuffer, AIndex, ACount);
-  AddItem(TItemType.RawChars, TValue.From<TBufferChunk>(TBufferChunk.Create(ABuffer, AIndex, ACount)));
+  AddItem(TItemType.RawChars).AsBufferChunk := TBufferChunk.Create(ABuffer, AIndex, ACount);
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteRaw(const AData: string);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteRaw(const AData: UnicodeString);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue;
   FStringValue.Append(AData);
-  AddItem(TItemType.Raw, AData);
+  AddItem(TItemType.Raw).AsUnicodeString := AData;
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteValue(const AValue: string);
+procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteValue(const AValue: UnicodeString);
 begin
   if FSingleStringValue <> '' then
     StartComplexValue;
   FStringValue.Append(AValue);
-  AddItem(TItemType.ValueString, AValue);
+  AddItem(TItemType.ValueString).AsUnicodeString := AValue;
 end;
 
 procedure TACLXMLWellFormedWriter.TAttributeValueCache.Replay(AWriter: TACLXMLWriter);
 var
   ABufChunk: TBufferChunk;
-  I: Integer;
   AItem: TItem;
-  AChars: TCharArray;
+  I: Integer;
 begin
   if FSingleStringValue <> '' then
   begin
@@ -2862,41 +2885,40 @@ begin
     AItem := FItems[I];
     case AItem.&Type of
       TItemType.EntityRef:
-        AWriter.WriteEntityRef(AItem.Data.AsString);
+        AWriter.WriteEntityRef(AItem.AsUnicodeString);
       TItemType.CharEntity:
-        AWriter.WriteCharEntity(AItem.Data.AsType<Char>);
+        AWriter.WriteCharEntity(AItem.AsUnicodeChar);
       TItemType.SurrogateCharEntity:
-        begin
-          AChars := AItem.Data.AsType<TCharArray>;
-          AWriter.WriteSurrogateCharEntity(AChars[0], AChars[1]);
-        end;
+        AWriter.WriteSurrogateCharEntity(AItem.AsUnicodeChar, AItem.AsUnicodeChar2);
       TItemType.Whitespace:
-        AWriter.WriteWhitespace(AItem.Data.AsString);
-      TItemType.String:
-        AWriter.WriteString(AItem.Data.AsString);
+        AWriter.WriteWhitespace(AItem.AsUnicodeString);
+      TItemType.&String:
+        AWriter.WriteString(AItem.AsUnicodeString);
       TItemType.StringChars:
         begin
-          ABufChunk := AItem.Data.AsType<TBufferChunk>;
+          ABufChunk := AItem.AsBufferChunk;
           AWriter.WriteChars(ABufChunk.Buffer, ABufChunk.Index, ABufChunk.Count);
         end;
       TItemType.Raw:
-        AWriter.WriteRaw(AItem.Data.AsString);
+        AWriter.WriteRaw(AItem.AsUnicodeString);
       TItemType.RawChars:
         begin
-          ABufChunk := AItem.Data.AsType<TBufferChunk>;
+          ABufChunk := AItem.AsBufferChunk;
           AWriter.WriteChars(ABufChunk.Buffer, ABufChunk.Index, ABufChunk.Count);
         end;
       TItemType.ValueString:
-        AWriter.WriteValue(AItem.Data.AsString);
-      else
-        Assert(False, 'Unexpected ItemType value.');
+        AWriter.WriteValue(AItem.AsUnicodeString);
+    {$IFNDEF FPC}
+    else
+      Assert(False, 'Unexpected ItemType value.');
+    {$ENDIF}
     end;
   end;
 end;
 
 procedure TACLXMLWellFormedWriter.TAttributeValueCache.Trim;
 var
-  AValBefore, AValAfter: string;
+  AValBefore, AValAfter: UnicodeString;
   I, AEndIndex: Integer;
   AItem: TItem;
   ABufChunk: TBufferChunk;
@@ -2912,7 +2934,7 @@ begin
   if AValBefore <> AValAfter then
   begin
     FStringValue.Free;
-    FStringValue := TStringBuilder.Create(AValAfter);
+    FStringValue := TACLStringBuilder.Create(AValAfter);
   end;
 
   I := FFirstItem;
@@ -2922,28 +2944,30 @@ begin
     case AItem.&Type of
       TItemType.Whitespace:
         Inc(FFirstItem);
-      TItemType.String,
+      TItemType.&String,
       TItemType.Raw,
       TItemType.ValueString:
         begin
-          AItem.Data := SysUtils.TrimLeft(AItem.Data.AsString); //# XmlConvert.TrimStringStart(string(AItem.data));
-          if AItem.Data.AsString = '' then
+          AItem.AsUnicodeString := SysUtils.TrimLeft(AItem.AsUnicodeString); //# XmlConvert.TrimStringStart(UnicodeString(AItem.data));
+          if AItem.AsUnicodeString = '' then
             Inc(FFirstItem);
         end;
       TItemType.StringChars,
       TItemType.RawChars:
         begin
-          ABufChunk := AItem.Data.AsType<TBufferChunk>;      //# 1. make local copy of struct AItem.Data (in .net class)
+          ABufChunk := AItem.AsBufferChunk;      //# 1. make local copy of struct AItem.Data (in .net class)
           AEndIndex := ABufChunk.Index + ABufChunk.Count;
           while (ABufChunk.Index < AEndIndex) and TACLXMLCharType.IsWhiteSpace(ABufChunk.Buffer[ABufChunk.Index]) do
           begin
             Inc(ABufChunk.Index);
             Dec(ABufChunk.Count);
           end;
-          AItem.Data := TValue.From<TBufferChunk>(ABufChunk); //# 2. update AItem.Data with modified data
+          AItem.AsBufferChunk := ABufChunk; //# 2. update AItem.Data with modified data
           if ABufChunk.Index = AEndIndex then
             Inc(FFirstItem); //# no characters left -> move the firstItem index to exclude it from the Replay
         end;
+    else
+      // do nothing, but to make FPC happy
     end;
     Inc(I);
   end;
@@ -2955,24 +2979,26 @@ begin
     case AItem.&Type of
       TItemType.Whitespace:
         Dec(FLastItem);
-      TItemType.String,
+      TItemType.&String,
       TItemType.Raw,
       TItemType.ValueString:
         begin
-          AItem.Data := SysUtils.TrimRight(AItem.Data.AsString); //# XmlConvert.TrimStringEnd(string(AItem.data));
-          if AItem.Data.AsString = '' then
+          AItem.AsUnicodeString := SysUtils.TrimRight(AItem.AsUnicodeString); //# XmlConvert.TrimStringEnd(UnicodeString(AItem.data));
+          if AItem.AsUnicodeString = '' then
             Dec(FLastItem);
         end;
       TItemType.StringChars,
       TItemType.RawChars:
         begin
-          ABufChunk := AItem.Data.AsType<TBufferChunk>;       //# 1. make local copy of struct AItem.Data (in .net class)
+          ABufChunk := AItem.AsBufferChunk;       //# 1. make local copy of struct AItem.Data (in .net class)
           while (ABufChunk.Count > 0) and TACLXMLCharType.IsWhiteSpace(ABufChunk.Buffer[ABufChunk.Index + ABufChunk.Count - 1]) do
             Dec(ABufChunk.Count);
-          AItem.Data := TValue.From<TBufferChunk>(ABufChunk); //# 2. update AItem.Data with modified data
+          AItem.AsBufferChunk := ABufChunk; //# 2. update AItem.Data with modified data
           if ABufChunk.Count = 0 then
             Dec(FLastItem); //# no characters left -> move the lastItem index to exclude it from the Replay
         end;
+    else
+      // do nothing, but to make FPC happy
     end;
     Dec(I);
   end;
@@ -2992,12 +3018,12 @@ begin
   Assert(FLastItem = -1);
 
   FStringValue.Append(FSingleStringValue);
-  AddItem(TItemType.String, FSingleStringValue);
+  AddItem(TItemType.&String).AsUnicodeString := FSingleStringValue;
 
   FSingleStringValue := '';
 end;
 
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.AddItem(AType: TItemType; AData: TValue);
+function TACLXMLWellFormedWriter.TAttributeValueCache.AddItem(AType: TItemType): TItem;
 var
   ANewItemIndex: Integer;
 begin
@@ -3011,7 +3037,8 @@ begin
   if FItems[ANewItemIndex] = nil then
     FItems[ANewItemIndex] := TItem.Create;
 
-  FItems[ANewItemIndex].&Set(AType, AData);
+  Result := FItems[ANewItemIndex];
+  Result.&Type := AType;
   FLastItem := ANewItemIndex;
 end;
 
@@ -3022,12 +3049,12 @@ begin
   FWfWriter := AWfWriter;
 end;
 
-function TACLXMLWellFormedWriter.TNamespaceResolverProxy.LookupNamespace(const APrefix: string): string;
+function TACLXMLWellFormedWriter.TNamespaceResolverProxy.LookupNamespace(const APrefix: UnicodeString): UnicodeString;
 begin
   Result := FWfWriter.LookupNamespace(APrefix);
 end;
 
-function TACLXMLWellFormedWriter.TNamespaceResolverProxy.LookupPrefix(const ANamespaceName: string): string;
+function TACLXMLWellFormedWriter.TNamespaceResolverProxy.LookupPrefix(const ANamespaceName: UnicodeString): UnicodeString;
 begin
   Result := FWfWriter.LookupPrefix(ANamespaceName);
 end;
@@ -3036,7 +3063,7 @@ end;
 
 constructor TACLXMLWellFormedWriter.Create(AWriter: TACLXMLRawWriter; ASettings: TACLXMLWriterSettings);
 var
-  ADefaultNs: string;
+  ADefaultNs: UnicodeString;
 begin
   FSpecAttr := TSpecialAttribute.No;
 
@@ -3203,7 +3230,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteStartElement(APrefix: string; const ALocalName: string; ANs: string);
+procedure TACLXMLWellFormedWriter.WriteStartElement(APrefix: UnicodeString; const ALocalName: UnicodeString; ANs: UnicodeString);
 var
   ATop: Integer;
 begin
@@ -3234,7 +3261,7 @@ begin
       ANs := LookupNamespace(APrefix);
       if ANs = '' then
       begin
-        Assert(Length(APrefix) = 0);
+        Assert(acStringLength(APrefix) = 0);
         ANs := '';
       end;
     end;
@@ -3330,11 +3357,11 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteStartAttribute(APrefix: string; ALocalName: string; ANamespaceName: string);
+procedure TACLXMLWellFormedWriter.WriteStartAttribute(APrefix: UnicodeString; ALocalName: UnicodeString; ANamespaceName: UnicodeString);
 label
   SkipPushAndWrite;
 var
-  ADefinedNs: string;
+  ADefinedNs: UnicodeString;
 begin
   try
     if ALocalName = '' then
@@ -3445,7 +3472,7 @@ end;
 
 procedure TACLXMLWellFormedWriter.WriteEndAttribute;
 var
-  AValue: string;
+  AValue: UnicodeString;
 begin
   try
     AdvanceState(TToken.EndAttribute);
@@ -3516,6 +3543,8 @@ begin
             FAttrValueCache.Replay(FWriter);
             FWriter.WriteEndAttribute;
           end;
+      else
+        // FPC
       end;
       FSpecAttr := TSpecialAttribute.No;
       FAttrValueCache.Clear;
@@ -3528,7 +3557,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteCData(const AText: string);
+procedure TACLXMLWellFormedWriter.WriteCData(const AText: UnicodeString);
 begin
   try
     AdvanceState(TToken.CData);
@@ -3539,7 +3568,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteComment(const AText: string);
+procedure TACLXMLWellFormedWriter.WriteComment(const AText: UnicodeString);
 begin
   try
     AdvanceState(TToken.Comment);
@@ -3550,7 +3579,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteProcessingInstruction(const AName, AText: string);
+procedure TACLXMLWellFormedWriter.WriteProcessingInstruction(const AName, AText: UnicodeString);
 begin
   try
     if AName = '' then
@@ -3558,7 +3587,7 @@ begin
 
     CheckNCName(AName);
 
-    if (Length(AName) = 3) and SameText(AName, 'xml') then
+    if (acStringLength(AName) = 3) and acSameText(AName, _U('xml')) then
     begin
       if FCurrentState <> TStates.Start then
         if FConformanceLevel = TACLXMLConformanceLevel.Document then
@@ -3582,7 +3611,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteEntityRef(const AName: string);
+procedure TACLXMLWellFormedWriter.WriteEntityRef(const AName: UnicodeString);
 begin
   try
     if AName = '' then
@@ -3601,7 +3630,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteCharEntity(ACh: Char);
+procedure TACLXMLWellFormedWriter.WriteCharEntity(ACh: WideChar);
 begin
   try
     if ACh.IsSurrogate then
@@ -3617,10 +3646,10 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char);
+procedure TACLXMLWellFormedWriter.WriteSurrogateCharEntity(ALowChar: WideChar; AHighChar: WideChar);
 begin
   try
-    if not Char.IsSurrogatePair(AHighChar, ALowChar) then
+    if not WideChar.IsSurrogatePair(AHighChar, ALowChar) then
       raise EACLXMLInvalidSurrogatePairException.Create(ALowChar, AHighChar);
 
     AdvanceState(TToken.Text);
@@ -3634,7 +3663,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteWhitespace(const AWs: string);
+procedure TACLXMLWellFormedWriter.WriteWhitespace(const AWs: UnicodeString);
 begin
   try
     if not TACLXMLCharType.IsOnlyWhitespace(AWs) then
@@ -3651,7 +3680,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteString(const AText: string);
+procedure TACLXMLWellFormedWriter.WriteString(const AText: UnicodeString);
 begin
   try
     if AText = '' then
@@ -3668,7 +3697,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
+procedure TACLXMLWellFormedWriter.WriteChars(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
 begin
   try
     if ABuffer = nil then
@@ -3694,7 +3723,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
+procedure TACLXMLWellFormedWriter.WriteRaw(const ABuffer: TUnicodeCharArray; AIndex: Integer; ACount: Integer);
 begin
   try
     if ABuffer = nil then
@@ -3720,7 +3749,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteRaw(const AData: string);
+procedure TACLXMLWellFormedWriter.WriteRaw(const AData: UnicodeString);
 begin
   try
     if AData = '' then
@@ -3802,10 +3831,10 @@ begin
   end;
 end;
 
-function TACLXMLWellFormedWriter.LookupPrefix(const ANs: string): string;
+function TACLXMLWellFormedWriter.LookupPrefix(const ANs: UnicodeString): UnicodeString;
 var
   I: Integer;
-  APrefix: string;
+  APrefix: UnicodeString;
 begin
   try
     if ANs = '' then
@@ -3842,13 +3871,13 @@ var
   I: Integer;
 begin
   I := FElemTop;
-  while (I >= 0) and (FElemScopeStack[I].XmlSpace = TACLXMLSpace(-1)) do
+  while (I >= 0) and (FElemScopeStack[I].XmlSpace = TACLXMLSpace.Invalid) do
     Dec(I);
   Assert(I >= 0);
   Result := FElemScopeStack[I].XmlSpace;
 end;
 
-function TACLXMLWellFormedWriter.GetXmlLang: string;
+function TACLXMLWellFormedWriter.GetXmlLang: UnicodeString;
 var
   I: Integer;
 begin
@@ -3861,7 +3890,7 @@ end;
 
 procedure TACLXMLWellFormedWriter.ThrowInvalidStateTransition(AToken: TToken; ACurrentState: TState);
 var
-  AWrongTokenMessage: string;
+  AWrongTokenMessage: UnicodeString;
 begin
   AWrongTokenMessage := Format(SXmlWrongToken, [Ord(AToken), Ord(ACurrentState)]);
   case ACurrentState of
@@ -3872,9 +3901,9 @@ begin
   raise EACLXMLInvalidOperationException.Create(AWrongTokenMessage);
 end;
 
-procedure TACLXMLWellFormedWriter.WriteQualifiedName(const ALocalName, ANs: string);
+procedure TACLXMLWellFormedWriter.WriteQualifiedName(const ALocalName, ANs: UnicodeString);
 var
-  APrefix: string;
+  APrefix: UnicodeString;
 begin
   try
     if ALocalName = '' then
@@ -3914,7 +3943,7 @@ begin
   end;
 end;
 
-procedure TACLXMLWellFormedWriter.WriteValue(const AValue: string);
+procedure TACLXMLWellFormedWriter.WriteValue(const AValue: UnicodeString);
 begin
   try
     if AValue = '' then
@@ -4002,11 +4031,11 @@ begin
 end;
 
 //# PushNamespaceImplicit is called when a prefix/namespace pair is used in an element name, attribute name or some other qualified name.
-procedure TACLXMLWellFormedWriter.PushNamespaceImplicit(const APrefix, ANs: string);
+procedure TACLXMLWellFormedWriter.PushNamespaceImplicit(const APrefix, ANs: UnicodeString);
 var
   AKind: TNamespaceKind;
   AExistingNsIndex: Integer;
-  ADefinedNs: string;
+  ADefinedNs: UnicodeString;
 begin
   //# See if the prefix is already defined
   AExistingNsIndex := LookupNamespaceIndex(APrefix);
@@ -4077,12 +4106,12 @@ end;
 
 //# PushNamespaceExplicit is called when a namespace declaration is written out;
 //# It returs true if the namespace declaration should we written out, false if it should be omited (if OmitDuplicateNamespaceDeclarations is true)
-function TACLXMLWellFormedWriter.PushNamespaceExplicit(const APrefix, ANs: string): Boolean;
+function TACLXMLWellFormedWriter.PushNamespaceExplicit(const APrefix, ANs: UnicodeString): Boolean;
 var
   AWriteItOut: Boolean;
   AExistingNsIndex: Integer;
   AExistingNsKind: TNamespaceKind;
-  ADefinedNs: string;
+  ADefinedNs: UnicodeString;
 begin
   AWriteItOut := True;
   //# See if the prefix is already defined
@@ -4150,7 +4179,7 @@ begin
   Result := AWriteItOut;
 end;
 
-procedure TACLXMLWellFormedWriter.AddNamespace(const APrefix, ANs: string; AKind: TNamespaceKind);
+procedure TACLXMLWellFormedWriter.AddNamespace(const APrefix, ANs: UnicodeString; AKind: TNamespaceKind);
 var
   ATop, I: Integer;
 begin
@@ -4167,7 +4196,7 @@ begin
     if FNsTop = MaxNamespacesWalkCount then
     begin
       FNsHashTable.Free;
-      FNsHashTable := TDictionary<string, Integer>.Create;
+      FNsHashTable := TACLDictionary<UnicodeString, Integer>.Create;
       for I := 0 to FNsTop do
         AddToNamespaceHashtable(I);
       FUseNsHashTable := True;
@@ -4176,7 +4205,7 @@ end;
 
 procedure TACLXMLWellFormedWriter.AddToNamespaceHashtable(ANamespaceIndex: Integer);
 var
-  APrefix: string;
+  APrefix: UnicodeString;
   AExistingNsIndex: Integer;
 begin
   APrefix := FNsStack[ANamespaceIndex].Prefix;
@@ -4185,7 +4214,7 @@ begin
   FNsHashTable.AddOrSetValue(APrefix, ANamespaceIndex);
 end;
 
-function TACLXMLWellFormedWriter.LookupNamespaceIndex(const APrefix: string): Integer;
+function TACLXMLWellFormedWriter.LookupNamespaceIndex(const APrefix: UnicodeString): Integer;
 var
   AIndex, I: Integer;
 begin
@@ -4219,11 +4248,11 @@ begin
   end;
 end;
 
-class function TACLXMLWellFormedWriter.DupAttrException(const APrefix, ALocalName: string): EACLXMLException;
+class function TACLXMLWellFormedWriter.DupAttrException(const APrefix, ALocalName: UnicodeString): EACLXMLException;
 var
-  ASb: TStringBuilder;
+  ASb: TACLStringBuilder;
 begin
-  ASb := TStringBuilder.Create;
+  ASb := TACLStringBuilder.Create;
   try
     if APrefix <> '' then
     begin
@@ -4366,7 +4395,7 @@ begin
   FWriter.StartElementContent;
 end;
 
-function TACLXMLWellFormedWriter.LookupNamespace(const APrefix: string): string;
+function TACLXMLWellFormedWriter.LookupNamespace(const APrefix: UnicodeString): UnicodeString;
 var
   I: Integer;
 begin
@@ -4381,7 +4410,7 @@ begin
     Result := '';
 end;
 
-function TACLXMLWellFormedWriter.LookupLocalNamespace(const APrefix: string): string;
+function TACLXMLWellFormedWriter.LookupLocalNamespace(const APrefix: UnicodeString): UnicodeString;
 var
   I: Integer;
 begin
@@ -4391,35 +4420,35 @@ begin
   Result := '';
 end;
 
-function TACLXMLWellFormedWriter.GeneratePrefix: string;
+function TACLXMLWellFormedWriter.GeneratePrefix: UnicodeString;
 var
-  AGenPrefix, S: string;
+  AGenPrefix, S: UnicodeString;
   I: Integer;
 begin
-  AGenPrefix := 'p' + IntToStr(FNsTop - 2);
+  AGenPrefix := 'p' + acIntToStr(FNsTop - 2);
   if LookupNamespace(AGenPrefix) = '' then
     Exit(AGenPrefix);
 
   I := 0;
   repeat
-    S := AGenPrefix + IntToStr(I);
+    S := AGenPrefix + acIntToStr(I);
     Inc(I);
   until not (LookupNamespace(S) <> '');
   Result := S;
 end;
 
-procedure TACLXMLWellFormedWriter.CheckNCName(const ANcname: string);
+procedure TACLXMLWellFormedWriter.CheckNCName(const ANcname: UnicodeString);
 var
   ALen: Integer;
-  P, AStart: PChar;
+  P, AStart: PWideChar;
 begin
   Assert(ANcname <> '');
-  AStart := PChar(ANcname);
+  AStart := PWideChar(ANcname);
   if (TACLXMLCharType.CharProperties[AStart^] and TACLXMLCharType.NCStartNameSC) = 0 then
     raise InvalidCharsException(ANcname, 0);
 
   P := AStart + 1;
-  ALen := Length(ANcname) - 1;
+  ALen := acStringLength(ANcname) - 1;
   while ALen > 0 do
   begin
     if (TACLXMLCharType.CharProperties[P^] and TACLXMLCharType.NCNameSC) <> 0 then
@@ -4430,7 +4459,7 @@ begin
   end;
 end;
 
-class function TACLXMLWellFormedWriter.InvalidCharsException(const AName: string; ABadCharIndex: Integer): EACLXMLException;
+class function TACLXMLWellFormedWriter.InvalidCharsException(const AName: UnicodeString; ABadCharIndex: Integer): EACLXMLException;
 begin
   Result := EACLXMLException.CreateFmt(SXmlInvalidNameCharsDetail, [AName, ABadCharIndex, TACLFastHex.Encode(AName[ABadCharIndex + 1])]);
 end;
@@ -4440,7 +4469,7 @@ begin
   Result := FCurrentState >= TStates.Closed;
 end;
 
-procedure TACLXMLWellFormedWriter.AddAttribute(const APrefix, ALocalName, ANamespaceName: string);
+procedure TACLXMLWellFormedWriter.AddAttribute(const APrefix, ALocalName, ANamespaceName: UnicodeString);
 var
   I, ATop, APrev: Integer;
 begin
@@ -4461,7 +4490,7 @@ begin
     if FAttrCount = MaxAttrDuplWalkCount then
     begin
       if FAttrHashTable = nil then
-        FAttrHashTable := TDictionary<string, Integer>.Create;
+        FAttrHashTable := TACLDictionary<UnicodeString, Integer>.Create;
       Assert(FAttrHashTable.Count = 0);
       for I := 0 to ATop - 1 do
         AddToAttrHashTable(I);
@@ -4481,7 +4510,7 @@ end;
 
 procedure TACLXMLWellFormedWriter.AddToAttrHashTable(AAttributeIndex: Integer);
 var
-  ALocalName: string;
+  ALocalName: UnicodeString;
   ACount, APrev: Integer;
 begin
   ALocalName := FAttrStack[AAttributeIndex].LocalName;

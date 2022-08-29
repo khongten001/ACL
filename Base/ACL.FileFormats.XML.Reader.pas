@@ -11,11 +11,11 @@
 
 unit ACL.FileFormats.XML.Reader;
 
-{$I ACL.Config.inc}
-{$SCOPEDENUMS ON}
-
 // Ported from .NET platform:
 // https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
+
+{$I ACL.Config.inc}
+{$SCOPEDENUMS ON}
 
 interface
 
@@ -25,7 +25,9 @@ uses
   SysUtils,
   Generics.Defaults,
   Generics.Collections,
+  // ACL
   ACL.Classes,
+  ACL.Classes.Collections,
   ACL.FileFormats.XML.Types,
   ACL.Utils.Common,
   ACL.Utils.Strings;
@@ -78,25 +80,25 @@ type
     PItem = ^TItem;
     TItem = record
       Hash: Cardinal;
-      Value: string;
+      Value: UnicodeString;
       Next: PItem;
 
-      function Compare(const AKey: TCharArray; AStart, ALength: Integer): Boolean;
+      function Compare(const AKey: TUnicodeCharArray; AStart, ALength: Integer): Boolean;
     end;
     TTable = array[0..TableSize] of PItem;
   {$ENDREGION}
   strict private
     FTable: TTable;
 
-    function Hash(const S: string): Cardinal; overload; inline;
-    function Hash(P: PChar; L: Integer): Cardinal; overload; inline;
-    function NewItem(const S: string; AHash: Cardinal): PItem; overload; inline;
-    function NewItem(const AKey: TCharArray; AStart, ALength: Integer; AHash: Cardinal): PItem; overload; inline;
+    function Hash(const S: UnicodeString): Cardinal; overload; inline;
+    function Hash(P: PWideChar; L: Integer): Cardinal; overload; inline;
+    function NewItem(const S: UnicodeString; AHash: Cardinal): PItem; overload; inline;
+    function NewItem(const AKey: TUnicodeCharArray; AStart, ALength: Integer; AHash: Cardinal): PItem; overload; inline;
   public
     destructor Destroy; override;
-    function Add(const AKey: string): string; overload;
-    function Add(const AKey: TCharArray; AStart, ALength: Integer): string; overload;
-    function Get(const AValue: string): string; overload;
+    function Add(const AKey: UnicodeString): UnicodeString; overload;
+    function Add(const AKey: TUnicodeCharArray; AStart, ALength: Integer): UnicodeString; overload;
+    function Get(const AValue: UnicodeString): UnicodeString; overload;
   end;
 
   { TACLXMLReaderSettings }
@@ -164,53 +166,53 @@ type
   protected
     class function CalcBufferSize(AInput: TStream): Integer; static;
 
-    function GetActualValue: string;
+    function GetActualValue: UnicodeString;
     function GetDepth: Integer; virtual; abstract;
     function GetHasValue: Boolean; virtual;
-    function GetLocalName: string; virtual; abstract;
-    function GetName: string; virtual;
-    function GetNamespaceURI: string; virtual; abstract;
+    function GetLocalName: UnicodeString; virtual; abstract;
+    function GetName: UnicodeString; virtual;
+    function GetNamespaceURI: UnicodeString; virtual; abstract;
     function GetNameTable: TACLXMLNameTable; virtual; abstract;
     function GetNodeType: TACLXMLNodeType; virtual; abstract;
-    function GetPrefix: string; virtual; abstract;
+    function GetPrefix: UnicodeString; virtual; abstract;
     function GetSettings: TACLXMLReaderSettings; virtual;
-    function GetValue: string; virtual; abstract;
+    function GetValue: UnicodeString; virtual; abstract;
     function GetXmlSpace: TACLXMLSpace; virtual;
 
     property NameTable: TACLXMLNameTable read GetNameTable;
   public
     function Read: Boolean; virtual; abstract;
-    procedure EnumAttributes(const AProc: TProc<string, string, string>); virtual; abstract;
-    function GetAttribute(const APrefix, ALocalName, ANamespaceURI: string): string; overload;
-    function GetAttribute(const AAttribute, ANamespaceURI: string): string; overload; virtual; abstract;
-    function GetAttribute(const AAttribute: AnsiString): string; overload;
-    function GetAttribute(const AAttribute: string): string; overload; virtual;
+    procedure EnumAttributes(const AProc: TProc<UnicodeString, UnicodeString, UnicodeString>); virtual; abstract;
+    function GetAttribute(const APrefix, ALocalName, ANamespaceURI: UnicodeString): UnicodeString; overload;
+    function GetAttribute(const AAttribute, ANamespaceURI: UnicodeString): UnicodeString; overload; virtual; abstract;
+    function GetAttribute(const AAttribute: AnsiString): UnicodeString; overload;
+    function GetAttribute(const AAttribute: UnicodeString): UnicodeString; overload; virtual;
     function GetAttributeAsBoolean(const AAttribute: AnsiString; const ADefaultValue: Boolean = False): Boolean; overload;
-    function GetAttributeAsBoolean(const AAttribute: string; const ADefaultValue: Boolean = False): Boolean; overload;
-    function GetAttributeAsInt64(const AAttribute: string; const ADefaultValue: Int64 = 0): Int64; overload;
-    function GetAttributeAsInteger(const AAttribute: string; ADefaultValue: Integer = 0): Integer; overload;
-    function GetAttributeAsSingle(const AAttribute: string; ADefaultValue: Single = 0): Single; overload;
+    function GetAttributeAsBoolean(const AAttribute: UnicodeString; const ADefaultValue: Boolean = False): Boolean; overload;
+    function GetAttributeAsInt64(const AAttribute: UnicodeString; const ADefaultValue: Int64 = 0): Int64; overload;
+    function GetAttributeAsInteger(const AAttribute: UnicodeString; ADefaultValue: Integer = 0): Integer; overload;
+    function GetAttributeAsSingle(const AAttribute: UnicodeString; ADefaultValue: Single = 0): Single; overload;
     function GetProgress: Integer; virtual; abstract;
     function IsEmptyElement: Boolean; virtual; abstract;
-    function LookupNamespace(const ANameSpace: string): string; overload; virtual; abstract;
+    function LookupNamespace(const ANameSpace: UnicodeString): UnicodeString; overload; virtual; abstract;
     function MoveToElement: Boolean; virtual; abstract;
     function MoveToNextAttribute: Boolean; virtual; abstract;
-    function ReadToFollowing(const ALocalName: string): Boolean; overload; virtual;
-    function ReadToFollowing(const ALocalName, ANameSpaceURI: string): Boolean; overload; virtual;
+    function ReadToFollowing(const ALocalName: UnicodeString): Boolean; overload; virtual;
+    function ReadToFollowing(const ALocalName, ANameSpaceURI: UnicodeString): Boolean; overload; virtual;
     procedure Skip; virtual;
-    function TryGetAttribute(const AAttribute: string; out AValue: string): Boolean; overload; virtual; abstract;
-    function TryGetAttribute(const APrefix, ALocalName, ANamespaceURI: string; out AValue: string): Boolean; overload; virtual; abstract;
+    function TryGetAttribute(const AAttribute: UnicodeString; out AValue: UnicodeString): Boolean; overload; virtual; abstract;
+    function TryGetAttribute(const APrefix, ALocalName, ANamespaceURI: UnicodeString; out AValue: UnicodeString): Boolean; overload; virtual; abstract;
 
-    property ActualValue: string read GetActualValue;
+    property ActualValue: UnicodeString read GetActualValue;
     property Depth: Integer read GetDepth;
     property HasValue: Boolean read GetHasValue;
-    property LocalName: string read GetLocalName;
-    property Name: string read GetName;
-    property NamespaceURI: string read GetNamespaceURI;
+    property LocalName: UnicodeString read GetLocalName;
+    property Name: UnicodeString read GetName;
+    property NamespaceURI: UnicodeString read GetNamespaceURI;
     property NodeType: TACLXMLNodeType read GetNodeType;
-    property Prefix: string read GetPrefix;
+    property Prefix: UnicodeString read GetPrefix;
     property ReadState: TACLXMLReadState read FReadState;
-    property Value: string read GetValue;
+    property Value: UnicodeString read GetValue;
     property XmlSpace: TACLXMLSpace read GetXmlSpace;
 
     property Settings: TACLXMLReaderSettings read GetSettings;
@@ -242,7 +244,7 @@ type
 
   { TACLXMLNodeLoaders }
 
-  TACLXMLTextLoader = procedure (AContext: TObject; const AText: string) of object;
+  TACLXMLTextLoader = procedure (AContext: TObject; const AText: UnicodeString) of object;
   TACLXMLNodeLoaders = class
   strict private type
   {$REGION 'private types'}
@@ -258,24 +260,24 @@ type
     end;
   {$ENDREGION}
   strict private
-    FData: TDictionary<string, THolder>;
+    FData: TACLDictionary<UnicodeString, THolder>;
   public
     constructor Create;
     destructor Destroy; override;
-    procedure Add(const ANamespace, ANodeName: string; ALoader: TACLXMLNodeLoaderClass); overload;
-    procedure Add(const ANamespace, ANodeName: string; AProc: TACLXMLTextLoader); overload;
-    procedure Add(const ANodeName: string; ALoader: TACLXMLNodeLoader); overload;
-    procedure Add(const ANodeName: string; ALoader: TACLXMLNodeLoaderClass); overload;
-    procedure Add(const ANodeName: string; AProc: TACLXMLTextLoader); overload;
+    procedure Add(const ANamespace, ANodeName: UnicodeString; ALoader: TACLXMLNodeLoaderClass); overload;
+    procedure Add(const ANamespace, ANodeName: UnicodeString; AProc: TACLXMLTextLoader); overload;
+    procedure Add(const ANodeName: UnicodeString; ALoader: TACLXMLNodeLoader); overload;
+    procedure Add(const ANodeName: UnicodeString; ALoader: TACLXMLNodeLoaderClass); overload;
+    procedure Add(const ANodeName: UnicodeString; AProc: TACLXMLTextLoader); overload;
     function GetLoader(AReader: TACLXMLReader): TACLXMLNodeLoader; overload;
-    function GetLoader(AReader: TACLXMLReader; const AName: string): TACLXMLNodeLoader; overload;
+    function GetLoader(AReader: TACLXMLReader; const AName: UnicodeString): TACLXMLNodeLoader; overload;
   end;
 
   { TACLXMLAttributeFilteredNodeLoader }
 
   TACLXMLAttributeFilteredNodeLoader = class(TACLXMLNodeLoader)
   protected
-    FAttributeName: string;
+    FAttributeName: UnicodeString;
 
     function GetLoader(AReader: TACLXMLReader): TACLXMLNodeLoader; override;
     function GetLoaderFilteredByAttribute(AReader: TACLXMLReader): TACLXMLNodeLoader; override;
@@ -302,7 +304,7 @@ type
 implementation
 
 uses
-  Math, StrUtils;
+  Math;
 
 const
   SXmlBadAttributeChar = '''%s'', hexadecimal value %s, is an invalid attribute character.';
@@ -337,7 +339,7 @@ const
   SXmlNamespaceDeclXmlXmlns = 'Prefix ''&s'' cannot be mapped to namespace name reserved for ''xml'' or ''xmlns''.';
   SXmlReadOnlyProperty = 'The ''%s'' property is read only and cannot be set.';
   SXmlTagMismatchEx = 'The ''%s'' start tag on line ''%s'' position ''%s'' does not match the end tag of ''%s''.';
-  SXmlUnclosedQuote = 'There is an unclosed literal string.';
+  SXmlUnclosedQuote = 'There is an unclosed literal UnicodeString.';
   SXmlUnexpectedEndTag = 'Unexpected end tag.';
   SXmlUnexpectedEOF = 'Unexpected end of file while parsing %s has occurred.';
   SXmlUnexpectedEOF1 = 'Unexpected end of file has occurred.';
@@ -360,9 +362,9 @@ type
   public
     procedure Convert(
       const ABytes: TBytes; AByteIndex, AByteCount: Integer;
-      const AChars: TCharArray; ACharIndex, ACharCount: Integer;
+      const AChars: TUnicodeCharArray; ACharIndex, ACharCount: Integer;
       out ABytesUsed, ACharsUsed: Integer); overload;
-    function WebName: string;
+    function WebName: UnicodeString;
   end;
 
   { TACLXMLNamespaceManager }
@@ -372,38 +374,38 @@ type
     MinDeclsCountForHashTable = 16;
   protected type
     TNamespaceDeclaration = record
-      Prefix: string;
-      Uri: string;
+      Prefix: UnicodeString;
+      Uri: UnicodeString;
       ScopeId: Integer;
       PreviousNsIndex: Integer;
-      procedure &Set(const APrefix, AUri: string; AScopeId, APreviousNsIndex: Integer);
+      procedure &Set(const APrefix, AUri: UnicodeString; AScopeId, APreviousNsIndex: Integer);
     end;
   strict private
-    FHashTable: TDictionary<string, Integer>;
+    FHashTable: TACLDictionary<UnicodeString, Integer>;
     FLastDecl: Integer;
     FNameTable: TACLXMLNameTable;
     FNsdecls: TArray<TNamespaceDeclaration>;
     FScopeId: Integer;
     FUseHashTable: Boolean;
-    FXml: string;
-    FXmlNs: string;
+    FXml: UnicodeString;
+    FXmlNs: UnicodeString;
   protected
     function GetNameTable: TACLXMLNameTable; virtual;
-    function GetDefaultNamespace: string; virtual;
+    function GetDefaultNamespace: UnicodeString; virtual;
   public
     constructor Create(ANameTable: TACLXMLNameTable);
     destructor Destroy; override;
-    procedure AddNamespace(APrefix, AUri: string); virtual;
-    function GetNamespaceDeclaration(AIdx: Integer; out APrefix: string; out AUri: string): Boolean;
-    function HasNamespace(const APrefix: string): Boolean; virtual;
-    function LookupNamespace(const APrefix: string): string; virtual;
-    function LookupNamespaceDecl(const APrefix: string): Integer;
-    function LookupPrefix(const AUri: string): string; virtual;
+    procedure AddNamespace(APrefix, AUri: UnicodeString); virtual;
+    function GetNamespaceDeclaration(AIdx: Integer; out APrefix: UnicodeString; out AUri: UnicodeString): Boolean;
+    function HasNamespace(const APrefix: UnicodeString): Boolean; virtual;
+    function LookupNamespace(const APrefix: UnicodeString): UnicodeString; virtual;
+    function LookupNamespaceDecl(const APrefix: UnicodeString): Integer;
+    function LookupPrefix(const AUri: UnicodeString): UnicodeString; virtual;
     function PopScope: Boolean; virtual;
     procedure PushScope; virtual;
-    procedure RemoveNamespace(const APrefix: string; const AUri: string); virtual;
+    procedure RemoveNamespace(const APrefix: UnicodeString; const AUri: UnicodeString); virtual;
 
-    property DefaultNamespace: string read GetDefaultNamespace;
+    property DefaultNamespace: UnicodeString read GetDefaultNamespace;
     property NameTable: TACLXMLNameTable read GetNameTable;
   end;
 
@@ -422,24 +424,24 @@ type
 
   { TACLXMLNodeData }
 
-  TACLXMLNodeData = class(TACLUnknownObject, IComparable)
+  TACLXMLNodeData = class(TACLUnknownObject)
   strict private type
     TValueLocation = (CharsBuffer, ValueString);
   strict private
     class var FNone: TACLXMLNodeData;
   strict private
-    FChars: TCharArray;
+    FChars: TUnicodeCharArray;
     FDepth: Integer;
     FIsEmptyOrDefault: Boolean;
     FLineInfo: TACLXMLLineInfo;
     FLineInfo2: TACLXMLLineInfo;
-    FLocalName: string;
-    FNamespace: string;
-    FNameWPrefix: string;
-    FPrefix: string;
-    FQuoteChar: Char;
+    FLocalName: UnicodeString;
+    FNamespace: UnicodeString;
+    FNameWPrefix: UnicodeString;
+    FPrefix: UnicodeString;
+    FQuoteChar: WideChar;
     FType: TACLXMLNodeType;
-    FValue: string;
+    FValue: UnicodeString;
     FValueLength: Integer;
     FValueLocation: TValueLocation; //# probably replace with special ValueStartPos value
     FValueStartPos: Integer;
@@ -453,34 +455,32 @@ type
     function GetIsDefaultAttribute: Boolean;
     procedure SetIsDefaultAttribute(const AValue: Boolean);
     function GetValueBuffered: Boolean;
-    function GetStringValue: string;
+    function GetStringValue: UnicodeString;
     procedure ClearName;
-    function CreateNameWPrefix(AXmlNameTable: TACLXMLNameTable): string;
+    function CreateNameWPrefix(AXmlNameTable: TACLXMLNameTable): UnicodeString;
   protected
     procedure OnBufferInvalidated;
 
     procedure Clear(AType: TACLXMLNodeType);
-    procedure CopyTo(AValueOffset: Integer; ASb: TStringBuilder); overload;
-    function GetNameWPrefix(ANameTable: TACLXMLNameTable): string;
+    procedure CopyTo(AValueOffset: Integer; ASb: TACLStringBuilder); overload;
+    function GetNameWPrefix(ANameTable: TACLXMLNameTable): UnicodeString;
     procedure SetLineInfo(ALineNo, ALinePos: Integer);
     procedure SetLineInfo2(ALineNo, ALinePos: Integer);
-    procedure SetNamedNode(AType: TACLXMLNodeType; const ALocalName, APrefix, ANameWPrefix: string); overload;
-    procedure SetNamedNode(AType: TACLXMLNodeType; const ALocalName: string); overload;
-    procedure SetValue(const AChars: TCharArray; AStartPos, ALength: Integer); overload;
-    procedure SetValue(const AValue: string); overload;
-    procedure SetValueNode(AType: TACLXMLNodeType; const AChars: TCharArray; AStartPos, ALength: Integer); overload;
-    procedure SetValueNode(AType: TACLXMLNodeType; const AValue: string); overload;
-    // IComparable
-    function CompareTo(AObject: TObject): Integer;
+    procedure SetNamedNode(AType: TACLXMLNodeType; const ALocalName, APrefix, ANameWPrefix: UnicodeString); overload;
+    procedure SetNamedNode(AType: TACLXMLNodeType; const ALocalName: UnicodeString); overload;
+    procedure SetValue(const AChars: TUnicodeCharArray; AStartPos, ALength: Integer); overload;
+    procedure SetValue(const AValue: UnicodeString); overload;
+    procedure SetValueNode(AType: TACLXMLNodeType; const AChars: TUnicodeCharArray; AStartPos, ALength: Integer); overload;
+    procedure SetValueNode(AType: TACLXMLNodeType; const AValue: UnicodeString); overload;
 
     property &Type: TACLXMLNodeType read FType write FType;
     property Depth: Integer read FDepth write FDepth;
     property LineInfo: TACLXMLLineInfo read FLineInfo write FLineInfo;
     property LineInfo2: TACLXMLLineInfo read FLineInfo2;
-    property LocalName: string read FLocalName;
-    property Namespace: string read FNamespace write FNamespace;
-    property Prefix: string read FPrefix;
-    property QuoteChar: Char read FQuoteChar write FQuoteChar;
+    property LocalName: UnicodeString read FLocalName;
+    property Namespace: UnicodeString read FNamespace write FNamespace;
+    property Prefix: UnicodeString read FPrefix;
+    property QuoteChar: WideChar read FQuoteChar write FQuoteChar;
     property XmlContextPushed: Boolean read FXmlContextPushed write FXmlContextPushed;
 
     class property None: TACLXMLNodeData read GetNone;
@@ -491,7 +491,7 @@ type
     property IsEmptyElement: Boolean read GetIsEmptyElement write SetIsEmptyElement;
     property LineNo: Integer read GetLineNo;
     property LinePos: Integer read GetLinePos;
-    property StringValue: string read GetStringValue;
+    property StringValue: UnicodeString read GetStringValue;
     property ValueBuffered: Boolean read GetValueBuffered;
   end;
 
@@ -506,7 +506,6 @@ type
     MaxAttrDuplWalkCount = 250;
     MinWhitespaceLookahedCount = 4096;
     XmlDeclarationBeginning = '<?xml';
-    MaxUTF8EncodedCharByteCount = 6;
   private type
 {$REGION 'Private helper types'}
     TParsingFunction = (
@@ -572,8 +571,8 @@ type
     TXmlContext = class
     public
       XmlSpace: TACLXMLSpace;
-      XmlLang: string;
-      DefaultNamespace: string;
+      XmlLang: UnicodeString;
+      DefaultNamespace: UnicodeString;
       PreviousContext: TXmlContext;
       constructor Create(APreviousContext: TXmlContext); overload;
     end;
@@ -582,7 +581,7 @@ type
     strict private
       function GetLinePos: Integer;
     public
-      Chars: TCharArray;
+      Chars: TUnicodeCharArray;
       CharPos: Integer;
       CharsUsed: Integer;
       Encoding: TEncoding;
@@ -604,8 +603,8 @@ type
 
 {$ENDREGION}
   private
-    FXML: string;
-    FXmlNs: string;
+    FXML: UnicodeString;
+    FXmlNs: UnicodeString;
     FLaterInitParam: TLaterInitParam;
 
     //# parsing function = what to do in the next Read() (3-items-long stack, usually used just 2 level)
@@ -642,22 +641,22 @@ type
     FDocumentStartBytePos: Integer;
     FFragment: Boolean;
     FFragmentType: TACLXMLNodeType;
-    FLastPrefix: string;
+    FLastPrefix: UnicodeString;
     FMaxCharactersInDocument: Int64;
     FNamespaceManager: TACLXMLNamespaceManager;
     FParsingMode: TParsingMode;
     FReadValueOffset: Integer;
     FRootElementParsed: Boolean;
     FStandalone: Boolean;
-    FStringBuilder: TStringBuilder;
+    FStringBuilder: TACLStringBuilder;
     FXmlContext: TXmlContext;
 
     function DetectEncoding: TEncoding;
 
-    function GetAttributeWithoutPrefix(const AName: string): TACLXMLNodeData;
-    function GetAttributeWithNamespace(const AName, ANamespaceURI: string): TACLXMLNodeData;
-    function GetAttributeWithPrefix(const ALocalName, APrefix: string): TACLXMLNodeData; overload;
-    function GetAttributeWithPrefix(const AName: string): TACLXMLNodeData; overload;
+    function GetAttributeWithoutPrefix(const AName: UnicodeString): TACLXMLNodeData;
+    function GetAttributeWithNamespace(const AName, ANamespaceURI: UnicodeString): TACLXMLNodeData;
+    function GetAttributeWithPrefix(const ALocalName, APrefix: UnicodeString): TACLXMLNodeData; overload;
+    function GetAttributeWithPrefix(const AName: UnicodeString): TACLXMLNodeData; overload;
     function GetInAttributeValueIterator: Boolean;
     function GetChars(AMaxCharsCount: Integer): Integer;
 
@@ -668,14 +667,14 @@ type
     procedure FinishInitStream;
 
     function AddAttribute(AEndNamePos, AColonPos: Integer): TACLXMLNodeData; overload;
-    function AddAttribute(const ALocalName, APrefix: string; const ANameWPrefix: string): TACLXMLNodeData; overload;
-    function AddAttributeNoChecks(const AName: string; AAttrDepth: Integer): TACLXMLNodeData;
+    function AddAttribute(const ALocalName, APrefix: UnicodeString; const ANameWPrefix: UnicodeString): TACLXMLNodeData; overload;
+    function AddAttributeNoChecks(const AName: UnicodeString; AAttrDepth: Integer): TACLXMLNodeData;
     function AddNode(ANodeIndex, ANodeDepth: Integer): TACLXMLNodeData;
     function AllocNode(ANodeIndex, ANodeDepth: Integer): TACLXMLNodeData;
     function GetTextNodeType(AOrChars: Integer): TACLXMLNodeType;
     function GetWhitespaceType: TACLXMLNodeType;
-    function LookupNamespace(ANode: TACLXMLNodeData): string; overload;
-    procedure AddNamespace(const APrefix, AUri: string; AAttribute: TACLXMLNodeData);
+    function LookupNamespace(ANode: TACLXMLNodeData): UnicodeString; overload;
+    procedure AddNamespace(const APrefix, AUri: UnicodeString; AAttribute: TACLXMLNodeData);
     procedure AttributeDuplCheck;
     procedure AttributeNamespaceLookup;
     procedure ElementNamespaceLookup;
@@ -683,7 +682,7 @@ type
     procedure OnDefaultNamespaceDecl(AAttribute: TACLXMLNodeData);
     procedure OnNamespaceDecl(AAttribute: TACLXMLNodeData);
     procedure OnXmlReservedAttribute(AAttribute: TACLXMLNodeData);
-    procedure ParseAttributeValueSlow(ACurPosition: Integer; AQuoteChar: Char; AAttribute: TACLXMLNodeData);
+    procedure ParseAttributeValueSlow(ACurPosition: Integer; AQuoteChar: WideChar; AAttribute: TACLXMLNodeData);
     procedure PopXmlContext;
     procedure PushXmlContext;
 
@@ -693,20 +692,20 @@ type
     function ParseDocumentContent: Boolean;
     function ParseElementContent: Boolean;
     function ParseName: Integer;
-    function ParseNamedCharRef(AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder): Integer;
-    function ParseNamedCharRefInline(AStartPosition: Integer; AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder): Integer;
-    function ParseNumericCharRef(AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder; out AEntityType: TEntityType): Integer;
-    function ParseNumericCharRefInline(AStartPosition: Integer; AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder;
+    function ParseNamedCharRef(AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder): Integer;
+    function ParseNamedCharRefInline(AStartPosition: Integer; AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder): Integer;
+    function ParseNumericCharRef(AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder; out AEntityType: TEntityType): Integer;
+    function ParseNumericCharRefInline(AStartPosition: Integer; AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder;
       out ACharCount: Integer; out AEntityType: TEntityType): Integer;
-    function ParsePI(APiInDtdStringBuilder: TStringBuilder = nil): Boolean;
+    function ParsePI(APiInDtdStringBuilder: TACLStringBuilder = nil): Boolean;
     function ParsePIValue(out AOutStartPosition, AOutEndPosition: Integer): Boolean;
     function ParseQName(AIsQName: Boolean; AStartOffset: Integer; out AColonPosition: Integer): Integer; overload;
     function ParseQName(out AColonPosition: Integer): Integer; overload;
     function ParseRootLevelWhitespace: Boolean;
     function ParseText: Boolean; overload;
     function ParseText(out AStartPosition, AEndPosition: Integer; var AOutOrChars: Integer): Boolean; overload;
-    function ParseUnexpectedToken: string; overload;
-    function ParseUnexpectedToken(APosition: Integer): string; overload;
+    function ParseUnexpectedToken: UnicodeString; overload;
+    function ParseUnexpectedToken(APosition: Integer): UnicodeString; overload;
     function ParseXmlDeclaration(AIsTextDecl: Boolean): Boolean;
     function ReadDataInName(var APosition: Integer): Boolean;
     procedure ParseAttributes;
@@ -733,63 +732,63 @@ type
     procedure ReThrow(E: Exception; ALineNo, ALinePos: Integer);
     procedure SetErrorState;
     procedure Throw(E: Exception); overload;
-    procedure Throw(const ARes: string); overload;
-    procedure Throw(const ARes, AArg: string); overload;
-    procedure Throw(const ARes: string; const AArgs: array of const); overload;
-    procedure Throw(const ARes: string; ALineNo, ALinePos: Integer); overload;
-    procedure Throw(const ARes, AArg: string; ALineNo, ALinePos: Integer); overload;
-    procedure Throw(APosition: Integer; const ARes: string); overload;
-    procedure Throw(APosition: Integer; const ARes, AArg: string); overload;
-    procedure Throw(APosition: Integer; const ARes: string; const AArgs: array of const); overload;
-    procedure Throw(APosition: Integer; const ARes: string; const AArgs: TArray<string>); overload;
+    procedure Throw(const ARes: UnicodeString); overload;
+    procedure Throw(const ARes, AArg: UnicodeString); overload;
+    procedure Throw(const ARes: UnicodeString; const AArgs: array of const); overload;
+    procedure Throw(const ARes: UnicodeString; ALineNo, ALinePos: Integer); overload;
+    procedure Throw(const ARes, AArg: UnicodeString; ALineNo, ALinePos: Integer); overload;
+    procedure Throw(APosition: Integer; const ARes: UnicodeString); overload;
+    procedure Throw(APosition: Integer; const ARes, AArg: UnicodeString); overload;
+    procedure Throw(APosition: Integer; const ARes: UnicodeString; const AArgs: array of const); overload;
+    procedure Throw(APosition: Integer; const ARes: UnicodeString; const AArgs: TArray<UnicodeString>); overload;
     procedure ThrowExpectingWhitespace(APosition: Integer);
-    procedure ThrowInvalidChar(const AData: TCharArray; ALength, AInvCharPos: Integer);
+    procedure ThrowInvalidChar(const AData: TUnicodeCharArray; ALength, AInvCharPos: Integer);
     procedure ThrowTagMismatch(AStartTag: TACLXMLNodeData);
-    procedure ThrowUnexpectedToken(APosition: Integer; const AExpectedToken1: string; const AExpectedToken2: string = ''); overload;
-    procedure ThrowUnexpectedToken(const AExpectedToken1, AExpectedToken2: string); overload;
-    procedure ThrowUnexpectedToken(AExpectedToken: string); overload;
+    procedure ThrowUnexpectedToken(APosition: Integer; const AExpectedToken1: UnicodeString; const AExpectedToken2: UnicodeString = ''); overload;
+    procedure ThrowUnexpectedToken(const AExpectedToken1, AExpectedToken2: UnicodeString); overload;
+    procedure ThrowUnexpectedToken(AExpectedToken: UnicodeString); overload;
     procedure ThrowUnclosedElements;
-    procedure ThrowWithoutLineInfo(const ARes: string); overload;
-    procedure ThrowWithoutLineInfo(const ARes, AArg: string); overload;
+    procedure ThrowWithoutLineInfo(const ARes: UnicodeString); overload;
+    procedure ThrowWithoutLineInfo(const ARes, AArg: UnicodeString); overload;
 
     procedure OnNewLine(APosition: Integer);
-    function EatWhitespaces(ASb: TStringBuilder): Integer;
+    function EatWhitespaces(ASb: TACLStringBuilder): Integer;
     procedure ShiftBuffer(ASourcePosition, ADestPosition, ACount: Integer);
     procedure UnDecodeChars;
   protected
     constructor Create(ASettings: TACLXMLReaderSettings); overload;
-    class procedure BlockCopyChars(ASource: TCharArray; ASourceOffset: Integer; ADestination: TCharArray;
+    class procedure BlockCopyChars(ASource: TUnicodeCharArray; ASourceOffset: Integer; ADestination: TUnicodeCharArray;
       ADestinationOffset, ACount: Integer); static; inline;
-    class function ConvertToConstArray(const AArgs: TArray<string>): TArray<TVarRec>;
-    class function StrEqual(const AChars: TCharArray; AStrPos1, AStrLen1: Integer; const AStr2: string): Boolean; static;
-    class function StripSpaces(const AValue: string): string; overload; static;
-    class procedure StripSpaces(var AValue: TCharArray; AIndex: Integer; var ALen: Integer); overload; static;
+    class function ConvertToConstArray(const AArgs: TArray<UnicodeString>): TArray<TVarRec>;
+    class function StrEqual(const AChars: TUnicodeCharArray; AStrPos1, AStrLen1: Integer; const AStr2: UnicodeString): Boolean; static;
+    class function StripSpaces(const AValue: UnicodeString): UnicodeString; overload; static;
+    class procedure StripSpaces(var AValue: TUnicodeCharArray; AIndex: Integer; var ALen: Integer); overload; static;
 
     procedure ClearNodes;
     procedure FinishInit;
     function GetNameTable: TACLXMLNameTable; override;
     function GetNodeType: TACLXMLNodeType; override;
-    function GetLocalName: string; override;
-    function GetNamespaceURI: string; override;
-    function GetValue: string; override;
+    function GetLocalName: UnicodeString; override;
+    function GetNamespaceURI: UnicodeString; override;
+    function GetValue: UnicodeString; override;
     function GetDepth: Integer; override;
     function GetXmlSpace: TACLXMLSpace; override;
-    function GetPrefix: string; override;
+    function GetPrefix: UnicodeString; override;
 
     property InAttributeValueIterator: Boolean read GetInAttributeValueIterator;
-    property XML: string read FXML;
-    property XmlNs: string read FXmlNs;
+    property XML: UnicodeString read FXML;
+    property XmlNs: UnicodeString read FXmlNs;
   public
     constructor Create; overload;
     constructor Create(AStream: TStream; const ABytes: TBytes; AByteCount: Integer; ASettings: TACLXMLReaderSettings); overload;
     destructor Destroy; override;
-    procedure EnumAttributes(const AProc: TProc<string, string, string>); override;
-    function GetAttribute(const AAttribute, ANamespaceURI: string): string; overload; override;
+    procedure EnumAttributes(const AProc: TProc<UnicodeString, UnicodeString, UnicodeString>); override;
+    function GetAttribute(const AAttribute, ANamespaceURI: UnicodeString): UnicodeString; overload; override;
     function GetProgress: Integer; override;
     function IsEmptyElement: Boolean; override;
-    function TryGetAttribute(const AAttribute: string; out AValue: string): Boolean; override;
-    function TryGetAttribute(const APrefix, ALocalName, ANamespaceURI: string; out AValue: string): Boolean; override;
-    function LookupNamespace(const APrefix: string): string; overload; override;
+    function TryGetAttribute(const AAttribute: UnicodeString; out AValue: UnicodeString): Boolean; override;
+    function TryGetAttribute(const APrefix, ALocalName, ANamespaceURI: UnicodeString; out AValue: UnicodeString): Boolean; override;
+    function LookupNamespace(const APrefix: UnicodeString): UnicodeString; overload; override;
     function MoveToElement: Boolean; override;
     function MoveToNextAttribute: Boolean; override;
     function Read: Boolean; override;
@@ -807,6 +806,9 @@ type
 
 function NotImplemented: Pointer;
 begin
+{$IFDEF FPC}
+  Result := nil;
+{$ENDIF}
   raise ENotImplemented.Create('Not implemented');
 end;
 
@@ -880,7 +882,7 @@ begin
   Result := 0; //# ERROR ?
 end;
 
-function RemoveRedundantSpaces(const AText: string): string;
+function RemoveRedundantSpaces(const AText: UnicodeString): UnicodeString;
 var
   P: PChar;
 begin
@@ -914,9 +916,9 @@ end;
 { TEncodingHelper }
 
 procedure TEncodingHelper.Convert(const ABytes: TBytes; AByteIndex, AByteCount: Integer;
-  const AChars: TCharArray; ACharIndex, ACharCount: Integer; out ABytesUsed, ACharsUsed: Integer);
+  const AChars: TUnicodeCharArray; ACharIndex, ACharCount: Integer; out ABytesUsed, ACharsUsed: Integer);
 var
-  ACharArray: TCharArray;
+  ACharArray: TUnicodeCharArray;
 begin
   AByteCount := Min(AByteCount, GetMaxByteCount(ACharCount));
   if Self = UTF8 then //# special case
@@ -929,7 +931,7 @@ begin
 
     if Self is TMBCSEncoding then
     begin
-      while (AByteCount > 0) and (UnicodeFromLocaleChars(TMBCSEncoding(Self).CodePage,
+      while (AByteCount > 0) and (MultiByteToWideChar(TMBCSEncoding(Self).CodePage,
         MB_ERR_INVALID_CHARS, PAnsiChar(@ABytes[AByteIndex]), AByteCount, nil, 0) = 0)
       do
         Dec(AByteCount);
@@ -937,14 +939,14 @@ begin
 
   ACharArray := GetChars(ABytes, AByteIndex, AByteCount);
   ACharsUsed := Min(Length(ACharArray), ACharCount);
-  Move(ACharArray[0], AChars[ACharIndex], ACharsUsed * SizeOf(Char));
+  Move(ACharArray[0], AChars[ACharIndex], ACharsUsed * SizeOf(WideChar));
   ABytesUsed := GetByteCount(ACharArray, 0, ACharsUsed);
 end;
 
-function TEncodingHelper.WebName: string;
+function TEncodingHelper.WebName: UnicodeString;
 var
   AStartPos: Integer;
-  AEncodingName: string;
+  AEncodingName: UnicodeString;
 begin
   AEncodingName := EncodingName;
   AStartPos := Pos('(', AEncodingName) + 1;
@@ -983,7 +985,7 @@ end;
 
 { TACLXMLNamespaceManager.TNamespaceDeclaration }
 
-procedure TACLXMLNamespaceManager.TNamespaceDeclaration.&Set(const APrefix, AUri: string; AScopeId, APreviousNsIndex: Integer);
+procedure TACLXMLNamespaceManager.TNamespaceDeclaration.&Set(const APrefix, AUri: UnicodeString; AScopeId, APreviousNsIndex: Integer);
 begin
   Prefix := APrefix;
   Uri := AUri;
@@ -995,7 +997,7 @@ end;
 
 constructor TACLXMLNamespaceManager.Create(ANameTable: TACLXMLNameTable);
 var
-  AEmptyStr: string;
+  AEmptyStr: UnicodeString;
 begin
   FLastDecl := 0;
   FNameTable := ANameTable;
@@ -1022,7 +1024,7 @@ begin
   Result := FNameTable;
 end;
 
-function TACLXMLNamespaceManager.GetDefaultNamespace: string;
+function TACLXMLNamespaceManager.GetDefaultNamespace: UnicodeString;
 begin
   Result := LookupNamespace('');
 end;
@@ -1051,7 +1053,7 @@ begin
   Result := True;
 end;
 
-procedure TACLXMLNamespaceManager.AddNamespace(APrefix, AUri: string);
+procedure TACLXMLNamespaceManager.AddNamespace(APrefix, AUri: UnicodeString);
 var
   ADeclIndex, APreviousDeclIndex, I: Integer;
 begin
@@ -1092,14 +1094,14 @@ begin
     begin
       //# add all to hash table
       Assert(FHashTable = nil);
-      FHashTable := TDictionary<string, Integer>.Create(FLastDecl);
+      FHashTable := TACLDictionary<UnicodeString, Integer>.Create(FLastDecl);
       for I := 0 to FLastDecl do
         FHashTable.AddOrSetValue(FNsdecls[I].Prefix, I);
       FUseHashTable := True;
     end;
 end;
 
-procedure TACLXMLNamespaceManager.RemoveNamespace(const APrefix: string; const AUri: string);
+procedure TACLXMLNamespaceManager.RemoveNamespace(const APrefix: UnicodeString; const AUri: UnicodeString);
 var
   ADeclIndex: Integer;
 begin
@@ -1117,7 +1119,7 @@ begin
   end;
 end;
 
-function TACLXMLNamespaceManager.LookupNamespace(const APrefix: string): string;
+function TACLXMLNamespaceManager.LookupNamespace(const APrefix: UnicodeString): UnicodeString;
 var
   ADeclIndex: Integer;
 begin
@@ -1128,7 +1130,7 @@ begin
     Result := FNsdecls[ADeclIndex].Uri;
 end;
 
-function TACLXMLNamespaceManager.LookupNamespaceDecl(const APrefix: string): Integer;
+function TACLXMLNamespaceManager.LookupNamespaceDecl(const APrefix: UnicodeString): Integer;
 var
   ADeclIndex, AThisDecl: Integer;
 begin
@@ -1163,7 +1165,7 @@ begin
   Result := -1;
 end;
 
-function TACLXMLNamespaceManager.LookupPrefix(const AUri: string): string;
+function TACLXMLNamespaceManager.LookupPrefix(const AUri: UnicodeString): UnicodeString;
 var
   AThisDecl: Integer;
 begin
@@ -1182,7 +1184,7 @@ begin
   Result := '';
 end;
 
-function TACLXMLNamespaceManager.HasNamespace(const APrefix: string): Boolean;
+function TACLXMLNamespaceManager.HasNamespace(const APrefix: UnicodeString): Boolean;
 var
   AThisDecl: Integer;
 begin
@@ -1202,7 +1204,7 @@ begin
   Result := False;
 end;
 
-function TACLXMLNamespaceManager.GetNamespaceDeclaration(AIdx: Integer; out APrefix: string; out AUri: string): Boolean;
+function TACLXMLNamespaceManager.GetNamespaceDeclaration(AIdx: Integer; out APrefix: UnicodeString; out AUri: UnicodeString): Boolean;
 begin
   AIdx := FLastDecl - AIdx;
   if AIdx < 0 then
@@ -1235,7 +1237,7 @@ begin
   Result := ABufferSize;
 end;
 
-function TACLXMLReader.GetActualValue: string;
+function TACLXMLReader.GetActualValue: UnicodeString;
 begin
   Result := Value;
   if XmlSpace <> TACLXMLSpace.Preserve then
@@ -1247,7 +1249,7 @@ begin
   Result := HasValueInternal(NodeType);
 end;
 
-function TACLXMLReader.GetName: string;
+function TACLXMLReader.GetName: UnicodeString;
 begin
   if Prefix <> '' then
     Result := NameTable.Add(Prefix + ':' + LocalName)
@@ -1265,31 +1267,31 @@ begin
   Result := TACLXMLSpace.None;
 end;
 
-function TACLXMLReader.GetAttribute(const AAttribute: AnsiString): string;
+function TACLXMLReader.GetAttribute(const AAttribute: AnsiString): UnicodeString;
 begin
-  Result := GetAttribute(string(AAttribute));
+  Result := GetAttribute(UnicodeString(AAttribute));
 end;
 
-function TACLXMLReader.GetAttribute(const AAttribute: string): string;
+function TACLXMLReader.GetAttribute(const AAttribute: UnicodeString): UnicodeString;
 begin
   if not TryGetAttribute(AAttribute, Result) then
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
 function TACLXMLReader.GetAttributeAsBoolean(const AAttribute: AnsiString; const ADefaultValue: Boolean = False): Boolean;
 begin
-  Result := GetAttributeAsBoolean(string(AAttribute), ADefaultValue);
+  Result := GetAttributeAsBoolean(UnicodeString(AAttribute), ADefaultValue);
 end;
 
-function TACLXMLReader.GetAttribute(const APrefix, ALocalName, ANamespaceURI: string): string;
+function TACLXMLReader.GetAttribute(const APrefix, ALocalName, ANamespaceURI: UnicodeString): UnicodeString;
 begin
   if not TryGetAttribute(APrefix, ALocalName, ANamespaceURI, Result) then
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
-function TACLXMLReader.GetAttributeAsBoolean(const AAttribute: string; const ADefaultValue: Boolean = False): Boolean;
+function TACLXMLReader.GetAttributeAsBoolean(const AAttribute: UnicodeString; const ADefaultValue: Boolean = False): Boolean;
 var
-  AValue: string;
+  AValue: UnicodeString;
 begin
   if TryGetAttribute(AAttribute, AValue) then
     Result := TACLXMLConvert.DecodeBoolean(AValue)
@@ -1297,28 +1299,28 @@ begin
     Result := ADefaultValue;
 end;
 
-function TACLXMLReader.GetAttributeAsInt64(const AAttribute: string; const ADefaultValue: Int64 = 0): Int64;
+function TACLXMLReader.GetAttributeAsInt64(const AAttribute: UnicodeString; const ADefaultValue: Int64 = 0): Int64;
 begin
   Result := StrToInt64Def(GetAttribute(AAttribute), ADefaultValue);
 end;
 
-function TACLXMLReader.GetAttributeAsInteger(const AAttribute: string; ADefaultValue: Integer = 0): Integer;
+function TACLXMLReader.GetAttributeAsInteger(const AAttribute: UnicodeString; ADefaultValue: Integer = 0): Integer;
 begin
   Result := StrToIntDef(GetAttribute(AAttribute), ADefaultValue);
 end;
 
-function TACLXMLReader.GetAttributeAsSingle(const AAttribute: string; ADefaultValue: Single = 0): Single;
+function TACLXMLReader.GetAttributeAsSingle(const AAttribute: UnicodeString; ADefaultValue: Single = 0): Single;
 begin
-  Result := StrToFloatDef(GetAttribute(AAttribute), ADefaultValue, TFormatSettings.Invariant);
+  Result := StrToFloatDef(GetAttribute(AAttribute), ADefaultValue, InvariantFormatSettings);
 end;
 
 //# Reads to the following element with the given Name.
-function TACLXMLReader.ReadToFollowing(const ALocalName: string): Boolean;
+function TACLXMLReader.ReadToFollowing(const ALocalName: UnicodeString): Boolean;
 var
-  AName: string;
+  AName: UnicodeString;
 begin
   if ALocalName = '' then
-    raise EInvalidArgument.Create(ALocalName);
+    raise EInvalidArgument.Create(acUnicodeToString(ALocalName));
   //# atomize name
   AName := NameTable.Add(ALocalName);
   while Read do
@@ -1327,9 +1329,9 @@ begin
   Result := False;
 end;
 
-function TACLXMLReader.ReadToFollowing(const ALocalName, ANameSpaceURI: string): Boolean;
+function TACLXMLReader.ReadToFollowing(const ALocalName, ANameSpaceURI: UnicodeString): Boolean;
 var
-  ALocalNameValue, ANamespaceURIValue: string;
+  ALocalNameValue, ANamespaceURIValue: UnicodeString;
 begin
   if ALocalName = '' then
     raise EACLXMLArgumentNullException.Create('LocalName');
@@ -1444,7 +1446,7 @@ begin
   FIsEmptyOrDefault := AValue;
 end;
 
-function TACLXMLNodeData.GetStringValue: string;
+function TACLXMLNodeData.GetStringValue: UnicodeString;
 begin
   Assert((FValueStartPos >= 0) or (FValueLocation = TValueLocation.ValueString), 'Value not ready.');
   if ValueBuffered then
@@ -1485,7 +1487,7 @@ begin
   FLineInfo2.&Set(ALineNo, ALinePos);
 end;
 
-procedure TACLXMLNodeData.SetValueNode(AType: TACLXMLNodeType; const AValue: string);
+procedure TACLXMLNodeData.SetValueNode(AType: TACLXMLNodeType; const AValue: UnicodeString);
 begin
 //#  Assert(FValueLocation <> TValueLocation.CharsBuffer);
   FType := AType;
@@ -1495,7 +1497,7 @@ begin
   FValueStartPos := -1;
 end;
 
-procedure TACLXMLNodeData.SetValueNode(AType: TACLXMLNodeType; const AChars: TCharArray; AStartPos, ALength: Integer);
+procedure TACLXMLNodeData.SetValueNode(AType: TACLXMLNodeType; const AChars: TUnicodeCharArray; AStartPos, ALength: Integer);
 begin
   FType := AType;
   ClearName;
@@ -1507,14 +1509,14 @@ begin
   FValueLength := ALength;
 end;
 
-procedure TACLXMLNodeData.SetNamedNode(AType: TACLXMLNodeType; const ALocalName: string);
+procedure TACLXMLNodeData.SetNamedNode(AType: TACLXMLNodeType; const ALocalName: UnicodeString);
 begin
   SetNamedNode(AType, ALocalName, '', ALocalName);
 end;
 
-procedure TACLXMLNodeData.SetNamedNode(AType: TACLXMLNodeType; const ALocalName, APrefix, ANameWPrefix: string);
+procedure TACLXMLNodeData.SetNamedNode(AType: TACLXMLNodeType; const ALocalName, APrefix, ANameWPrefix: UnicodeString);
 begin
-  Assert(Length(ALocalName) > 0);
+  Assert(ALocalName <> '');
 
   FType := AType;
   FLocalName := ALocalName;
@@ -1526,14 +1528,14 @@ begin
   FValueStartPos := -1;
 end;
 
-procedure TACLXMLNodeData.SetValue(const AValue: string);
+procedure TACLXMLNodeData.SetValue(const AValue: UnicodeString);
 begin
   FValueStartPos := -1;
   FValue := AValue;
   FValueLocation := TValueLocation.ValueString;
 end;
 
-procedure TACLXMLNodeData.SetValue(const AChars: TCharArray; AStartPos: Integer; ALength: Integer);
+procedure TACLXMLNodeData.SetValue(const AChars: TUnicodeCharArray; AStartPos: Integer; ALength: Integer);
 begin
   FValue := '';
   FValueLocation := TValueLocation.CharsBuffer;
@@ -1554,7 +1556,7 @@ begin
   FValueStartPos := -1;
 end;
 
-function TACLXMLNodeData.GetNameWPrefix(ANameTable: TACLXMLNameTable): string;
+function TACLXMLNodeData.GetNameWPrefix(ANameTable: TACLXMLNameTable): UnicodeString;
 begin
   if FNameWPrefix <> '' then
     Result := FNameWPrefix
@@ -1562,7 +1564,7 @@ begin
     Result := CreateNameWPrefix(ANameTable);
 end;
 
-function TACLXMLNodeData.CreateNameWPrefix(AXmlNameTable: TACLXMLNameTable): string;
+function TACLXMLNodeData.CreateNameWPrefix(AXmlNameTable: TACLXMLNameTable): UnicodeString;
 begin
   Assert(FNameWPrefix = '');
   if FPrefix = '' then
@@ -1572,22 +1574,7 @@ begin
   Result := FNameWPrefix;
 end;
 
-function TACLXMLNodeData.CompareTo(AObject: TObject): Integer;
-begin
-  if AObject is TACLXMLNodeData then
-  begin
-    Result := CompareStr(FLocalName, TACLXMLNodeData(AObject).FLocalName);
-    if Result = 0 then
-      Result := CompareStr(FNamespace, TACLXMLNodeData(AObject).FNamespace);
-  end
-  else
-  begin
-    Assert(False, 'We should never get to this point.');
-    Result := 1;
-  end;
-end;
-
-procedure TACLXMLNodeData.CopyTo(AValueOffset: Integer; ASb: TStringBuilder);
+procedure TACLXMLNodeData.CopyTo(AValueOffset: Integer; ASb: TACLStringBuilder);
 begin
   if FValue = '' then
   begin
@@ -1599,7 +1586,7 @@ begin
     if AValueOffset <= 0 then
       ASb.Append(FValue)
     else
-      ASb.Append(FValue, AValueOffset, Length(FValue) - AValueOffset);
+      ASb.Append(FValue, AValueOffset, acStringLength(FValue) - AValueOffset);
 end;
 
 { TACLXMLTextReader }
@@ -1612,18 +1599,18 @@ begin
   FFragmentType := TACLXMLNodeType.Document;
 end;
 
-class procedure TACLXMLTextReader.BlockCopyChars(ASource: TCharArray; ASourceOffset: Integer;
-  ADestination: TCharArray; ADestinationOffset, ACount: Integer);
+class procedure TACLXMLTextReader.BlockCopyChars(ASource: TUnicodeCharArray; ASourceOffset: Integer;
+  ADestination: TUnicodeCharArray; ADestinationOffset, ACount: Integer);
 begin
-  Move(ASource[ASourceOffset], ADestination[ADestinationOffset], ACount * SizeOf(Char));
+  Move(ASource[ASourceOffset], ADestination[ADestinationOffset], ACount * SizeOf(WideChar));
 end;
 
-class function TACLXMLTextReader.StrEqual(const AChars: TCharArray; AStrPos1, AStrLen1: Integer;
-  const AStr2: string): Boolean;
+class function TACLXMLTextReader.StrEqual(const AChars: TUnicodeCharArray; AStrPos1, AStrLen1: Integer;
+  const AStr2: UnicodeString): Boolean;
 var
   I: Integer;
 begin
-  if AStrLen1 <> Length(AStr2) then
+  if AStrLen1 <> acStringLength(AStr2) then
     Exit(False);
   I := 0;
   while (I < AStrLen1) and (AChars[AStrPos1 + I] = AStr2[I + 1]) do
@@ -1635,12 +1622,12 @@ end;
 //# StripSpaces removes spaces at the beginning and at the end of the value and
 //# replaces sequences of spaces with a single space
 //# rewritten and optimized for vcl
-class function TACLXMLTextReader.StripSpaces(const AValue: string): string;
+class function TACLXMLTextReader.StripSpaces(const AValue: UnicodeString): UnicodeString;
 var
   ALen: Integer;
   ADest, ASrc, ASrcEnd, ADestStart: PChar;
 begin
-  ALen := Length(AValue);
+  ALen := acStringLength(AValue);
   if ALen = 0 then
     Exit('');
   ASrc := PChar(AValue);
@@ -1677,10 +1664,10 @@ begin
 end;
 
 //# StripSpaces removes spaces at the beginning and at the end of the value and replaces sequences of spaces with a single space
-class procedure TACLXMLTextReader.StripSpaces(var AValue: TCharArray; AIndex: Integer; var ALen: Integer);
+class procedure TACLXMLTextReader.StripSpaces(var AValue: TUnicodeCharArray; AIndex: Integer; var ALen: Integer);
 var
   AStartPos, AEndPos, AOffset, I, J: Integer;
-  ACh: Char;
+  ACh: WideChar;
 begin
   if ALen <= 0 then
     Exit;
@@ -1827,7 +1814,7 @@ begin
 //#  FOuterReader := Self;
 
   FXmlContext := TXmlContext.Create;
-  FStringBuilder := TStringBuilder.Create;
+  FStringBuilder := TACLStringBuilder.Create;
 
   ANameTable := ASettings.NameTable;
   if ANameTable = nil then
@@ -1885,11 +1872,11 @@ begin
       end;
     TACLXMLConformanceLevel.Document:
       FFragmentType := TACLXMLNodeType.Document;
-    else
-    begin
-      Assert(False);
-      FFragmentType := TACLXMLNodeType.Document; //# goto case TACLXMLConformanceLevel.Document;
-    end;
+  else
+  {$IFNDEF FPC}
+    Assert(False);
+    FFragmentType := TACLXMLNodeType.Document; //# goto case TACLXMLConformanceLevel.Document;
+  {$ENDIF}
   end;
 end;
 
@@ -1933,10 +1920,10 @@ begin
   FFullAttributeCleanup := False;
 end;
 
-function TACLXMLTextReader.GetAttribute(const AAttribute, ANamespaceURI: string): string;
+function TACLXMLTextReader.GetAttribute(const AAttribute, ANamespaceURI: UnicodeString): UnicodeString;
 var
-  ALocalName: string;
-  ANamespace: string;
+  ALocalName: UnicodeString;
+  ANamespace: UnicodeString;
   ANode: TACLXMLNodeData;
   I: Integer;
 begin
@@ -1951,11 +1938,11 @@ begin
   Result := '';
 end;
 
-function TACLXMLTextReader.TryGetAttribute(const AAttribute: string; out AValue: string): Boolean;
+function TACLXMLTextReader.TryGetAttribute(const AAttribute: UnicodeString; out AValue: UnicodeString): Boolean;
 var
   AAttrData: TACLXMLNodeData;
 begin
-  if AAttribute.Contains(':') then
+  if acPos(':', AAttribute) > 0 then
     AAttrData := GetAttributeWithPrefix(AAttribute)
   else
     AAttrData := GetAttributeWithoutPrefix(AAttribute);
@@ -1965,7 +1952,7 @@ begin
     AValue := AAttrData.StringValue;
 end;
 
-function TACLXMLTextReader.TryGetAttribute(const APrefix, ALocalName, ANamespaceURI: string; out AValue: string): Boolean;
+function TACLXMLTextReader.TryGetAttribute(const APrefix, ALocalName, ANamespaceURI: UnicodeString; out AValue: UnicodeString): Boolean;
 var
   AAttrData: TACLXMLNodeData;
 begin
@@ -2026,12 +2013,12 @@ begin
   Result := (FAttributeCount > 0) and (FParsingFunction >= TParsingFunction.InReadAttributeValue);
 end;
 
-function TACLXMLTextReader.GetAttributeWithoutPrefix(const AName: string): TACLXMLNodeData;
+function TACLXMLTextReader.GetAttributeWithoutPrefix(const AName: UnicodeString): TACLXMLNodeData;
 begin
   Result := GetAttributeWithPrefix(AName, '');
 end;
 
-procedure TACLXMLTextReader.EnumAttributes(const AProc: TProc<string, string, string>);
+procedure TACLXMLTextReader.EnumAttributes(const AProc: TProc<UnicodeString, UnicodeString, UnicodeString>);
 var
   AData: TACLXMLNodeData;
   I: Integer;
@@ -2043,9 +2030,9 @@ begin
   end;
 end;
 
-function TACLXMLTextReader.GetAttributeWithPrefix(const AName: string): TACLXMLNodeData;
+function TACLXMLTextReader.GetAttributeWithPrefix(const AName: UnicodeString): TACLXMLNodeData;
 var
-  ANameValue: string;
+  ANameValue: UnicodeString;
   ANode: TACLXMLNodeData;
   I: Integer;
 begin
@@ -2061,10 +2048,10 @@ begin
   Result := nil;
 end;
 
-function TACLXMLTextReader.GetAttributeWithNamespace(const AName, ANamespaceURI: string): TACLXMLNodeData;
+function TACLXMLTextReader.GetAttributeWithNamespace(const AName, ANamespaceURI: UnicodeString): TACLXMLNodeData;
 var
-  ALocalName: string;
-  ANamespace: string;
+  ALocalName: UnicodeString;
+  ANamespace: UnicodeString;
   ANode: TACLXMLNodeData;
   I: Integer;
 begin
@@ -2079,11 +2066,11 @@ begin
   Result := nil;
 end;
 
-function TACLXMLTextReader.GetAttributeWithPrefix(const ALocalName, APrefix: string): TACLXMLNodeData;
+function TACLXMLTextReader.GetAttributeWithPrefix(const ALocalName, APrefix: UnicodeString): TACLXMLNodeData;
 var
-  ANameValue: string;
+  ANameValue: UnicodeString;
   ANode: TACLXMLNodeData;
-  APrefixValue: string;
+  APrefixValue: UnicodeString;
   I: Integer;
 begin
   ANameValue := FNameTable.Add(ALocalName);
@@ -2099,12 +2086,12 @@ begin
   Result := nil;
 end;
 
-function TACLXMLTextReader.GetLocalName: string;
+function TACLXMLTextReader.GetLocalName: UnicodeString;
 begin
   Result := FCurrentNode.LocalName;
 end;
 
-function TACLXMLTextReader.GetNamespaceURI: string;
+function TACLXMLTextReader.GetNamespaceURI: UnicodeString;
 begin
   Result := FCurrentNode.Namespace;
 end;
@@ -2119,7 +2106,7 @@ begin
   Result := FCurrentNode.&Type;
 end;
 
-function TACLXMLTextReader.GetPrefix: string;
+function TACLXMLTextReader.GetPrefix: UnicodeString;
 begin
   Result := FCurrentNode.Prefix;
 end;
@@ -2219,7 +2206,7 @@ begin
   Result := FCurrentNode.IsEmptyElement;
 end;
 
-function TACLXMLTextReader.LookupNamespace(const APrefix: string): string;
+function TACLXMLTextReader.LookupNamespace(const APrefix: UnicodeString): UnicodeString;
 begin
   if not FSupportNamespaces then
     Result := ''
@@ -2296,14 +2283,14 @@ label
   ReturnPartial;
 var
   APosition, ARcount, ARpos: Integer;
-  AChars: TCharArray;
-  AStopChar, ACh: Char;
+  AChars: TUnicodeCharArray;
+  AStopChar, ACh: WideChar;
 begin
   if FParsingState.CharsUsed - FParsingState.CharPos < 3 then
   begin
     //# read new characters into the buffer
     if ReadData = 0 then
-      Throw(SXmlUnexpectedEOF, IfThen(AType = TACLXMLNodeType.Comment, 'Comment', 'CDATA'));
+      Throw(SXmlUnexpectedEOF, IfThenW(AType = TACLXMLNodeType.Comment, 'Comment', 'CDATA'));
   end;
 
   APosition := FParsingState.CharPos;
@@ -2472,7 +2459,7 @@ label
 var
   AMangoQuirks, ANeedMoreChars: Boolean;
   APosition: Integer;
-  AChars: TCharArray;
+  AChars: TUnicodeCharArray;
 begin
   AMangoQuirks := False;
   while True do
@@ -2658,12 +2645,12 @@ begin
   for I := FIndex + 1 to FIndex + FAttributeCount do
   begin
     AAt := FNodes[I];
-    if (AAt.&Type = TACLXMLNodeType.Attribute) and (Length(AAt.Prefix) > 0) then
+    if (AAt.&Type = TACLXMLNodeType.Attribute) and (acStringLength(AAt.Prefix) > 0) then
       AAt.Namespace := LookupNamespace(AAt);
   end;
 end;
 
-function TACLXMLTextReader.AddAttribute(const ALocalName, APrefix: string; const ANameWPrefix: string): TACLXMLNodeData;
+function TACLXMLTextReader.AddAttribute(const ALocalName, APrefix: UnicodeString; const ANameWPrefix: UnicodeString): TACLXMLNodeData;
 var
   ANewAttr, AAttr: TACLXMLNodeData;
   AAttrHash, I: Integer;
@@ -2700,7 +2687,7 @@ end;
 
 function TACLXMLTextReader.AddAttribute(AEndNamePos, AColonPos: Integer): TACLXMLNodeData;
 var
-  ALocalName, APrefix: string;
+  ALocalName, APrefix: UnicodeString;
   AStartPos, APrefixLen: Integer;
 begin
   //# setup attribute name
@@ -2714,7 +2701,7 @@ begin
     FAttributeNeedNamespaceLookup := True;
     AStartPos := FParsingState.CharPos;
     APrefixLen := AColonPos - AStartPos;
-    if (APrefixLen = Length(FLastPrefix)) and StrEqual(FParsingState.Chars, AStartPos, APrefixLen, FLastPrefix) then
+    if (APrefixLen = acStringLength(FLastPrefix)) and StrEqual(FParsingState.Chars, AStartPos, APrefixLen, FLastPrefix) then
       Result := AddAttribute(FNameTable.Add(FParsingState.Chars, AColonPos + 1, AEndNamePos - AColonPos - 1), FLastPrefix, '')
     else
     begin
@@ -2725,7 +2712,7 @@ begin
   end;
 end;
 
-function TACLXMLTextReader.AddAttributeNoChecks(const AName: string; AAttrDepth: Integer): TACLXMLNodeData;
+function TACLXMLTextReader.AddAttributeNoChecks(const AName: UnicodeString; AAttrDepth: Integer): TACLXMLNodeData;
 var
   ANewAttr: TACLXMLNodeData;
 begin
@@ -2735,7 +2722,7 @@ begin
   Result := ANewAttr;
 end;
 
-function TACLXMLTextReader.LookupNamespace(ANode: TACLXMLNodeData): string;
+function TACLXMLTextReader.LookupNamespace(ANode: TACLXMLNodeData): UnicodeString;
 begin
   Result := FNamespaceManager.LookupNamespace(ANode.Prefix);
   if Result = '' then
@@ -2757,19 +2744,16 @@ begin
     FCurrentNode.Namespace := LookupNamespace(FCurrentNode);
 end;
 
-procedure TACLXMLTextReader.ParseAttributeValueSlow(ACurPosition: Integer; AQuoteChar: Char; AAttribute: TACLXMLNodeData);
+procedure TACLXMLTextReader.ParseAttributeValueSlow(ACurPosition: Integer; AQuoteChar: WideChar; AAttribute: TACLXMLNodeData);
 label
   LblReadData;
 var
   APosition: Integer;
-  AChars: TCharArray;
-  AValueChunkLineInfo, AEntityLineInfo: TACLXMLLineInfo;
-  ACh: Char;
+  AChars: TUnicodeCharArray;
+  ACh: WideChar;
 begin
   APosition := ACurPosition;
   AChars := FParsingState.Chars;
-
-  AValueChunkLineInfo := TACLXMLLineInfo.Create(FParsingState.LineNo, FParsingState.LinePos);
 
   Assert(FStringBuilder.Length = 0);
 
@@ -2854,9 +2838,6 @@ begin
             if APosition - FParsingState.CharPos > 0 then
               FStringBuilder.Append(AChars, FParsingState.CharPos, APosition - FParsingState.CharPos);
             FParsingState.CharPos := APosition;
-
-            AEntityLineInfo := TACLXMLLineInfo.Create(FParsingState.LineNo, FParsingState.LinePos + 1);
-
             if not (HandleEntityReference(True, TEntityExpandType.All, APosition) in
               [TEntityType.CharacterDec, TEntityType.CharacterHex, TEntityType.CharacterNamed]) then
               APosition := FParsingState.CharPos;
@@ -2940,7 +2921,7 @@ begin
   ACurrentXmlContext.Free;
 end;
 
-procedure TACLXMLTextReader.AddNamespace(const APrefix, AUri: string; AAttribute: TACLXMLNodeData);
+procedure TACLXMLTextReader.AddNamespace(const APrefix, AUri: UnicodeString; AAttribute: TACLXMLNodeData);
 begin
   if AUri = TACLXMLReservedNamespaces.XmlNs then
   begin
@@ -2968,7 +2949,7 @@ end;
 
 procedure TACLXMLTextReader.OnDefaultNamespaceDecl(AAttribute: TACLXMLNodeData);
 var
-  ANamespace: string;
+  ANamespace: UnicodeString;
 begin
   if not FSupportNamespaces then
     Exit;
@@ -2985,7 +2966,7 @@ end;
 
 procedure TACLXMLTextReader.OnNamespaceDecl(AAttribute: TACLXMLNodeData);
 var
-  ANamespace: string;
+  ANamespace: UnicodeString;
 begin
   if not FSupportNamespaces then
     Exit;
@@ -2997,7 +2978,7 @@ end;
 
 procedure TACLXMLTextReader.OnXmlReservedAttribute(AAttribute: TACLXMLNodeData);
 var
-  AValue: string;
+  AValue: UnicodeString;
 begin
   if AAttribute.LocalName = 'space' then
   begin
@@ -3026,9 +3007,9 @@ label
   lbContinueParseName, LblReadData, lbEnd;
 var
   APosition, ALineNoDelta, AStartNameCharSize, AAttrNameLinePos, AColonPos: Integer;
-  AChars: TCharArray;
+  AChars: TUnicodeCharArray;
   AAttr: TACLXMLNodeData;
-  ATmpCh0, ATmpCh1, ATmpCh2, AQuoteChar, ATmpCh3: Char;
+  ATmpCh0, ATmpCh1, ATmpCh2, AQuoteChar, ATmpCh3: WideChar;
 begin
   APosition := FParsingState.CharPos;
   AChars := FParsingState.Chars;
@@ -3272,8 +3253,8 @@ label
   ContinueStartName, ContinueName, ParseQNameSlow, SetElement;
 var
   APosition, AColonPos, AStartPos, APrefixLen: Integer;
-  AChars: TCharArray;
-  ACh: Char;
+  AChars: TUnicodeCharArray;
+  ACh: WideChar;
   AIsWs: Boolean;
 begin
   APosition := FParsingState.CharPos;
@@ -3336,7 +3317,7 @@ SetElement:
   begin
     AStartPos := FParsingState.CharPos;
     APrefixLen := AColonPos - AStartPos;
-    if (APrefixLen = Length(FLastPrefix)) and StrEqual(AChars, AStartPos, APrefixLen, FLastPrefix) then
+    if (APrefixLen = acStringLength(FLastPrefix)) and StrEqual(AChars, AStartPos, APrefixLen, FLastPrefix) then
       FCurrentNode.SetNamedNode(TACLXMLNodeType.Element, FNameTable.Add(AChars, AColonPos + 1, APosition - AColonPos - 1), FLastPrefix, '')
     else
     begin
@@ -3402,7 +3383,7 @@ label
   LReadData;
 var
   APosition: Integer;
-  AChars: TCharArray;
+  AChars: TUnicodeCharArray;
 begin
   while True do
   begin
@@ -3519,21 +3500,21 @@ label
 var
   AStartTagNode: TACLXMLNodeData;
   APrefLen, ALocLen, ANameLen, AColonPos, APosition: Integer;
-  AChars: TCharArray;
+  AChars: TUnicodeCharArray;
   AEndTagLineInfo: TACLXMLLineInfo;
-  ATmpCh: Char;
+  ATmpCh: WideChar;
 begin
   AStartTagNode := FNodes[FIndex - 1];
 
-  APrefLen := Length(AStartTagNode.Prefix);
-  ALocLen := Length(AStartTagNode.LocalName);
+  APrefLen := acStringLength(AStartTagNode.Prefix);
+  ALocLen := acStringLength(AStartTagNode.LocalName);
 
   while FParsingState.CharsUsed - FParsingState.CharPos < APrefLen + ALocLen + 1 do
     if ReadData = 0 then
       Break;
 
   AChars := FParsingState.Chars;
-  if Length(AStartTagNode.Prefix) = 0 then
+  if AStartTagNode.Prefix = '' then
   begin
     if not StrEqual(AChars, FParsingState.CharPos, ALocLen, AStartTagNode.LocalName) then
       ThrowTagMismatch(AStartTagNode);
@@ -3632,10 +3613,10 @@ begin
   FParsingState.LineStartPos := APosition - 1;
 end;
 
-function TACLXMLTextReader.EatWhitespaces(ASb: TStringBuilder): Integer;
+function TACLXMLTextReader.EatWhitespaces(ASb: TACLStringBuilder): Integer;
 var
   APosition, AWsCount, ATmp1, ATmp2, ATmp3: Integer;
-  AChars: TCharArray;
+  AChars: TUnicodeCharArray;
 begin
   APosition := FParsingState.CharPos;
   AWsCount := 0;
@@ -3730,14 +3711,14 @@ end;
 
 procedure TACLXMLTextReader.ShiftBuffer(ASourcePosition, ADestPosition, ACount: Integer);
 begin
-  Move(FParsingState.Chars[ASourcePosition], FParsingState.Chars[ADestPosition], ACount * SizeOf(Char));
+  Move(FParsingState.Chars[ASourcePosition], FParsingState.Chars[ADestPosition], ACount * SizeOf(WideChar));
 end;
 
 function TACLXMLTextReader.ParsePIValue(out AOutStartPosition, AOutEndPosition: Integer): Boolean;
 var
   APosition, ARcount, ARpos: Integer;
-  AChars: TCharArray;
-  ATmpCh, ACh: Char;
+  AChars: TUnicodeCharArray;
+  ATmpCh, ACh: WideChar;
 begin
   //# read new characters into the buffer
   if FParsingState.CharsUsed - FParsingState.CharPos < 2 then
@@ -3868,13 +3849,13 @@ begin
 end;
 
 //# Parses processing instruction; if piInDtdStringBuilder != null, the processing instruction is in DTD and
-//# it will be saved in the passed string builder (target, whitespace & value).
-function TACLXMLTextReader.ParsePI(APiInDtdStringBuilder: TStringBuilder): Boolean;
+//# it will be saved in the passed UnicodeString builder (target, whitespace & value).
+function TACLXMLTextReader.ParsePI(APiInDtdStringBuilder: TACLStringBuilder): Boolean;
 var
   ANameEndPos, AStartPos, AEndPos: Integer;
-  ATarget: string;
-  ACh: Char;
-  ASb: TStringBuilder;
+  ATarget: UnicodeString;
+  ACh: WideChar;
+  ASb: TACLStringBuilder;
 begin
   if FParsingMode = TParsingMode.Full then
     FCurrentNode.SetLineInfo(FParsingState.LineNo, FParsingState.LinePos);
@@ -3884,8 +3865,8 @@ begin
   ANameEndPos := ParseName;
   ATarget := FNameTable.Add(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos);
 
-  if SameText(ATarget, 'xml') then
-    Throw(IfThen(ATarget = 'xml', SXMLXmlDeclNotFirst, SXmlInvalidPIName), ATarget);
+  if acSameText(ATarget, _U('xml')) then
+    Throw(IfThenW(ATarget = 'xml', SXMLXmlDeclNotFirst, SXmlInvalidPIName), ATarget);
 
   FParsingState.CharPos := ANameEndPos;
 
@@ -3970,7 +3951,7 @@ label
   ContinueStartName, ContinueName;
 var
   AColonOffset, APosition: Integer;
-  AChars: TCharArray;
+  AChars: TUnicodeCharArray;
 begin
   AColonOffset := -1;
   APosition := FParsingState.CharPos + AStartOffset;
@@ -4096,7 +4077,7 @@ begin
     Result := GetWhitespaceType;
 end;
 
-function TACLXMLTextReader.GetValue: string;
+function TACLXMLTextReader.GetValue: UnicodeString;
 begin
   if FParsingFunction >= TParsingFunction.PartialTextValue then
     if FParsingFunction = TParsingFunction.PartialTextValue then
@@ -4197,14 +4178,14 @@ end;
 //#        character or surrogates pair (if expand == true)
 //#      - returns position of the end of the character reference, that is of the character next to the original ';'
 function TACLXMLTextReader.ParseNumericCharRefInline(AStartPosition: Integer; AExpand: Boolean;
-  AInternalSubsetBuilder: TStringBuilder; out ACharCount: Integer; out AEntityType: TEntityType): Integer;
+  AInternalSubsetBuilder: TACLStringBuilder; out ACharCount: Integer; out AEntityType: TEntityType): Integer;
 label
   Return;
 var
   AVal, APosition, ADigitPos: Integer;
-  AChars: TCharArray;
-  ABadDigitExceptionString: string;
-  ACh, ALow, AHigh: Char;
+  AChars: TUnicodeCharArray;
+  ABadDigitExceptionString: UnicodeString;
+  ACh, ALow, AHigh: WideChar;
 begin
   Assert((FParsingState.Chars[AStartPosition] = '&') and (FParsingState.Chars[AStartPosition + 1] = '#'));
 
@@ -4265,7 +4246,7 @@ begin
       begin
         FParsingState.CharPos := APosition;
         AEntityType := TEntityType.Skipped;
-        Throw(SXmlCharEntityOverflow, '');  //#Throw(Res.Xml_CharEntityOverflow, (string)null, e);
+        Throw(SXmlCharEntityOverflow, '');  //#Throw(Res.Xml_CharEntityOverflow, (UnicodeString)null, e);
       end;
   end;
 
@@ -4276,9 +4257,9 @@ begin
     else
       Throw(APosition, ABadDigitExceptionString);
 
-  if AVal <= Ord(High(Char)) then
+  if AVal <= Ord(High(WideChar)) then
   begin
-    ACh := Char(AVal);
+    ACh := WideChar(AVal);
     if not TACLXMLCharType.IsCharData(ACh) and FCheckCharacters then
       Throw(IfThen(FParsingState.Chars[AStartPosition + 2] = 'x', AStartPosition + 3, AStartPosition + 2), SXmlInvalidCharacter,
         EACLXMLException.BuildCharExceptionArgs(ACh, #0));
@@ -4325,13 +4306,13 @@ end;
 //#      - replaces the last character of the entity reference (';') with the referenced character (if expand == true)
 //#      - returns position of the end of the character reference, that is of the character next to the original ';'
 function TACLXMLTextReader.ParseNamedCharRefInline(AStartPosition: Integer; AExpand: Boolean;
-  AInternalSubsetBuilder: TStringBuilder): Integer;
+  AInternalSubsetBuilder: TACLStringBuilder): Integer;
 label
   FoundCharRef;
 var
   APosition: Integer;
-  AChars: TCharArray;
-  ACh: Char;
+  AChars: TUnicodeCharArray;
+  ACh: WideChar;
 begin
   Assert(AStartPosition < FParsingState.CharsUsed);
   Assert(FParsingState.Chars[AStartPosition] = '&');
@@ -4450,7 +4431,7 @@ end;
 //#        character or surrogates pair (if expand == true)
 //#      - returns position of the end of the character reference, that is of the character next to the original ';'
 //#      - if (expand == true) then ps.CharPos is changed to point to the replaced character
-function TACLXMLTextReader.ParseNumericCharRef(AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder;
+function TACLXMLTextReader.ParseNumericCharRef(AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder;
   out AEntityType: TEntityType): Integer;
 var
   ANewPos, ACharCount: Integer;
@@ -4482,7 +4463,7 @@ end;
 //#      - replaces the last character of the entity reference (';') with the referenced character (if expand == true)
 //#      - returns position of the end of the character reference, that is of the character next to the original ';'
 //#      - if (expand == true) then ps.CharPos is changed to point to the replaced character
-function TACLXMLTextReader.ParseNamedCharRef(AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder): Integer;
+function TACLXMLTextReader.ParseNamedCharRef(AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder): Integer;
 var
   ANewPos: Integer;
 begin
@@ -4552,10 +4533,10 @@ function TACLXMLTextReader.ParseText(out AStartPosition, AEndPosition: Integer; 
 label
   NoValue, LblReadData, ReturnPartialValue;
 var
-  AChars: TCharArray;
+  AChars: TUnicodeCharArray;
   APosition, ARcount, ARpos, AOrChars, ACharRefEndPos, ACharCount, AOffset: Integer;
   AEntityType: TEntityType;
-  C, ACh: Char;
+  C, ACh: WideChar;
 begin
   AChars := FParsingState.Chars;
   APosition := FParsingState.CharPos;
@@ -4716,7 +4697,7 @@ LblReadData:
     begin
       if FParsingState.CharsUsed - FParsingState.CharPos > 0 then
       begin
-        if (FParsingState.Chars[FParsingState.CharPos] <> Char($D)) and (FParsingState.Chars[FParsingState.CharPos] <> ']') then
+        if (FParsingState.Chars[FParsingState.CharPos] <> WideChar($D)) and (FParsingState.Chars[FParsingState.CharPos] <> ']') then
           Throw(SXmlUnexpectedEOF1);
         Assert(FParsingState.IsEof);
       end
@@ -4746,13 +4727,13 @@ ReturnPartialValue:
   Result := C = '<';
 end;
 
-function TACLXMLTextReader.ParseUnexpectedToken(APosition: Integer): string;
+function TACLXMLTextReader.ParseUnexpectedToken(APosition: Integer): UnicodeString;
 begin
   FParsingState.CharPos := APosition;
   Result := ParseUnexpectedToken;
 end;
 
-function TACLXMLTextReader.ParseUnexpectedToken: string;
+function TACLXMLTextReader.ParseUnexpectedToken: UnicodeString;
 var
   APosition: Integer;
 begin
@@ -4778,20 +4759,20 @@ function TACLXMLTextReader.ParseXmlDeclaration(AIsTextDecl: Boolean): Boolean;
 
   procedure ThrowTextDecl;
   begin
-    Throw(IfThen(AIsTextDecl, SXmlInvalidTextDecl, SXmlInvalidXmlDecl));
+    Throw(IfThenW(AIsTextDecl, SXmlInvalidTextDecl, SXmlInvalidXmlDecl));
   end;
 
 label
   NoXmlDecl, LblReadData, LblContinue;
 var
-  ASb: TStringBuilder;
+  ASb: TACLStringBuilder;
   AXmlDeclState, AOriginalSbLen, AWsCount, ANameEndPos, APosition: Integer;
   AEncoding: TEncoding;
-  AEncodingName: string;
-  ABadVersion: string;
+  AEncodingName: UnicodeString;
+  ABadVersion: UnicodeString;
   AAttr: TACLXMLNodeData;
-  AQuoteChar: Char;
-  AChars: TCharArray;
+  AQuoteChar: WideChar;
+  AChars: TUnicodeCharArray;
 begin
   while FParsingState.CharsUsed - FParsingState.CharPos < 6 do
     if ReadData = 0 then
@@ -4810,7 +4791,7 @@ begin
 
   Assert((FStringBuilder.Length = 0) or AIsTextDecl);
   if AIsTextDecl then
-    ASb := TStringBuilder.Create
+    ASb := TACLStringBuilder.Create
   else
     ASb := FStringBuilder;
 
@@ -4853,7 +4834,7 @@ begin
           begin
             AEncodingName := FParsingState.Encoding.WebName;
             if (((AEncodingName <> 'utf-8') and (AEncodingName <> 'utf-16')) and (AEncodingName <> 'utf-16be')) and not (FParsingState.Encoding is TMBCSEncoding) then
-              Throw(SXmlEncodingSwitchAfterResetState, IfThen(FParsingState.Encoding.GetByteCount('A') = 1, 'UTF-8', 'UTF-16'));
+              Throw(SXmlEncodingSwitchAfterResetState, IfThenW(FParsingState.Encoding.GetByteCount('A') = 1, 'UTF-8', 'UTF-16'));
           end;
           if FParsingState.Decoder = TEncoding.ASCII then
             SwitchEncodingToUTF8;
@@ -5024,7 +5005,7 @@ NoXmlDecl:
     AEncodingName := FParsingState.Encoding.WebName;
     if (AEncodingName <> 'utf-8') and (AEncodingName <> 'utf-16') and (AEncodingName <> 'utf-16be') and
        not (FParsingState.Encoding is TMBCSEncoding) then
-      Throw(SXmlEncodingSwitchAfterResetState, IfThen(FParsingState.Encoding.GetByteCount('A') = 1, 'UTF-8', 'UTF-16'));
+      Throw(SXmlEncodingSwitchAfterResetState, IfThenW(FParsingState.Encoding.GetByteCount('A') = 1, 'UTF-8', 'UTF-16'));
   end;
 
   if FParsingState.Decoder = TEncoding.ASCII then
@@ -5059,9 +5040,9 @@ begin
   while not ParseText(AStartPos, AEndPos, AOrChars) do ;
 end;
 
-procedure TACLXMLTextReader.ReThrow(E: Exception; ALineNo, ALinePos: Integer);
+procedure TACLXMLTextReader.Rethrow(E: Exception; ALineNo, ALinePos: Integer);
 begin
-  Throw(EACLXMLException.Create(E.Message, nil, ALineNo, ALinePos, ''));
+  Throw(EACLXMLException.Create(acStringToUnicode(E.Message), nil, ALineNo, ALinePos, ''));
 end;
 
 function TACLXMLTextReader.Read: Boolean;
@@ -5330,7 +5311,7 @@ begin
   else
   begin
     FParsingState.Encoding := AEncoding;
-    if ContainsStr(FParsingState.Encoding.WebName, 'utf-16') then
+    if acPos('utf-16', FParsingState.Encoding.WebName, True) > 0 then
       FParsingState.Decoder := TEncoding.Unicode
     else
       FParsingState.Decoder := AEncoding;
@@ -5354,29 +5335,29 @@ begin
   SwitchEncoding(TEncoding.UTF8);
 end;
 
-procedure TACLXMLTextReader.ThrowUnexpectedToken(APosition: Integer; const AExpectedToken1, AExpectedToken2: string);
+procedure TACLXMLTextReader.ThrowUnexpectedToken(APosition: Integer; const AExpectedToken1, AExpectedToken2: UnicodeString);
 begin
   FParsingState.CharPos := APosition;
   ThrowUnexpectedToken(AExpectedToken1, AExpectedToken2);
 end;
 
-procedure TACLXMLTextReader.Throw(const ARes: string);
+procedure TACLXMLTextReader.Throw(const ARes: UnicodeString);
 begin
   Throw(ARes, '');
 end;
 
-procedure TACLXMLTextReader.Throw(APosition: Integer; const ARes: string);
+procedure TACLXMLTextReader.Throw(APosition: Integer; const ARes: UnicodeString);
 begin
   FParsingState.CharPos := APosition;
   Throw(ARes, '');
 end;
 
-procedure TACLXMLTextReader.Throw(const ARes: string; ALineNo, ALinePos: Integer);
+procedure TACLXMLTextReader.Throw(const ARes: UnicodeString; ALineNo, ALinePos: Integer);
 begin
   Throw(EACLXMLException.Create(ARes, '', ALineNo, ALinePos, ''));
 end;
 
-procedure TACLXMLTextReader.Throw(const ARes, AArg: string);
+procedure TACLXMLTextReader.Throw(const ARes, AArg: UnicodeString);
 begin
   Throw(EACLXMLException.Create(ARes, AArg, FParsingState.LineNo, FParsingState.LinePos, ''));
 end;
@@ -5411,9 +5392,9 @@ begin
   end;
 end;
 
-procedure TACLXMLTextReader.ThrowUnexpectedToken(const AExpectedToken1, AExpectedToken2: string);
+procedure TACLXMLTextReader.ThrowUnexpectedToken(const AExpectedToken1, AExpectedToken2: UnicodeString);
 var
-  AUnexpectedToken: string;
+  AUnexpectedToken: UnicodeString;
 begin
   AUnexpectedToken := ParseUnexpectedToken;
   if AUnexpectedToken = '' then
@@ -5424,29 +5405,32 @@ begin
     Throw(SXmlUnexpectedTokenEx, [AUnexpectedToken, AExpectedToken1]);
 end;
 
-procedure TACLXMLTextReader.ThrowUnexpectedToken(AExpectedToken: string);
+procedure TACLXMLTextReader.ThrowUnexpectedToken(AExpectedToken: UnicodeString);
 begin
   ThrowUnexpectedToken(AExpectedToken, '');
 end;
 
-procedure TACLXMLTextReader.ThrowWithoutLineInfo(const ARes, AArg: string);
+procedure TACLXMLTextReader.ThrowWithoutLineInfo(const ARes, AArg: UnicodeString);
 begin
   Throw(EACLXMLException.Create(ARes, AArg, ''));
 end;
 
-class function TACLXMLTextReader.ConvertToConstArray(const AArgs: TArray<string>): TArray<TVarRec>;
+class function TACLXMLTextReader.ConvertToConstArray(const AArgs: TArray<UnicodeString>): TArray<TVarRec>;
 var
   I: Integer;
 begin
+{$IFDEF FPC}
+  Result := nil;
+{$ENDIF}
   SetLength(Result, Length(AArgs));
   for I := Low(AArgs) to High(AArgs) do
   begin
-    string(Result[I].VUnicodeString) := UnicodeString(AArgs[I]);
+    UnicodeString(Result[I].VUnicodeString) := UnicodeString(AArgs[I]);
     Result[I].VType := vtUnicodeString;
   end;
 end;
 
-procedure TACLXMLTextReader.ThrowWithoutLineInfo(const ARes: string);
+procedure TACLXMLTextReader.ThrowWithoutLineInfo(const ARes: UnicodeString);
 begin
   Throw(EACLXMLException.Create(ARes, '', ''));
 end;
@@ -5487,7 +5471,7 @@ begin
   PreviousContext := APreviousContext;
 end;
 
-procedure TACLXMLTextReader.Throw(APosition: Integer; const ARes, AArg: string);
+procedure TACLXMLTextReader.Throw(APosition: Integer; const ARes, AArg: UnicodeString);
 begin
   FParsingState.CharPos := APosition;
   Throw(ARes, AArg);
@@ -5506,7 +5490,7 @@ end;
 
 procedure TACLXMLTextReader.ThrowExpectingWhitespace(APosition: Integer);
 var
-  AUnexpectedToken: string;
+  AUnexpectedToken: UnicodeString;
 begin
   AUnexpectedToken := ParseUnexpectedToken(APosition);
   if AUnexpectedToken = '' then
@@ -5515,12 +5499,12 @@ begin
     Throw(APosition, SXmlExpectingWhiteSpace, AUnexpectedToken);
 end;
 
-procedure TACLXMLTextReader.ThrowInvalidChar(const AData: TCharArray; ALength, AInvCharPos: Integer);
+procedure TACLXMLTextReader.ThrowInvalidChar(const AData: TUnicodeCharArray; ALength, AInvCharPos: Integer);
 begin
   Throw(AInvCharPos, SXmlInvalidCharacter, EACLXMLException.BuildCharExceptionArgs(AData, ALength, AInvCharPos));
 end;
 
-procedure TACLXMLTextReader.Throw(const ARes: string; const AArgs: array of const);
+procedure TACLXMLTextReader.Throw(const ARes: UnicodeString; const AArgs: array of const);
 begin
   Throw(EACLXMLException.Create(ARes, AArgs, FParsingState.LineNo, FParsingState.LinePos, ''));
 end;
@@ -5528,15 +5512,15 @@ end;
 procedure TACLXMLTextReader.ThrowTagMismatch(AStartTag: TACLXMLNodeData);
 var
   AColonPos, AEndPos: Integer;
-  AArg0, AArg1, AArg2, AArg3: string;
+  AArg0, AArg1, AArg2, AArg3: UnicodeString;
 begin
   if AStartTag.&Type = TACLXMLNodeType.Element then
   begin
     //# parse the bad name
     AEndPos := ParseQName(AColonPos);
     AArg0 := AStartTag.GetNameWPrefix(FNameTable);
-    AArg1 := IntToStr(AStartTag.LineInfo.LineNo);
-    AArg2 := IntToStr(AStartTag.LineInfo.LinePos);
+    AArg1 := acIntToStr(AStartTag.LineInfo.LineNo);
+    AArg2 := acIntToStr(AStartTag.LineInfo.LinePos);
     SetString(AArg3, PChar(@FParsingState.Chars[FParsingState.CharPos]), AEndPos - FParsingState.CharPos);
     Throw(SXmlTagMismatchEx, [AArg0, AArg1, AArg2, AArg3]);
   end
@@ -5547,18 +5531,18 @@ begin
   end;
 end;
 
-procedure TACLXMLTextReader.Throw(const ARes, AArg: string; ALineNo, ALinePos: Integer);
+procedure TACLXMLTextReader.Throw(const ARes, AArg: UnicodeString; ALineNo, ALinePos: Integer);
 begin
   Throw(EACLXMLException.Create(ARes, AArg, ALineNo, ALinePos, ''));
 end;
 
-procedure TACLXMLTextReader.Throw(APosition: Integer; const ARes: string; const AArgs: array of const);
+procedure TACLXMLTextReader.Throw(APosition: Integer; const ARes: UnicodeString; const AArgs: array of const);
 begin
   FParsingState.CharPos := APosition;
   Throw(ARes, AArgs);
 end;
 
-procedure TACLXMLTextReader.Throw(APosition: Integer; const ARes: string; const AArgs: TArray<string>);
+procedure TACLXMLTextReader.Throw(APosition: Integer; const ARes: UnicodeString; const AArgs: TArray<UnicodeString>);
 begin
   Throw(APosition, ARes, ConvertToConstArray(AArgs));
 end;
@@ -5584,7 +5568,7 @@ begin
   inherited Destroy;
 end;
 
-function TACLXMLNameTable.Add(const AKey: string): string;
+function TACLXMLNameTable.Add(const AKey: UnicodeString): UnicodeString;
 var
   AIndex, AHash: Cardinal;
   AEntry, ATemp: PItem;
@@ -5614,7 +5598,7 @@ begin
     until False;
 end;
 
-function TACLXMLNameTable.Add(const AKey: TCharArray; AStart, ALength: Integer): string;
+function TACLXMLNameTable.Add(const AKey: TUnicodeCharArray; AStart, ALength: Integer): UnicodeString;
 var
   AIndex, AHash: Cardinal;
   AEntry, ATemp: PItem;
@@ -5644,7 +5628,7 @@ begin
     until False;
 end;
 
-function TACLXMLNameTable.Get(const AValue: string): string;
+function TACLXMLNameTable.Get(const AValue: UnicodeString): UnicodeString;
 var
   AHash: Cardinal;
   AEntry, ATemp: PItem;
@@ -5652,7 +5636,7 @@ begin
   AHash := Hash(AValue);
   AEntry := FTable[AHash mod TableSize];
   if AEntry = nil then
-    Exit(EmptyStr);
+    Exit(EmptyStrU);
 
   repeat
     if (AHash = AEntry.Hash) and (AValue = AEntry.Value) then
@@ -5660,20 +5644,20 @@ begin
 
     ATemp := AEntry.Next;
     if ATemp = nil then
-      Exit(EmptyStr);
+      Exit(EmptyStrU);
 
     AEntry := ATemp;
   until False;
 
-  Result := EmptyStr;
+  Result := EmptyStrU;
 end;
 
-function TACLXMLNameTable.Hash(const S: string): Cardinal;
+function TACLXMLNameTable.Hash(const S: UnicodeString): Cardinal;
 begin
-  Result := Hash(PChar(S), Length(S));
+  Result := Hash(PWideChar(S), acStringLength(S));
 end;
 
-function TACLXMLNameTable.Hash(P: PChar; L: Integer): Cardinal;
+function TACLXMLNameTable.Hash(P: PWideChar; L: Integer): Cardinal;
 begin
   Result := 0;
   while L > 0 do
@@ -5684,12 +5668,12 @@ begin
   end;
 end;
 
-function TACLXMLNameTable.NewItem(const AKey: TCharArray; AStart, ALength: Integer; AHash: Cardinal): PItem;
+function TACLXMLNameTable.NewItem(const AKey: TUnicodeCharArray; AStart, ALength: Integer; AHash: Cardinal): PItem;
 begin
-  Result := NewItem(acMakeString(PChar(@AKey[AStart]), ALength), AHash);
+  Result := NewItem(acMakeString(PWideChar(@AKey[AStart]), ALength), AHash);
 end;
 
-function TACLXMLNameTable.NewItem(const S: string; AHash: Cardinal): PItem;
+function TACLXMLNameTable.NewItem(const S: UnicodeString; AHash: Cardinal): PItem;
 begin
   New(Result);
   Result.Value := S;
@@ -5699,9 +5683,9 @@ end;
 
 { TACLXMLNameTable.TItem }
 
-function TACLXMLNameTable.TItem.Compare(const AKey: TCharArray; AStart, ALength: Integer): Boolean;
+function TACLXMLNameTable.TItem.Compare(const AKey: TUnicodeCharArray; AStart, ALength: Integer): Boolean;
 begin
-  Result := (Length(Value) = ALength) and CompareMem(PChar(Value), @AKey[AStart], ALength * SizeOf(Char));
+  Result := (Length(Value) = ALength) and CompareMem(PChar(Value), @AKey[AStart], ALength * SizeOf(WideChar));
 end;
 
 { TACLXMLTextReader.TParsingState }
@@ -5786,7 +5770,7 @@ end;
 
 constructor TACLXMLNodeLoaders.Create;
 begin
-  FData := TObjectDictionary<string, THolder>.Create([doOwnsValues]);
+  FData := TACLDictionary<UnicodeString, THolder>.Create([doOwnsValues]);
 end;
 
 destructor TACLXMLNodeLoaders.Destroy;
@@ -5795,27 +5779,27 @@ begin
   inherited;
 end;
 
-procedure TACLXMLNodeLoaders.Add(const ANodeName: string; ALoader: TACLXMLNodeLoader);
+procedure TACLXMLNodeLoaders.Add(const ANodeName: UnicodeString; ALoader: TACLXMLNodeLoader);
 begin
   FData.AddOrSetValue(ANodeName, THolder.Create(ALoader));
 end;
 
-procedure TACLXMLNodeLoaders.Add(const ANodeName: string; ALoader: TACLXMLNodeLoaderClass);
+procedure TACLXMLNodeLoaders.Add(const ANodeName: UnicodeString; ALoader: TACLXMLNodeLoaderClass);
 begin
   FData.AddOrSetValue(ANodeName, THolder.Create(ALoader));
 end;
 
-procedure TACLXMLNodeLoaders.Add(const ANodeName: string; AProc: TACLXMLTextLoader);
+procedure TACLXMLNodeLoaders.Add(const ANodeName: UnicodeString; AProc: TACLXMLTextLoader);
 begin
   Add(ANodeName, TACLXMLNodeTextLoader.Create(AProc));
 end;
 
-procedure TACLXMLNodeLoaders.Add(const ANamespace, ANodeName: string; ALoader: TACLXMLNodeLoaderClass);
+procedure TACLXMLNodeLoaders.Add(const ANamespace, ANodeName: UnicodeString; ALoader: TACLXMLNodeLoaderClass);
 begin
   Add(ANamespace + ':' + ANodeName, ALoader);
 end;
 
-procedure TACLXMLNodeLoaders.Add(const ANamespace, ANodeName: string; AProc: TACLXMLTextLoader);
+procedure TACLXMLNodeLoaders.Add(const ANamespace, ANodeName: UnicodeString; AProc: TACLXMLTextLoader);
 begin
   Add(ANamespace + ':' + ANodeName, AProc);
 end;
@@ -5824,10 +5808,10 @@ function TACLXMLNodeLoaders.GetLoader(AReader: TACLXMLReader): TACLXMLNodeLoader
 begin
   Result := GetLoader(AReader, AReader.Name);
   if Result = nil then
-    Result := GetLoader(AReader, EmptyStr);
+    Result := GetLoader(AReader, EmptyStrU);
 end;
 
-function TACLXMLNodeLoaders.GetLoader(AReader: TACLXMLReader; const AName: string): TACLXMLNodeLoader;
+function TACLXMLNodeLoaders.GetLoader(AReader: TACLXMLReader; const AName: UnicodeString): TACLXMLNodeLoader;
 var
   AHolder: THolder;
 begin
@@ -5978,6 +5962,8 @@ begin
                 if ALoader <> nil then
                   ALoader.OnText(AContext, AReader);
               end;
+          else
+            // do nothing, but make FPC happy
           end;
       finally
         AReader.Free;

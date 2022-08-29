@@ -16,16 +16,17 @@ unit ACL.Web.Http;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.WinInet,
+  // Winapi
+  Windows,
+  WinInet,
   // System
-  System.Classes,
-  System.Types,
+  Classes,
+  SyncObjs,
+  Types,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
   ACL.Classes.Collections,
-  ACL.FileFormats.INI,
   ACL.Threading,
   ACL.Threading.Pool,
   ACL.Utils.Common,
@@ -50,8 +51,8 @@ type
   strict private
     FInfo: TACLWebErrorInfo;
   public
-    constructor Create(const Code: Integer; const Text: string); overload;
-    constructor Create(const DefaultText: string = ''); overload;
+    constructor Create(const Code: Integer; const Text: UnicodeString); overload;
+    constructor Create(const DefaultText: UnicodeString = ''); overload;
     //
     property Info: TACLWebErrorInfo read FInfo;
   end;
@@ -82,22 +83,22 @@ type
   THttpConnection = class
   strict private
     FHandle: HINTERNET;
-    FHost: string;
+    FHost: UnicodeString;
     FSecured: Boolean;
     FSession: HINTERNET;
 
     procedure CreateSession;
   protected
     property Handle: HINTERNET read FHandle;
-    property Host: string read FHost;
+    property Host: UnicodeString read FHost;
     property Secured: Boolean read FSecured;
   public
-    constructor Create(const AHost: string; APort: Word; ASecured: Boolean);
+    constructor Create(const AHost: UnicodeString; APort: Word; ASecured: Boolean);
     destructor Destroy; override;
     //
     class procedure ReleaseHandle(var AHandle: HINTERNET);
     class procedure SetOption(Handle: HINTERNET; Option, Value: Cardinal); overload;
-    class procedure SetOption(Handle: HINTERNET; Option: Cardinal; const Value: string); overload;
+    class procedure SetOption(Handle: HINTERNET; Option: Cardinal; const Value: UnicodeString); overload;
   end;
 
   { THttpHeaders }
@@ -106,48 +107,52 @@ type
   public const
     Delimiter = ': ';
   protected
-    class function Get(const AHeaders, AName: string; out AValue: string; out APosStart, APosFinish: Integer): Boolean; overload;
+    class function Get(const AHeaders, AName: UnicodeString; out AValue: UnicodeString; out APosStart, APosFinish: Integer): Boolean; overload;
   public
-    class function Contains(const AHeaders, AName: string): Boolean;
-    class function Extract(var AHeaders: string; const AName: string; out AValue: string): Boolean;
-    class function Get(const AHeaders, AName: string; out AValue: string): Boolean; overload;
+    class function Contains(const AHeaders, AName: UnicodeString): Boolean;
+    class function Extract(var AHeaders: UnicodeString; const AName: UnicodeString; out AValue: UnicodeString): Boolean;
+    class function Get(const AHeaders, AName: UnicodeString; out AValue: UnicodeString): Boolean; overload;
   end;
 
   { THttpRequest }
 
   THttpRequestDataProc = reference to function (Data: PByte; Count: Integer): Boolean;
+  THttpRequestDataProc2 = function (Data: PByte; Count: Integer): Boolean of object;
   THttpRequestProgressProc = function (const APosition, ASize: Int64): Boolean of object;
 
   THttpRequest = class
   strict private const
     BufferSize = 64 * SIZE_ONE_KILOBYTE;
   strict private
-    FCookieURL: string;
+    FCookieURL: UnicodeString;
     FHandle: HINTERNET;
-    FHost: string;
-    FMethod: string;
+    FHost: UnicodeString;
+    FMethod: UnicodeString;
   protected
     function GetQueryValue(const ID: Integer): Integer;
-    function GetQueryValueAsString(const ID: Integer): string;
+    function GetQueryValueAsString(const ID: Integer): UnicodeString;
     function HasData: Boolean;
-    function SendCore(const AHeaders: string; ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil): Boolean;
-    procedure ProcessCookies(var AHeaders: string);
+    function SendCore(const AHeaders: UnicodeString; ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil): Boolean;
+    procedure ProcessCookies(var AHeaders: UnicodeString);
     //
     property Handle: HINTERNET read FHandle;
   public
-    constructor Create(AConnection: THttpConnection; const Method, Path: string);
+    constructor Create(AConnection: THttpConnection; const Method, Path: UnicodeString);
     destructor Destroy; override;
-    procedure Receive(ADataProc: THttpRequestDataProc; AProgressProc: THttpRequestProgressProc = nil);
-    procedure Send(ACustomHeaders: string = ''; ARange: IACLWebRequestRange = nil;
+    procedure Receive(ADataProc: THttpRequestDataProc; AProgressProc: THttpRequestProgressProc = nil); overload;
+  {$IFDEF FPC}
+    procedure Receive(ADataProc: THttpRequestDataProc2; AProgressProc: THttpRequestProgressProc = nil); overload;
+  {$ENDIF}
+    procedure Send(ACustomHeaders: UnicodeString = ''; ARange: IACLWebRequestRange = nil;
       ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil);
     function StatusIsOk: Boolean;
     //
     property ContentLength: Integer index HTTP_QUERY_CONTENT_LENGTH read GetQueryValue;
-    property ContentRange: string index HTTP_QUERY_CONTENT_RANGE read GetQueryValueAsString;
-    property ContentType: string index HTTP_QUERY_CONTENT_TYPE read GetQueryValueAsString;
-    property RawHeaders: string index HTTP_QUERY_RAW_HEADERS read GetQueryValueAsString;
+    property ContentRange: UnicodeString index HTTP_QUERY_CONTENT_RANGE read GetQueryValueAsString;
+    property ContentType: UnicodeString index HTTP_QUERY_CONTENT_TYPE read GetQueryValueAsString;
+    property RawHeaders: UnicodeString index HTTP_QUERY_RAW_HEADERS read GetQueryValueAsString;
     property StatusCode: Integer index HTTP_QUERY_STATUS_CODE read GetQueryValue;
-    property StatusText: string index HTTP_QUERY_STATUS_TEXT read GetQueryValueAsString;
+    property StatusText: UnicodeString index HTTP_QUERY_STATUS_TEXT read GetQueryValueAsString;
   end;
 
   { TACLHttpClient }
@@ -234,7 +239,7 @@ type
     function GetSize: Int64; override;
     procedure SetSize(const NewSize: Int64); override;
   public
-    constructor Create(const URL: TACLWebURL; const ACachedFileName: string = '';
+    constructor Create(const URL: TACLWebURL; const ACachedFileName: UnicodeString = '';
       AMode: TACLHttpInputStreamDownloadMode = hisdmASAP);
     destructor Destroy; override;
     class function ValidateCacheStream(AStream: TStream): Boolean; overload;
@@ -249,16 +254,14 @@ type
 implementation
 
 uses
-  System.StrUtils,
-  System.SysUtils,
-  System.Math,
+  Math,
+  SysUtils,
   // ACL
   ACL.Classes.StringList,
   ACL.FastCode,
   ACL.Math,
   ACL.Parsers,
   ACL.Utils.FileSystem,
-  ACL.Utils.Registry,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
 
@@ -284,7 +287,7 @@ type
   strict private
     FError: TACLWebErrorInfo;
     FHandler: IACLHttpClientHandler;
-    FMethod: string;
+    FMethod: UnicodeString;
     FOptions: TACLHttpClientOptions;
     FPostData: TStream;
     FPriority: TACLTaskPriority;
@@ -307,7 +310,7 @@ type
       const ARange: IACLWebRequestRange; APriority: TACLTaskPriority; AOptions: TACLHttpClientOptions);
     destructor Destroy; override;
     //
-    property Method: string read FMethod;
+    property Method: UnicodeString read FMethod;
     property Options: TACLHttpClientOptions read FOptions;
     property URL: TACLWebURL read FURL;
   end;
@@ -361,23 +364,29 @@ begin
   if GetLastError = ERROR_INSUFFICIENT_BUFFER then
   begin
     AReserved := 0;
+  {$IFDEF FPC}
+    Result := EmptyStrU;
+  {$ENDIF}
     SetLength(Result, ABufferLength div SizeOf(WideChar));
     HttpQueryInfoW(AService, ID, @Result[1], ABufferLength, AReserved);
     SetLength(Result, ABufferLength div SizeOf(WideChar));
   end
   else
-    Result := EmptyStr;
+    Result := EmptyStrU;
 end;
 
 { EHttpError }
 
-constructor EHttpError.Create(const DefaultText: string = '');
+constructor EHttpError.Create(const DefaultText: UnicodeString = '');
 var
   ABuffer: array[Byte] of WideChar;
   ABufferLength: DWORD;
   AError: DWORD;
 begin
   ABufferLength := Length(ABuffer);
+{$IFDEF FPC}
+  AError := 0;
+{$ENDIF}
   if InternetGetLastResponseInfoW(AError, @ABuffer[0], ABufferLength) and (AError > 0) then
   begin
     SetString(FInfo.ErrorMessage, PWideChar(@ABuffer[0]), ABufferLength);
@@ -387,13 +396,13 @@ begin
     if GetLastError <> 0 then
     begin
       FInfo.ErrorCode := GetLastError;
-      FInfo.ErrorMessage := SysErrorMessage(FInfo.ErrorCode);
+      FInfo.ErrorMessage := _U(SysErrorMessage(FInfo.ErrorCode));
     end
     else
       Info.Initialize(acWebErrorUnknown, Format(sErrorInternal, [DefaultText]));
 end;
 
-constructor EHttpError.Create(const Code: Integer; const Text: string);
+constructor EHttpError.Create(const Code: Integer; const Text: UnicodeString);
 begin
   Info.Initialize(Code, Text);
 end;
@@ -421,7 +430,7 @@ end;
 
 { THttpConnection }
 
-constructor THttpConnection.Create(const AHost: string; APort: Word; ASecured: Boolean);
+constructor THttpConnection.Create(const AHost: UnicodeString; APort: Word; ASecured: Boolean);
 begin
   FHost := AHost;
   FSecured := ASecured;
@@ -454,9 +463,9 @@ begin
   end;
 end;
 
-class procedure THttpConnection.SetOption(Handle: HINTERNET; Option: Cardinal; const Value: string);
+class procedure THttpConnection.SetOption(Handle: HINTERNET; Option: Cardinal; const Value: UnicodeString);
 begin
-  InternetSetOptionW(Handle, Option, PWideChar(Value), Length(Value));
+  InternetSetOptionW(Handle, Option, PWideChar(Value), acStringLength(Value));
 end;
 
 class procedure THttpConnection.SetOption(Handle: HINTERNET; Option, Value: Cardinal);
@@ -494,24 +503,24 @@ end;
 
 { THttpHeader }
 
-class function THttpHeaders.Contains(const AHeaders, AName: string): Boolean;
+class function THttpHeaders.Contains(const AHeaders, AName: UnicodeString): Boolean;
 var
-  AValue: string;
+  AValue: UnicodeString;
 begin
   Result := Get(AHeaders, AName, AValue);
 end;
 
-class function THttpHeaders.Extract(var AHeaders: string; const AName: string; out AValue: string): Boolean;
+class function THttpHeaders.Extract(var AHeaders: UnicodeString; const AName: UnicodeString; out AValue: UnicodeString): Boolean;
 var
   APosFinish: Integer;
   APosStart: Integer;
 begin
   Result := Get(AHeaders, AName, AValue, APosStart, APosFinish);
   if Result then
-    Delete(AHeaders, APosStart, APosFinish - APosStart + Length(acCRLF))
+    Delete(AHeaders, APosStart, APosFinish - APosStart + acStringLength(acCRLF))
 end;
 
-class function THttpHeaders.Get(const AHeaders, AName: string; out AValue: string): Boolean;
+class function THttpHeaders.Get(const AHeaders, AName: UnicodeString; out AValue: UnicodeString): Boolean;
 var
   APosFinish: Integer;
   APosStart: Integer;
@@ -519,7 +528,7 @@ begin
   Result := Get(AHeaders, AName, AValue, APosStart, APosFinish);
 end;
 
-class function THttpHeaders.Get(const AHeaders, AName: string; out AValue: string; out APosStart, APosFinish: Integer): Boolean;
+class function THttpHeaders.Get(const AHeaders, AName: UnicodeString; out AValue: UnicodeString; out APosStart, APosFinish: Integer): Boolean;
 begin
   AValue := acExtractString(AHeaders + acCRLF, AName + Delimiter, acCRLF, APosStart, APosFinish);
   Result := APosStart > 0;
@@ -527,7 +536,7 @@ end;
 
 { THttpRequest }
 
-constructor THttpRequest.Create(AConnection: THttpConnection; const Method, Path: string);
+constructor THttpRequest.Create(AConnection: THttpConnection; const Method, Path: UnicodeString);
 
   function BuildFlags: Cardinal;
   begin
@@ -564,6 +573,9 @@ begin
     AContentPosition := 0;
     while HasData do
     begin
+    {$IFDEF FPC}
+      ABytesRead := 0;
+    {$ENDIF}
       if not InternetReadFile(Handle, ABuffer, BufferSize, ABytesRead) then
         raise EHttpError.Create('InternetReadFile failed');
       if ABytesRead = 0 then
@@ -582,13 +594,24 @@ begin
   end;
 end;
 
-procedure THttpRequest.Send(ACustomHeaders: string = '';
+{$IFDEF FPC}
+procedure THttpRequest.Receive(ADataProc: THttpRequestDataProc2; AProgressProc: THttpRequestProgressProc = nil);
+begin
+  Receive(
+    function (Data: PByte; Count: Integer): Boolean
+    begin
+      Result := ADataProc(Data, Count);
+    end, AProgressProc);
+end;
+{$ENDIF}
+
+procedure THttpRequest.Send(ACustomHeaders: UnicodeString = '';
   ARange: IACLWebRequestRange = nil; ADataStream: TStream = nil;
   AProgressProc: THttpRequestProgressProc = nil);
 
-  procedure AddHeaderValue(AHeaders: TACLStringList; const AName, ADefaultValue: string);
+  procedure AddHeaderValue(AHeaders: TACLStringList; const AName, ADefaultValue: UnicodeString);
   var
-    AValue: string;
+    AValue: UnicodeString;
   begin
     if not THttpHeaders.Extract(ACustomHeaders, AName, AValue) then
       AValue := ADefaultValue;
@@ -598,9 +621,9 @@ procedure THttpRequest.Send(ACustomHeaders: string = '';
 
   function BuildRange: UnicodeString;
   begin
-    Result := 'bytes=' + IntToStr(ARange.GetOffset) + '-';
+    Result := 'bytes=' + acIntToStr(ARange.GetOffset) + '-';
     if ARange.GetSize >= 0 then
-      Result := Result + IntToStr(ARange.GetOffset + ARange.GetSize - 1);
+      Result := Result + acIntToStr(ARange.GetOffset + ARange.GetSize - 1);
   end;
 
   function BuildHeaders: UnicodeString;
@@ -646,7 +669,7 @@ begin
   Result := HTTPQueryDWORD(Handle, ID);
 end;
 
-function THttpRequest.GetQueryValueAsString(const ID: Integer): string;
+function THttpRequest.GetQueryValueAsString(const ID: Integer): UnicodeString;
 begin
   Result := HTTPQueryString(Handle, ID);
 end;
@@ -655,10 +678,13 @@ function THttpRequest.HasData: Boolean;
 var
   X: DWORD;
 begin
+{$IFDEF FPC}
+  X := 0;
+{$ENDIF}
   Result := InternetQueryDataAvailable(Handle, X, 0, 0) and (X > 0);
 end;
 
-function THttpRequest.SendCore(const AHeaders: string;
+function THttpRequest.SendCore(const AHeaders: UnicodeString;
   ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil): Boolean;
 var
   ABuffer: TInternetBuffersW;
@@ -674,8 +700,8 @@ begin
     ZeroMemory(@ABuffer, SizeOf(ABuffer));
     ABuffer.dwStructSize := SizeOf(ABuffer);
     ABuffer.lpcszHeader := PWideChar(AHeaders);
-    ABuffer.dwHeadersLength := Length(AHeaders);
-    ABuffer.dwHeadersTotal := Length(AHeaders);
+    ABuffer.dwHeadersLength := acStringLength(AHeaders);
+    ABuffer.dwHeadersTotal := acStringLength(AHeaders);
     ABuffer.dwBufferTotal := ADataStream.Size;
 
     if HttpSendRequestEx(Handle, @ABuffer, nil, HSR_INITIATE, 0) then
@@ -687,6 +713,7 @@ begin
       AData := AllocMem(BufferSize);
       try
         repeat
+          ADataWritten := 0;
           ADataUsed := ADataStream.Read(AData^, BufferSize);
           if ADataUsed > 0 then
           begin
@@ -708,7 +735,7 @@ begin
     end;
   end
   else
-    Result := HttpSendRequest(Handle, PWideChar(AHeaders), Length(AHeaders), nil, 0);
+    Result := HttpSendRequestW(Handle, PWideChar(AHeaders), acStringLength(AHeaders), nil, 0);
 end;
 
 function THttpRequest.StatusIsOk: Boolean;
@@ -717,9 +744,9 @@ begin
   Result := InRange(StatusCode, 200, 299);
 end;
 
-procedure THttpRequest.ProcessCookies(var AHeaders: string);
+procedure THttpRequest.ProcessCookies(var AHeaders: UnicodeString);
 var
-  AValue: string;
+  AValue: UnicodeString;
 begin
   while THttpHeaders.Extract(AHeaders, IdentCookie, AValue) do
     InternetSetCookie(PChar(FCookieURL), nil, PChar(AValue));
@@ -959,7 +986,7 @@ end;
 { TACLHttpInputStream }
 
 constructor TACLHttpInputStream.Create(const URL: TACLWebURL;
-  const ACachedFileName: string = ''; AMode: TACLHttpInputStreamDownloadMode = hisdmASAP);
+  const ACachedFileName: UnicodeString = ''; AMode: TACLHttpInputStreamDownloadMode = hisdmASAP);
 var
   AList: TACLList<Integer>;
 begin
@@ -968,7 +995,7 @@ begin
   FMode := AMode;
   FFreeBlocks := TACLThreadList<Integer>.Create;
   FFreeBlocksEvent := TACLEvent.Create;
-  FCacheStreamLock := TACLCriticalSection.Create(Self, 'Lock');
+  FCacheStreamLock := TACLCriticalSection.Create;
 
   if acFileExists(ACachedFileName) then
   begin
@@ -1131,8 +1158,10 @@ begin
       Result := FPosition + Offset;
     soEnd:
       Result := Size + Offset
+{$IFNDEF FPC}
   else
     Result := FPosition;
+{$ENDIF}
   end;
   Result := MinMax(Result, 0, Size);
   FPosition := Result;
@@ -1140,6 +1169,9 @@ end;
 
 function TACLHttpInputStream.Write(const Buffer; Count: Integer): Longint;
 begin
+{$IFDEF FPC}
+  Result := 0;
+{$ENDIF}
   raise EInvalidOperation.Create(ClassName);
 end;
 

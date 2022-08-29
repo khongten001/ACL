@@ -16,12 +16,10 @@ unit ACL.WEB;
 interface
 
 uses
-  Winapi.Windows,
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
-  System.Math,
+  Classes,
+  SysUtils,
+  Math,
   // ACL
   ACL.Classes.StringList,
   ACL.FileFormats.INI,
@@ -116,10 +114,10 @@ type
 
   TACLWebParams = class(TACLStringList)
   public
-    function Add(const AName, AValue: string): TACLWebParams; reintroduce; overload;
-    function Add(const AName: string; const AValue: Integer): TACLWebParams; reintroduce; overload;
-    function Add(const AName: string; const AValue: TBytes): TACLWebParams; reintroduce; overload;
-    function AddIfNonEmpty(const AName, AValue: string): TACLWebParams; reintroduce;
+    function Add(const AName, AValue: UnicodeString): TACLWebParams; reintroduce; overload;
+    function Add(const AName: UnicodeString; const AValue: Integer): TACLWebParams; reintroduce; overload;
+    function Add(const AName: UnicodeString; const AValue: TBytes): TACLWebParams; reintroduce; overload;
+    function AddIfNonEmpty(const AName, AValue: UnicodeString): TACLWebParams; reintroduce;
     class function New: TACLWebParams;
     function ToString: string; override;
   end;
@@ -157,13 +155,12 @@ function acURLEscape(const S: UnicodeString): UnicodeString;
 implementation
 
 uses
-  Winapi.WinInet,
+  WinInet,
   // ACL
   ACL.Math,
   ACL.Parsers,
   ACL.Utils.Common,
   ACL.Utils.Date,
-  ACL.Utils.Registry,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
 
@@ -183,7 +180,7 @@ var
 begin
   Result := S;
   for I := 0 to Length(ReservedChars) - 1 do
-    Result := StringReplace(Result, ReservedChars[I], '%' + IntToHex(Byte(ReservedChars[I]), 2), [rfReplaceAll]);
+    Result := acStringReplace(Result, ReservedChars[I], '%' + acIntToHex(Byte(ReservedChars[I]), 2));
 end;
 
 function RFC822ToDateTime(const Value: UnicodeString): TDateTime;
@@ -218,8 +215,8 @@ begin
     Check(AParser.GetToken(AToken));
     for M := 1 to 12 do
     begin
-      if AToken.Compare(InvariantFormatSettings.ShortMonthNames[M]) or
-         AToken.Compare(InvariantFormatSettings.LongMonthNames[M])
+      if AToken.Compare(_U(InvariantFormatSettings.ShortMonthNames[M])) or
+         AToken.Compare(_U(InvariantFormatSettings.LongMonthNames[M]))
       then
         Break;
     end;
@@ -282,7 +279,7 @@ end;
 
 function acURLEncode(const B: TArray<Byte>): UnicodeString;
 var
-  S: TStringBuilder;
+  S: TACLStringBuilder;
   I: Integer;
 begin
   S := TACLStringBuilderManager.Get(Length(B) * 3);
@@ -337,7 +334,10 @@ var
 begin
   AIndex := 1;
   ADestIndex := 1;
-  ALength := Length(S);
+  ALength := acStringLength(S);
+{$IFDEF FPC}
+  Result := EmptyStrU;
+{$ENDIF}
   SetLength(Result, ALength);
   while AIndex <= ALength do
   begin
@@ -361,7 +361,7 @@ var
 begin
   if acFindString(acCRLF, S, ADelimPos) then
   begin
-    Result.CustomHeaders := Copy(S, ADelimPos + Length(acCRLF), MaxInt);
+    Result.CustomHeaders := Copy(S, ADelimPos + acStringLength(acCRLF), MaxInt);
     S := Copy(S, 1, ADelimPos - 1);
   end
   else
@@ -371,7 +371,7 @@ begin
   if acFindString(acProtocolDelimiter, S, ADelimPos) then
   begin
     Result.Protocol := Copy(S, 1, ADelimPos - 1);
-    Result.Secured := SameText(Result.Protocol, AProtocol + 's');
+    Result.Secured := acSameText(Result.Protocol, AProtocol + 's');
     Delete(S, 1, ADelimPos + 2);
   end
   else
@@ -416,12 +416,12 @@ end;
 
 function TACLWebURL.ToString: UnicodeString;
 var
-  B: TStringBuilder;
+  B: TACLStringBuilder;
 begin
   if Host = '' then
     Exit('');
 
-  B := TStringBuilder.Create;
+  B := TACLStringBuilder.Create;
   try
     if Protocol <> '' then
     begin
@@ -464,7 +464,7 @@ end;
 
 { TACLWebParams }
 
-function TACLWebParams.Add(const AName: string; const AValue: TBytes): TACLWebParams;
+function TACLWebParams.Add(const AName: UnicodeString; const AValue: TBytes): TACLWebParams;
 begin
   if Self <> nil then
     Result := Self
@@ -474,7 +474,7 @@ begin
   Result.AddEx(AName + '=' + acURLEncode(AValue));
 end;
 
-function TACLWebParams.Add(const AName, AValue: string): TACLWebParams;
+function TACLWebParams.Add(const AName, AValue: UnicodeString): TACLWebParams;
 begin
   if Self <> nil then
     Result := Self
@@ -484,12 +484,12 @@ begin
   Result.AddEx(AName + '=' + acURLEscape(AValue));
 end;
 
-function TACLWebParams.Add(const AName: string; const AValue: Integer): TACLWebParams;
+function TACLWebParams.Add(const AName: UnicodeString; const AValue: Integer): TACLWebParams;
 begin
-  Result := Add(AName, IntToStr(AValue));
+  Result := Add(AName, acIntToStr(AValue));
 end;
 
-function TACLWebParams.AddIfNonEmpty(const AName, AValue: string): TACLWebParams;
+function TACLWebParams.AddIfNonEmpty(const AName, AValue: UnicodeString): TACLWebParams;
 begin
   if AValue <> '' then
     Result := Add(AName, AValue)
@@ -541,6 +541,9 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
     try
       if AConfig.ReadStream(sWebConfigSection, 'Proxy', AStream) then
       begin
+      {$IFDEF FPC}
+        ID := 0;
+      {$ENDIF}
         AStream.Read(ID, SizeOf(ID));
         if ID <> PROXY_SETTINGS_ID then
           AStream.Position := 0;
@@ -622,7 +625,7 @@ end;
 constructor EACLWebError.Create(const AInfo: TACLWebErrorInfo);
 begin
   FInfo := AInfo;
-  Create(AInfo.ToString);
+  Create(acUnicodeToString(AInfo.ToString));
 end;
 
 { TACLWebProxyInfo }
@@ -637,10 +640,10 @@ end;
 
 procedure TACLWebProxyInfo.Reset;
 begin
-  Server := EmptyStr;
-  ServerPort := EmptyStr;
-  UserName := EmptyStr;
-  UserPass := EmptyStr;
+  Server := EmptyStrU;
+  ServerPort := EmptyStrU;
+  UserName := EmptyStrU;
+  UserPass := EmptyStrU;
 end;
 
 end.

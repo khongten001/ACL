@@ -17,13 +17,16 @@ unit ACL.Graphics.TextLayout32;
 interface
 
 uses
-  Winapi.Windows,
+  // Winapi
+  Windows,
   // System
+  Classes,
+  Types,
+{$IFNDEF FPC}
   System.UITypes,
-  System.Types,
-  System.Classes,
+{$ENDIF}
   // VCL
-  Vcl.Graphics,
+  Graphics,
   // ACL
   ACL.Classes,
   ACL.FastCode,
@@ -57,7 +60,7 @@ type
     procedure SetColorAlpha(const AValue: Byte);
     procedure SetShadow(const AValue: TACLFontShadow);
   public
-    constructor Create;
+    constructor Create; {$IFDEF FPC}override;{$ENDIF}
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
     function AppendTextExtends(const S: TSize): TSize;
@@ -177,12 +180,12 @@ type
   TACLSimpleTextLayout32 = class
   strict private
     FFont: TACLFont;
-    FText: string;
+    FText: UnicodeString;
     FTextViewInfo: TACLTextViewInfo;
 
     procedure FontChangeHandler(Sender: TObject);
     function GetSize: TSize;
-    procedure SetText(const Value: string);
+    procedure SetText(const Value: UnicodeString);
   protected
     procedure CheckCalculated;
   public
@@ -193,7 +196,7 @@ type
     //
     property Font: TACLFont read FFont;
     property Size: TSize read GetSize;
-    property Text: string read FText write SetText;
+    property Text: UnicodeString read FText write SetText;
   end;
 
 procedure DrawText32(DC: HDC; const R: TRect; const AText: UnicodeString; AFont: TACLFont;
@@ -207,8 +210,8 @@ procedure DrawText32Prepared(DC: HDC; const R: TRect; const ATextViewInfo: TACLT
 implementation
 
 uses
-  System.Math,
-  System.SysUtils;
+  Math,
+  SysUtils;
 
 const
   MapTextOffsets: array[TACLMarginPart] of TPoint =
@@ -317,7 +320,7 @@ begin
   begin
     ATextDC := CreateCompatibleDC(0);
     try
-      TACLText32Renderer.Instance.DoDraw(DC, ATextDC, PChar(AText), Length(AText), nil, AFont, R, AFont.TextExtends.TopLeft, 0);
+      TACLText32Renderer.Instance.DoDraw(DC, ATextDC, PWideChar(AText), acStringLength(AText), nil, AFont, R, AFont.TextExtends.TopLeft, 0);
     finally
       DeleteDC(ATextDC);
     end;
@@ -631,7 +634,7 @@ begin
     SelectObject(ATextDC, AFont.Handle);
     ATextExtends := AFont.TextExtends;
     acTextPrepare(ATextDC, R, AEndEllipsis, AAlignment, AVertAlignment, AText, ATextSize, ATextOffset, ATextExtends);
-    Instance.DoDraw(DC, ATextDC, PChar(AText), Length(AText), nil, AFont,
+    Instance.DoDraw(DC, ATextDC, PWideChar(AText), acStringLength(AText), nil, AFont,
       Bounds(ATextOffset.X, ATextOffset.Y, ATextSize.cx, ATextSize.cy),
       ATextExtends.TopLeft, 0);
   finally
@@ -646,7 +649,7 @@ var
 begin
   ATextDC := CreateCompatibleDC(0);
   try
-    Instance.DoDraw(DC, ATextDC, PChar(AText), Length(AText), nil,
+    Instance.DoDraw(DC, ATextDC, PWideChar(AText), acStringLength(AText), nil,
       AFont, R, acPointOffset(ATextOffset, AFont.TextExtends.TopLeft), ADuplicateOffset);
   finally
     DeleteDC(ATextDC);
@@ -898,6 +901,10 @@ begin
   ALayoutBox := AOwner.FLayout.BoundingRect;
   Inc(ALayoutBox.Bottom, acMarginHeight(AOwner.Font.TextExtends));
   Inc(ALayoutBox.Right, acMarginWidth(AOwner.Font.TextExtends));
+{$IFDEF FPC}
+  AClipBox := NullRect;
+  ARect := NullRect;
+{$ENDIF}
   if GetClipBox(ACanvas.Handle, AClipBox) <> NULLREGION then
     IntersectRect(ARect, ALayoutBox, AClipBox);
 
@@ -944,6 +951,9 @@ var
 begin
   if ABlock.VisibleLength > 0 then
   begin
+  {$IFDEF FPC}
+    AWindowOrg := NullPoint;
+  {$ENDIF}
     GetWindowOrgEx(Canvas.Handle, AWindowOrg);
     try
       APoint := acPointOffsetNegative(AWindowOrg, FOrigin);
@@ -1012,7 +1022,7 @@ begin
     Dec(AMaxWidth, Font.MeasureSize(acEndEllipsis).cx);
     FTextViewInfo.AdjustToWidth(AMaxWidth, AReducedCharacters, AReducedWidth);
     FreeAndNil(FTextViewInfo);
-    FText := Copy(FText, 1, Length(FText) - AReducedCharacters) + acEndEllipsis;
+    FText := Copy(FText, 1, acStringLength(FText) - AReducedCharacters) + acEndEllipsis;
   end;
 end;
 
@@ -1028,7 +1038,7 @@ begin
   Result := Font.AppendTextExtends(FTextViewInfo.Size);
 end;
 
-procedure TACLSimpleTextLayout32.SetText(const Value: string);
+procedure TACLSimpleTextLayout32.SetText(const Value: UnicodeString);
 begin
   if FText <> Value then
   begin

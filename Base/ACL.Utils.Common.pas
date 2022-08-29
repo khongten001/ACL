@@ -176,8 +176,9 @@ function LParamToPointer(const LParam: LPARAM): Pointer;
 function PointerToLParam(const Ptr: Pointer): LPARAM;
 
 {$IFDEF FPC}
-function AtomicExchange(var ATarget: THandle; const ASource: THandle): THandle; overload;
-function AtomicExchange(var ATarget: Pointer; const ASource: Pointer): Pointer; overload;
+function AtomicExchange(var ATarget: THandle; const ANewValue: THandle): THandle; overload;
+function AtomicExchange(var ATarget: Pointer; const ANewValue: Pointer): Pointer; overload;
+function AtomicCmpExchange(var ATarget: Pointer; const ANewValue, AComparand: Pointer): Pointer; overload;
 {$ENDIF}
 implementation
 
@@ -225,28 +226,33 @@ begin
 end;
 
 {$IFDEF FPC}
-function AtomicExchange(var ATarget: THandle; const ASource: THandle): THandle; overload;
+function AtomicExchange(var ATarget: THandle; const ANewValue: THandle): THandle; overload;
 begin
 {$push}
   {$hints off}
   {$IFDEF CPUX64}
-    Result := THandle(InterlockedExchange64(QWORD(ATarget), QWORD(ASource)));
+    Result := THandle(InterlockedExchange64(QWORD(ATarget), QWORD(ANewValue)));
   {$ELSE}
-    Result := THandle(InterlockedExchange(DWORD(ATarget), DWORD(ASource)));
+    Result := THandle(InterlockedExchange(DWORD(ATarget), DWORD(ANewValue)));
   {$ENDIF}
 {$pop}
 end;
 
-function AtomicExchange(var ATarget: Pointer; const ASource: Pointer): Pointer;
+function AtomicExchange(var ATarget: Pointer; const ANewValue: Pointer): Pointer;
 begin
 {$push}
   {$hints off}
   {$IFDEF CPUX64}
-    Result := Pointer(InterlockedExchange64(QWORD(ATarget), QWORD(ASource)));
+    Result := Pointer(InterlockedExchange64(QWORD(ATarget), QWORD(ANewValue)));
   {$ELSE}
-    Result := Pointer(InterlockedExchange(DWORD(ATarget), DWORD(ASource)));
+    Result := Pointer(InterlockedExchange(DWORD(ATarget), DWORD(ANewValue)));
   {$ENDIF}
 {$pop}
+end;
+
+function AtomicCmpExchange(var ATarget: Pointer; const ANewValue, AComparand: Pointer): Pointer;
+begin
+  Result := InterlockedCompareExchangePointer(ATarget, ANewValue, AComparand);
 end;
 
 {$ENDIF}
