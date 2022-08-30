@@ -16,21 +16,22 @@ unit ACL.UI.Controls.Buttons;
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
+  // Winapi
+  Messages,
+  Windows,
   // VCL
-  Vcl.ActnList,
-  Vcl.Controls,
-  Vcl.Forms,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.Menus,
-  Vcl.StdCtrls,
+  ActnList,
+  Controls,
+  Forms,
+  Graphics,
+  ImgList,
+  Menus,
+  StdCtrls,
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  Classes,
+  Generics.Collections,
+  SysUtils,
+  Types,
   System.UITypes,
   // ACL
   ACL.Classes,
@@ -77,15 +78,15 @@ type
     property ContentOffsets: TRect read GetContentOffsets;
     property TextColors[AState: TACLButtonState]: TColor read GetTextColor;
     // for backward compatibility with scripts
-    property TextColor: TACLResourceColor index absNormal read GetColor;
-    property TextColorDisabled: TACLResourceColor index absDisabled read GetColor;
-    property TextColorHover: TACLResourceColor index absHover read GetColor;
-    property TextColorPressed: TACLResourceColor index absPressed read GetColor;
+    property TextColor: TACLResourceColor index Ord(absNormal) read GetColor;
+    property TextColorDisabled: TACLResourceColor index Ord(absDisabled) read GetColor;
+    property TextColorHover: TACLResourceColor index Ord(absHover) read GetColor;
+    property TextColorPressed: TACLResourceColor index Ord(absPressed) read GetColor;
   published
-    property ColorText: TACLResourceColor index absNormal read GetColor write SetColor stored IsColorStored;
-    property ColorTextDisabled: TACLResourceColor index absDisabled read GetColor write SetColor stored IsColorStored;
-    property ColorTextHover: TACLResourceColor index absHover read GetColor write SetColor stored IsColorStored;
-    property ColorTextPressed: TACLResourceColor index absPressed read GetColor write SetColor stored IsColorStored;
+    property ColorText: TACLResourceColor index Ord(absNormal) read GetColor write SetColor stored IsColorStored;
+    property ColorTextDisabled: TACLResourceColor index Ord(absDisabled) read GetColor write SetColor stored IsColorStored;
+    property ColorTextHover: TACLResourceColor index Ord(absHover) read GetColor write SetColor stored IsColorStored;
+    property ColorTextPressed: TACLResourceColor index Ord(absPressed) read GetColor write SetColor stored IsColorStored;
     property Texture: TACLResourceTexture index 0 read GetTexture write SetTexture stored IsTextureStored;
   end;
 
@@ -416,7 +417,7 @@ type
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     // Messages
-    procedure CMEnabledChanged(var Message: TMessage); override;
+    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -546,7 +547,7 @@ type
     procedure SetState(AValue: TCheckBoxState); virtual;
     procedure UpdateSubControlEnabled;
     // Messages
-    procedure CMEnabledChanged(var Message: TMessage); override;
+    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMHitTest(var Message: TCMHitTest); message CM_HITTEST;
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
     //
@@ -587,12 +588,12 @@ type
     procedure SetDefaultSize; override;
 
     // IACLInplaceControl
-    function InplaceGetValue: string;
+    function InplaceGetValue: UnicodeString;
     function IACLInplaceControl.InplaceIsFocused = Focused;
-    procedure InplaceSetValue(const AValue: string);
+    procedure InplaceSetValue(const AValue: UnicodeString);
     procedure IACLInplaceControl.InplaceSetFocus = SetFocus;
     //
-    procedure CMHitTest(var Message: TWMNCHitTest); override;
+    procedure CMHitTest(var Message: TWMNCHitTest); message CM_HITTEST;
   public
     constructor CreateInplace(const AParams: TACLInplaceInfo);
   end;
@@ -616,9 +617,9 @@ type
 implementation
 
 uses
-  System.Math,
+  Math,
   // ACL
-  ACL.UI.PopupMenu,
+  //ACL.UI.PopupMenu,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
@@ -1566,9 +1567,10 @@ begin
   if Assigned(OnClick) or (ActionLink <> nil) or (ModalResult <> mrNone) then
     inherited PerformClick
   else
-    if (Kind = sbkDropDownButton) and Assigned(DropDownMenu) and (DropDownMenu.Items.DefaultItem <> nil) then
-      DropDownMenu.Items.DefaultItem.Click
-    else
+    {$MESSAGE 'TODO'}
+    //if (Kind = sbkDropDownButton) and Assigned(DropDownMenu) and (DropDownMenu.Items.DefaultItem <> nil) then
+    //  DropDownMenu.Items.DefaultItem.Click
+    //else
       ShowDropDownMenu;
 end;
 
@@ -1908,7 +1910,7 @@ begin
   begin
     AssignCanvasParameters(ACanvas);
     //#AI: DrawTextW is always used to make layout consistent between singleline and multiline checkboxes
-    DrawTextW(ACanvas.Handle, Caption, -1, FTextRect, acTextAligns[Alignment] or acTextWordWrap[WordWrap]);
+    DrawTextW(ACanvas.Handle, PWideChar(Caption), -1, FTextRect, acTextAligns[Alignment] or acTextWordWrap[WordWrap]);
   end;
   if ShowLine then
     acDrawLabelLine(ACanvas, FLineRect, TextRect, Style.ColorLine1.Value, Style.ColorLine2.Value);
@@ -2081,7 +2083,7 @@ begin
     PtInRect(ViewInfo.LineRect, P));
 end;
 
-procedure TACLCustomCheckBox.WMNCHitTest(var Message: TCMHitTest);
+procedure TACLCustomCheckBox.WMNCHitTest;
 begin
   if Perform(CM_HITTEST, 0, PointToLParam(ScreenToClient(SmallPointToPoint(Message.Pos)))) <> 0 then
     Message.Result := HTCLIENT
@@ -2175,12 +2177,12 @@ begin
   OnKeyDown := AParams.OnKeyDown;
 end;
 
-function TACLInplaceCheckBox.InplaceGetValue: string;
+function TACLInplaceCheckBox.InplaceGetValue: UnicodeString;
 begin
   Result := BoolToStr(Checked, True)
 end;
 
-procedure TACLInplaceCheckBox.InplaceSetValue(const AValue: string);
+procedure TACLInplaceCheckBox.InplaceSetValue(const AValue: UnicodeString);
 begin
   Caption := AValue;
   Checked := AValue = BoolToStr(True, True);

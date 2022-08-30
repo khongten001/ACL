@@ -16,34 +16,31 @@ unit ACL.UI.Forms;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  Winapi.CommDlg,
-  Winapi.ActiveX,
+  // Winapi
+  Windows,
+  Messages,
+  ActiveX,
   // System
-  System.Types,
-  System.SysUtils,
-  System.Classes,
-  System.Contnrs,
-  System.TypInfo,
+  Classes,
+  Contnrs,
+  Types,
+  TypInfo,
+  SysUtils,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.Forms,
-  Vcl.ImgList,
-  Vcl.Dialogs,
-  Vcl.ExtCtrls,
-  Vcl.StdCtrls,
-  Vcl.ActnList,
-  Vcl.Menus,
+  Controls,
+  Graphics,
+  Forms,
+  ImgList,
+  Dialogs,
+  ExtCtrls,
+  ActnList,
+  Menus,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
   ACL.FileFormats.INI,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Math,
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.Threading,
@@ -52,8 +49,6 @@ uses
   ACL.Utils.Common,
   ACL.Utils.Desktop,
   ACL.Utils.DPIAware,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Registry,
   ACL.Utils.Strings;
 
 const
@@ -61,6 +56,9 @@ const
   CM_SCALECHANGED  = $BF01;
 
 type
+{$IFDEF FPC}
+  TWindowHook = function (var Message: TMessage): Boolean;
+{$ENDIF}
 
   { TACLBasicForm }
 
@@ -69,10 +67,16 @@ type
     procedure ApplyColorSchema;
     procedure WMAppCommand(var Message: TMessage); message WM_APPCOMMAND;
   protected
+  {$IFDEF FPC}
+    procedure InitializeNewForm; virtual;
+  {$ENDIF}
     // IACLApplicationListener
     procedure IACLApplicationListener.Changed = ApplicationSettingsChanged;
     procedure ApplicationSettingsChanged(AChanges: TACLApplicationChanges); virtual;
   public
+  {$IFDEF FPC}
+    constructor CreateNew(AOwner: TComponent; Dummy: Integer = 0); override;
+  {$ENDIF}
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
   end;
@@ -90,7 +94,7 @@ type
     procedure SetClientHeight(Value: Integer);
     procedure SetClientWidth(Value: Integer);
     procedure TakeParentFontIfNecessary;
-    procedure CMParentFontChanged(var Message: TCMParentFontChanged); message CM_PARENTFONTCHANGED;
+    procedure CMParentFontChanged(var Message: TMessage); message CM_PARENTFONTCHANGED;
   {$IFNDEF DELPHI102TOKYO}
     procedure WMNCCreate(var Message: TWMNCCreate); message WM_NCCREATE;
   {$ENDIF}
@@ -101,21 +105,23 @@ type
   protected
     procedure ApplicationSettingsChanged(AChanges: TACLApplicationChanges); override;
     procedure ChangeScale(M, D: Integer); overload; override; final;
-    procedure ChangeScale(M, D: Integer; IsDpiChange: Boolean); override;
+    procedure ChangeScale(M, D: Integer; IsDpiChange: Boolean);{$IFNDEF FPC} override;{$ENDIF}
     procedure DoShow; override;
     procedure InitializeNewForm; override;
     function IsDesigning: Boolean;
     procedure Loaded; override;
     procedure ReadState(Reader: TReader); override;
+  {$IFNDEF FPC}
     procedure ScaleControlsForDpi(NewPPI: Integer); override;
+  {$ENDIF}
     procedure ScaleFactorChanged; virtual;
     procedure SetParent(AParent: TWinControl); override;
     procedure SetPixelsPerInch(Value: Integer); {$IFDEF DELPHI110ALEXANDRIA}override;{$ENDIF}
   public
     destructor Destroy; override;
-    procedure ScaleForCurrentDPI; override;
+    procedure ScaleForCurrentDPI; {$IFNDEF FPC}override;{$ENDIF}
     procedure ScaleForPPI(ATargetDPI: Integer; AWindowRect: PRect); reintroduce; overload; virtual;
-    procedure ScaleForPPI(NewPPI: Integer); overload; override; final;
+    procedure ScaleForPPI(NewPPI: Integer); overload; {$IFNDEF FPC}override; final;{$ENDIF}
     //
     property ScaleFactor: TACLScaleFactor read FScaleFactor;
   published
@@ -153,7 +159,11 @@ type
     procedure AfterFormCreate; virtual;
     procedure BeforeFormCreate; virtual;
     function CanCloseByEscape: Boolean; virtual;
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO-CreateParams'}
+  {$ELSE}
     procedure CreateParams(var Params: TCreateParams); override;
+  {$ENDIF}
     procedure ScaleFactorChanged; override;
     procedure UpdateImageLists; virtual;
 
@@ -183,7 +193,9 @@ type
     procedure WMWindowPosChanged(var Message: TWMWindowPosChanged); message WM_WINDOWPOSCHANGED;
     procedure WndProc(var Message: TMessage); override;
   public
+  {$IFNDEF FPC}
     constructor Create(AOwner: TComponent); override;
+  {$ENDIF}
     constructor CreateDialog(AOwnerHandle: THandle; ANew: Boolean = False); virtual;
     constructor CreateNew(AOwner: TComponent; Dummy: Integer = 0); override;
     destructor Destroy; override;
@@ -219,7 +231,11 @@ type
   protected
     FUseOwnMessagesLoop: Boolean;
 
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO-CreateParams'}
+  {$ELSE}
     procedure CreateParams(var Params: TCreateParams); override;
+  {$ENDIF}
     procedure Deactivate; override;
     procedure WndProc(var Message: TMessage); override;
 
@@ -229,8 +245,8 @@ type
     procedure Initialize; virtual;
     procedure ValidatePopupFormBounds(var R: TRect); virtual;
 
-    procedure CMDialogKey(var Message: TWMKey); override;
-    procedure CMWantSpecialKey(var Message: TCMWantSpecialKey); message CM_WANTSPECIALKEY;
+    procedure CMDialogKey(var Message: TWMKey); message CM_DIALOGKEY;
+    procedure CMWantSpecialKey(var Message: TWMKey); message CM_WANTSPECIALKEY;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -310,12 +326,15 @@ procedure TerminateOpenForms;
 implementation
 
 uses
-  Winapi.DwmApi,
+  // Winapi
+  DwmApi,
   // System
-  System.Math,
-  System.Character,
+  Character,
+  Math,
+{$IFNDEF FPC}
   // Vcl
   Vcl.AppEvnts,
+{$ENDIF}
   // ACL.UI
   ACL.UI.Controls.BaseControls;
 
@@ -374,7 +393,11 @@ type
   end;
 
 var
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+{$ELSE}
   FApplicationEvents: TApplicationEvents;
+{$ENDIF}
   FEnableNonClientDpiScaling: TEnableNonClientDpiScalingProc;
 
 procedure FormDisableCloseButton(AHandle: HWND);
@@ -433,6 +456,19 @@ begin
 end;
 
 { TACLBasicForm }
+
+{$IFDEF FPC}
+constructor TACLBasicForm.CreateNew(AOwner: TComponent; Dummy: Integer = 0);
+begin
+  inherited;
+  InitializeNewForm;
+end;
+
+procedure TACLBasicForm.InitializeNewForm;
+begin
+  // do nothing
+end;
+{$ENDIF}
 
 procedure TACLBasicForm.AfterConstruction;
 begin
@@ -498,7 +534,11 @@ begin
       Scaled := APrevScaled;
     end;
   {$ELSE}
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO'}
+  {$ELSE}
     inherited ScaleForPPI(NewPPI);
+  {$ENDIF}
   {$ENDIF}
     TakeParentFontIfNecessary;
   end
@@ -518,7 +558,11 @@ begin
   TACLControlsHelper.ScaleChanging(Self, AState);
   try
     ScaleFactor.Change(M, D);
+    {$IFDEF FPC}
+      {$MESSAGE 'TODO'}
+    {$ELSE}
     inherited ChangeScale(M, D, IsDpiChange);
+    {$ENDIF}
     PixelsPerInch := MulDiv(PixelsPerInch, M, D);
     TakeParentFontIfNecessary;
     ScaleFactorChanged;
@@ -536,7 +580,9 @@ end;
 procedure TACLBasicScalableForm.InitializeNewForm;
 begin
   inherited;
+{$IFNDEF FPC}
   FCurrentPPI := PixelsPerInch;
+{$ENDIF}
   FScaleFactor := TACLScaleFactor.Create;
   FScaleFactor.Assign(TACLFormScalingHelper.GetCurrentPPI(Self), acDefaultDPI);
   FScaleFactor.ListenerAdd(ScaleFactorChangeHandler);
@@ -569,6 +615,7 @@ begin
   end;
 end;
 
+{$IFNDEF FPC}
 procedure TACLBasicScalableForm.ScaleControlsForDpi(NewPPI: Integer);
 begin
   DisableAlign;
@@ -579,6 +626,7 @@ begin
     EnableAlign;
   end;
 end;
+{$ENDIF}
 
 procedure TACLBasicScalableForm.ScaleForCurrentDPI;
 begin
@@ -586,7 +634,9 @@ begin
   try
     if Scaled and not IsDesigning and (Parent = nil) then
       ScaleForPPI(TACLApplication.GetTargetDPI(Self));
+  {$IFNDEF FPC}
     ScalingFlags := [];
+  {$ENDIF}
     Perform(CM_PARENTBIDIMODECHANGED, 0, 0);
   finally
     EnableAlign;
@@ -605,10 +655,10 @@ procedure TACLBasicScalableForm.ReadState(Reader: TReader);
   end;
 
 begin
-{$IFNDEF DELPHI110ALEXANDRIA}
+{$IF NOT DEFINED(DELPHI110ALEXANDRIA) AND NOT DEFINED(FPC)}
   if ClassParent = TForm then
     OldCreateOrder := not ModuleIsCpp;
-{$ENDIF}
+{$IFEND}
 
   DisableAlign;
   try
@@ -641,7 +691,9 @@ begin
   if csReadingState in ControlState then
   begin
     FLoadedClientHeight := Value;
+  {$IFNDEF FPC}
     ScalingFlags := ScalingFlags + [sfHeight];
+  {$ENDIF}
   end
   else
     inherited ClientHeight := Value;
@@ -652,7 +704,9 @@ begin
   if csReadingState in ControlState then
   begin
     FLoadedClientWidth := Value;
+  {$IFNDEF FPC}
     ScalingFlags := ScalingFlags + [sfWidth];
+  {$ENDIF}
   end
   else
     inherited ClientWidth := Value;
@@ -663,7 +717,9 @@ begin
   if csReadingState in ControlState then
   begin
     TACLScaleFactorAccess(FScaleFactor).AssignCore(Value, acDefaultDPI);
+  {$IFNDEF FPC}
     FCurrentPPI := Value;
+  {$ENDIF}
   end;
 {$IFDEF DELPHI110ALEXANDRIA}
   inherited;
@@ -694,7 +750,11 @@ begin
       if (Parent <> nil) and not IsDesigning then
         Font := TWinControlAccess(Parent).Font
       else
+      {$IFDEF FPC}
+        {$MESSAGE 'TODO'};
+      {$ELSE}
         acAssignFont(Font, Application.DefaultFont, ScaleFactor, acSystemScaleFactor);
+      {$ENDIF}
 
       ParentFont := True;
     finally
@@ -703,12 +763,12 @@ begin
   end;
 end;
 
-procedure TACLBasicScalableForm.CMParentFontChanged(var Message: TCMParentFontChanged);
+procedure TACLBasicScalableForm.CMParentFontChanged(var Message: TMessage);
 begin
   if ParentFont then
   begin
     if Message.wParam <> 0 then
-      Font.Assign(Message.Font)
+      Font.Assign(TFont(Message.LParam))
     else
       TakeParentFontIfNecessary;
   end;
@@ -718,11 +778,15 @@ end;
 procedure TACLBasicScalableForm.WMNCCreate(var Message: TWMNCCreate);
 begin
   inherited;
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO'};
+  {$ELSE}
   if Scaled and IsWinVistaOrLater and IsProcessDPIAware then
   begin
     if Assigned(FEnableNonClientDpiScaling) then
       FEnableNonClientDpiScaling(WindowHandle);
   end;
+  {$ENDIF}
 end;
 {$ENDIF}
 
@@ -744,12 +808,16 @@ begin
 
     if (ATargetDPI <> TACLFormScalingHelper.GetCurrentPPI(Self)) and Scaled and (TACLApplication.TargetDPI = 0) then
     begin
+    {$IFNDEF FPC}
       if Assigned(OnBeforeMonitorDpiChanged) then
         OnBeforeMonitorDpiChanged(Self, PixelsPerInch, ATargetDPI);
+    {$ENDIF}
       APrevPixelsPerInch := PixelsPerInch;
       ScaleForPPI(ATargetDPI, PRect(Message.LParam));
+    {$IFNDEF FPC}
       if Assigned(OnAfterMonitorDpiChanged) then
         OnAfterMonitorDpiChanged(Self, APrevPixelsPerInch, PixelsPerInch);
+    {$ENDIF}
     end;
     Message.Result := 0;
   end;
@@ -778,12 +846,14 @@ end;
 
 { TACLForm }
 
+{$IFNDEF FPC}
 constructor TACLForm.Create(AOwner: TComponent);
 begin
   BeforeFormCreate;
   inherited Create(AOwner);
   AfterFormCreate;
 end;
+{$ENDIF}
 
 constructor TACLForm.CreateDialog(AOwnerHandle: THandle; ANew: Boolean = False);
 var
@@ -938,6 +1008,9 @@ begin
   Result := False;
 end;
 
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+{$ELSE}
 procedure TACLForm.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
@@ -951,6 +1024,7 @@ begin
       Params.WndParent := FOwnerHandle;
   end;
 end;
+{$ENDIF}
 
 procedure TACLForm.ScaleFactorChanged;
 begin
@@ -966,7 +1040,12 @@ end;
 
 function TACLForm.ShouldBeStayOnTop: Boolean;
 begin
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO'};
+  Result := False;
+  {$ELSE}
   Result := StayOnTop or TACLStayOnTopHelper.ShouldBeStayOnTop(GetOwnerWindow);
+  {$ENDIF}
 end;
 
 procedure TACLForm.StayOnTopChanged;
@@ -1209,11 +1288,15 @@ begin
   ShowPopup(ARect);
 end;
 
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+{$ELSE}
 procedure TACLCustomPopupForm.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
   Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW or CS_VREDRAW or CS_HREDRAW;
 end;
+{$ENDIF}
 
 procedure TACLCustomPopupForm.Deactivate;
 begin
@@ -1324,7 +1407,12 @@ begin
     repeat
       if PeekMessage(AMsg, 0, 0, 0, PM_REMOVE) then
       begin
+        {$IFDEF FPC}
+          {$MESSAGE 'TODO'};
+        if (AMsg.Message <> WM_QUIT) then
+        {$ELSE}
         if (AMsg.Message <> WM_QUIT) and not (AApp.IsHintMsg(AMsg) or AApp.IsMDIMsg(AMsg)) then
+        {$ENDIF}
         begin
           TranslateMessage(AMsg);
           DispatchMessage(AMsg);
@@ -1342,7 +1430,7 @@ begin
     PopupClose;
 end;
 
-procedure TACLCustomPopupForm.CMWantSpecialKey(var Message: TCMWantSpecialKey);
+procedure TACLCustomPopupForm.CMWantSpecialKey(var Message: TWMKey);
 begin
   inherited;
   if Message.CharCode = VK_ESCAPE then
@@ -1491,7 +1579,12 @@ begin
       APropInfo := AProperties^[I];
       if APropInfo.PropType^.Kind = tkClass then
       begin
+        {$IFDEF FPC}
+        {$MESSAGE 'TODO'}
+        APropClass := nil;
+        {$ELSE}
         APropClass := GetObjectPropClass(APropInfo);
+        {$ENDIF}
         if APropClass.InheritsFrom(TComponent) then
         begin
           if APropClass.InheritsFrom(TCustomImageList) then
@@ -1534,7 +1627,11 @@ var
 begin
   Result := AName;
   ALength := Length(Result);
+{$IFDEF FPC}
+  while (ALength > 0) and TCharacter.IsNumber(Result[ALength]) do
+{$ELSE}
   while (ALength > 0) and Result[ALength].IsNumber do
+{$ENDIF}
     Dec(ALength);
   SetLength(Result, ALength);
   if acEndsWith(Result, DarkModeSuffix) then
@@ -1566,7 +1663,7 @@ class function TACLStayOnTopHelper.ExecuteCommonDialog(ADialog: TCommonDialog; A
 begin
   Application.ModalStarted;
   try
-    Result := ADialog.Execute(AHandleWnd);
+    Result := ADialog.Execute{$IFNDEF FPC}(AHandleWnd){$ENDIF};
   finally
     Application.ModalFinished;
   end;
@@ -1605,12 +1702,16 @@ end;
 
 class procedure TACLStayOnTopHelper.CheckForApplicationEvents;
 begin
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'};
+{$ELSE}
   if FApplicationEvents = nil then
   begin
     FApplicationEvents := TApplicationEvents.Create(nil);
     FApplicationEvents.OnModalBegin := AppEventsModalHandler;
     FApplicationEvents.OnModalEnd := AppEventsModalHandler;
   end;
+{$ENDIF}
 end;
 
 class function TACLStayOnTopHelper.StayOnTopAvailable: Boolean;
@@ -1622,8 +1723,10 @@ end;
 
 class function TACLFormScalingHelper.GetCurrentPPI(AForm: TCustomForm): Integer;
 begin
+{$IFNDEF FPC}
   Result := TCustomFormAccess(AForm).FCurrentPPI;
   if Result = 0 then
+{$ENDIF}
     Result := TCustomFormAccess(AForm).PixelsPerInch;
 end;
 
@@ -1641,6 +1744,9 @@ var
   APrevParentFont: Boolean;
   AState: TState;
 begin
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+{$ELSE}
   APrevDPI := TACLFormScalingHelper.GetCurrentPPI(AForm);
   if (ATargetDPI <> APrevDPI) and (ATargetDPI >= acMinDPI) and not IsScaleChanging(AForm) then
   begin
@@ -1670,6 +1776,7 @@ begin
       ScalingEnd(AForm, AState);
     end;
   end;
+{$ENDIF}
 end;
 
 class function TACLFormScalingHelper.IsScaleChanging(AForm: TCustomForm): Boolean;
@@ -1768,7 +1875,7 @@ var
   AWindow: TWinControl;
 begin
   Result := 0;
-  if (Code >= 0) and ((wParam = WM_MOUSEWHEEL) or (wParam = WM_MOUSEHWHEEL)) and Mouse.WheelPresent then
+  if (Code >= 0) and ((wParam = WM_MOUSEWHEEL) or (wParam = WM_MOUSEHWHEEL)){$IFNDEF FPC} and Mouse.WheelPresent{$ENDIF} then
   begin
     AMHS := PMouseHookStructEx(lParam);
 
@@ -1815,6 +1922,10 @@ end;
 initialization
   @FEnableNonClientDpiScaling := GetProcAddress(GetModuleHandle(user32), 'EnableNonClientDpiScaling');
 
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'};
+{$ELSE}
 finalization
   FreeAndNil(FApplicationEvents);
+{$ENDIF}
 end.

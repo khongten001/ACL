@@ -527,6 +527,9 @@ function AlphaBlend(DC: HDC; p2, p3, p4, p5: Integer;
   DC6: HDC; p7, p8, p9, p10: Integer; p11: TBlendFunction): BOOL; stdcall; external 'msimg32.dll';
 function UpdateLayeredWindow(Handle: THandle; hdcDest: HDC; pptDst: PPoint; _psize: PSize;
   hdcSrc: HDC; pptSrc: PPoint; crKey: COLORREF; pblend: PBLENDFUNCTION; dwFlags: DWORD): Boolean; stdcall; external user32;
+
+function IdentToAlphaColor(const Ident: string; var Color: Integer): Boolean;
+function StringToAlphaColor(const Value: string): TAlphaColor;
 {$ENDIF}
 implementation
 
@@ -549,6 +552,161 @@ type
 
   PRectArray = ^TRectArray;
   TRectArray = array [0..0] of TRect;
+
+{$IFDEF FPC}
+
+const
+  AlphaColors: array [0..147] of TIdentMapEntry = (
+    (Value: Integer($FFF0F8FF); Name: 'claAliceblue'),
+    (Value: Integer($FFFAEBD7); Name: 'claAntiquewhite'),
+    (Value: Integer($FF00FFFF); Name: 'claAqua'),
+    (Value: Integer($FF7FFFD4); Name: 'claAquamarine'),
+    (Value: Integer($FFF0FFFF); Name: 'claAzure'),
+    (Value: Integer($FFF5F5DC); Name: 'claBeige'),
+    (Value: Integer($FFFFE4C4); Name: 'claBisque'),
+    (Value: Integer($FF000000); Name: 'claBlack';),
+    (Value: Integer($FFFFEBCD); Name: 'claBlanchedalmond'),
+    (Value: Integer($FF0000FF); Name: 'claBlue'),
+    (Value: Integer($FF8A2BE2); Name: 'claBlueviolet'),
+    (Value: Integer($FFA52A2A); Name: 'claBrown'),
+    (Value: Integer($FFDEB887); Name: 'claBurlywood'),
+    (Value: Integer($FF5F9EA0); Name: 'claCadetblue'),
+    (Value: Integer($FF7FFF00); Name: 'claChartreuse'),
+    (Value: Integer($FFD2691E); Name: 'claChocolate'),
+    (Value: Integer($FFFF7F50); Name: 'claCoral'),
+    (Value: Integer($FF6495ED); Name: 'claCornflowerblue'),
+    (Value: Integer($FFFFF8DC); Name: 'claCornsilk'),
+    (Value: Integer($FFDC143C); Name: 'claCrimson'),
+    (Value: Integer($FF00FFFF); Name: 'claCyan'),
+    (Value: Integer($FF00008B); Name: 'claDarkblue'),
+    (Value: Integer($FF008B8B); Name: 'claDarkcyan'),
+    (Value: Integer($FFB8860B); Name: 'claDarkgoldenrod'),
+    (Value: Integer($FFA9A9A9); Name: 'claDarkgray'),
+    (Value: Integer($FF006400); Name: 'claDarkgreen'),
+    (Value: Integer($FFA9A9A9); Name: 'claDarkgrey'),
+    (Value: Integer($FFBDB76B); Name: 'claDarkkhaki'),
+    (Value: Integer($FF8B008B); Name: 'claDarkmagenta'),
+    (Value: Integer($FF556B2F); Name: 'claDarkolivegreen'),
+    (Value: Integer($FFFF8C00); Name: 'claDarkorange'),
+    (Value: Integer($FF9932CC); Name: 'claDarkorchid'),
+    (Value: Integer($FF8B0000); Name: 'claDarkred'),
+    (Value: Integer($FFE9967A); Name: 'claDarksalmon'),
+    (Value: Integer($FF8FBC8F); Name: 'claDarkseagreen'),
+    (Value: Integer($FF483D8B); Name: 'claDarkslateblue'),
+    (Value: Integer($FF2F4F4F); Name: 'claDarkslategray'),
+    (Value: Integer($FF2F4F4F); Name: 'claDarkslategrey'),
+    (Value: Integer($FF00CED1); Name: 'claDarkturquoise'),
+    (Value: Integer($FF9400D3); Name: 'claDarkviolet'),
+    (Value: Integer($FFFF1493); Name: 'claDeeppink'),
+    (Value: Integer($FF00BFFF); Name: 'claDeepskyblue'),
+    (Value: Integer($FF696969); Name: 'claDimgray'),
+    (Value: Integer($FF696969); Name: 'claDimgrey'),
+    (Value: Integer($FF1E90FF); Name: 'claDodgerblue'),
+    (Value: Integer($FFB22222); Name: 'claFirebrick'),
+    (Value: Integer($FFFFFAF0); Name: 'claFloralwhite'),
+    (Value: Integer($FF228B22); Name: 'claForestgreen'),
+    (Value: Integer($FFFF00FF); Name: 'claFuchsia'),
+    (Value: Integer($FFDCDCDC); Name: 'claGainsboro'),
+    (Value: Integer($FFF8F8FF); Name: 'claGhostwhite'),
+    (Value: Integer($FFFFD700); Name: 'claGold'),
+    (Value: Integer($FFDAA520); Name: 'claGoldenrod'),
+    (Value: Integer($FF808080); Name: 'claGray'),
+    (Value: Integer($FF008000); Name: 'claGreen'),
+    (Value: Integer($FFADFF2F); Name: 'claGreenyellow'),
+    (Value: Integer($FF808080); Name: 'claGrey'),
+    (Value: Integer($FFF0FFF0); Name: 'claHoneydew'),
+    (Value: Integer($FFFF69B4); Name: 'claHotpink'),
+    (Value: Integer($FFCD5C5C); Name: 'claIndianred'),
+    (Value: Integer($FF4B0082); Name: 'claIndigo'),
+    (Value: Integer($FFFFFFF0); Name: 'claIvory'),
+    (Value: Integer($FFF0E68C); Name: 'claKhaki'),
+    (Value: Integer($FFE6E6FA); Name: 'claLavender'),
+    (Value: Integer($FFFFF0F5); Name: 'claLavenderblush'),
+    (Value: Integer($FF7CFC00); Name: 'claLawngreen'),
+    (Value: Integer($FFFFFACD); Name: 'claLemonchiffon'),
+    (Value: Integer($FFADD8E6); Name: 'claLightblue'),
+    (Value: Integer($FFF08080); Name: 'claLightcoral'),
+    (Value: Integer($FFE0FFFF); Name: 'claLightcyan'),
+    (Value: Integer($FFFAFAD2); Name: 'claLightgoldenrodyellow'),
+    (Value: Integer($FFD3D3D3); Name: 'claLightgray'),
+    (Value: Integer($FF90EE90); Name: 'claLightgreen'),
+    (Value: Integer($FFD3D3D3); Name: 'claLightgrey'),
+    (Value: Integer($FFFFB6C1); Name: 'claLightpink'),
+    (Value: Integer($FFFFA07A); Name: 'claLightsalmon'),
+    (Value: Integer($FF20B2AA); Name: 'claLightseagreen'),
+    (Value: Integer($FF87CEFA); Name: 'claLightskyblue'),
+    (Value: Integer($FF778899); Name: 'claLightslategray'),
+    (Value: Integer($FF778899); Name: 'claLightslategrey'),
+    (Value: Integer($FFB0C4DE); Name: 'claLightsteelblue'),
+    (Value: Integer($FFFFFFE0); Name: 'claLightyellow'),
+    (Value: Integer($FF00FF00); Name: 'claLime'),
+    (Value: Integer($FF32CD32); Name: 'claLimegreen'),
+    (Value: Integer($FFFAF0E6); Name: 'claLinen'),
+    (Value: Integer($FFFF00FF); Name: 'claMagenta'),
+    (Value: Integer($FF800000); Name: 'claMaroon'),
+    (Value: Integer($FF66CDAA); Name: 'claMediumaquamarine'),
+    (Value: Integer($FF0000CD); Name: 'claMediumblue'),
+    (Value: Integer($FFBA55D3); Name: 'claMediumorchid'),
+    (Value: Integer($FF9370DB); Name: 'claMediumpurple'),
+    (Value: Integer($FF3CB371); Name: 'claMediumseagreen'),
+    (Value: Integer($FF7B68EE); Name: 'claMediumslateblue'),
+    (Value: Integer($FF00FA9A); Name: 'claMediumspringgreen'),
+    (Value: Integer($FF48D1CC); Name: 'claMediumturquoise'),
+    (Value: Integer($FFC71585); Name: 'claMediumvioletred'),
+    (Value: Integer($FF191970); Name: 'claMidnightblue'),
+    (Value: Integer($FFF5FFFA); Name: 'claMintcream'),
+    (Value: Integer($FFFFE4E1); Name: 'claMistyrose'),
+    (Value: Integer($FFFFE4B5); Name: 'claMoccasin'),
+    (Value: Integer($FFFFDEAD); Name: 'claNavajowhite'),
+    (Value: Integer($FF000080); Name: 'claNavy'),
+    (Value: Integer($FFFDF5E6); Name: 'claOldlace'),
+    (Value: Integer($FF808000); Name: 'claOlive'),
+    (Value: Integer($FF6B8E23); Name: 'claOlivedrab'),
+    (Value: Integer($FFFFA500); Name: 'claOrange'),
+    (Value: Integer($FFFF4500); Name: 'claOrangered'),
+    (Value: Integer($FFDA70D6); Name: 'claOrchid'),
+    (Value: Integer($FFEEE8AA); Name: 'claPalegoldenrod'),
+    (Value: Integer($FF98FB98); Name: 'claPalegreen'),
+    (Value: Integer($FFAFEEEE); Name: 'claPaleturquoise'),
+    (Value: Integer($FFDB7093); Name: 'claPalevioletred'),
+    (Value: Integer($FFFFEFD5); Name: 'claPapayawhip'),
+    (Value: Integer($FFFFDAB9); Name: 'claPeachpuff'),
+    (Value: Integer($FFCD853F); Name: 'claPeru'),
+    (Value: Integer($FFFFC0CB); Name: 'claPink'),
+    (Value: Integer($FFDDA0DD); Name: 'claPlum'),
+    (Value: Integer($FFB0E0E6); Name: 'claPowderblue'),
+    (Value: Integer($FF800080); Name: 'claPurple'),
+    (Value: Integer($FFFF0000); Name: 'claRed'),
+    (Value: Integer($FFBC8F8F); Name: 'claRosybrown'),
+    (Value: Integer($FF4169E1); Name: 'claRoyalblue'),
+    (Value: Integer($FF8B4513); Name: 'claSaddlebrown'),
+    (Value: Integer($FFFA8072); Name: 'claSalmon'),
+    (Value: Integer($FFF4A460); Name: 'claSandybrown'),
+    (Value: Integer($FF2E8B57); Name: 'claSeagreen'),
+    (Value: Integer($FFFFF5EE); Name: 'claSeashell'),
+    (Value: Integer($FFA0522D); Name: 'claSienna'),
+    (Value: Integer($FFC0C0C0); Name: 'claSilver'),
+    (Value: Integer($FF87CEEB); Name: 'claSkyblue'),
+    (Value: Integer($FF6A5ACD); Name: 'claSlateblue'),
+    (Value: Integer($FF708090); Name: 'claSlategray'),
+    (Value: Integer($FF708090); Name: 'claSlategrey'),
+    (Value: Integer($FFFFFAFA); Name: 'claSnow'),
+    (Value: Integer($FF00FF7F); Name: 'claSpringgreen'),
+    (Value: Integer($FF4682B4); Name: 'claSteelblue'),
+    (Value: Integer($FFD2B48C); Name: 'claTan'),
+    (Value: Integer($FF008080); Name: 'claTeal'),
+    (Value: Integer($FFD8BFD8); Name: 'claThistle'),
+    (Value: Integer($FFFF6347); Name: 'claTomato'),
+    (Value: Integer($FF40E0D0); Name: 'claTurquoise'),
+    (Value: Integer($FFEE82EE); Name: 'claViolet'),
+    (Value: Integer($FFF5DEB3); Name: 'claWheat'),
+    (Value: Integer($FFFFFFFF); Name: 'claWhite'),
+    (Value: Integer($FFF5F5F5); Name: 'claWhitesmoke'),
+    (Value: Integer($FFFFFF00); Name: 'claYellow'),
+    (Value: Integer($FF9ACD32); Name: 'claYellowgreen'),
+    (Value: Integer($0); Name: 'claNull')
+  );
+{$ENDIF}
 
 var
   FMeasureCanvas: TACLMeasureCanvas = nil;
@@ -646,6 +804,58 @@ begin
       TACLHexCode.Decode(AColor[5], AColor[6]));
   end;
 end;
+
+{$IFDEF FPC}
+
+function IdentToAlphaColor(const Ident: string; var Color: Integer): Boolean;
+var
+  LIdent: string;
+begin
+  LIdent := Ident;
+  if (LIdent.Length > 0) and (LIdent.Chars[0] = 'x') then
+  begin
+    Color := Integer(StringToAlphaColor(LIdent));
+    Result := True;
+  end
+  else
+    Result := IdentToInt(LIdent, Color, AlphaColors);
+
+  // Allow "clXXXX" constants and convert it to TAlphaColor
+  if not Result and (LIdent.Length > 3) then
+  begin
+    LIdent := LIdent.Insert(2, 'a');
+    Result := IdentToInt(LIdent, Integer(Color), AlphaColors);
+  end;
+end;
+
+function StringToAlphaColor(const Value: string): TAlphaColor;
+var
+  LValue: string;
+  LColor: Integer;
+begin
+  LValue := Value;
+  if LValue = #0 then
+    LValue := '$0'
+  else if (LValue <> '') and ((LValue.Chars[0] = '#') or (LValue.Chars[0] = 'x')) then
+    LValue := '$' + LValue.SubString(1);
+
+  if (not IdentToAlphaColor('cla' + LValue, LColor)) and (not IdentToAlphaColor(LValue, LColor)) then
+    Result := TAlphaColor(StrToInt64(LValue))
+  else
+    Result := TAlphaColor(LColor);
+end;
+
+function AlphaColorToIdent(Color: Integer; var Ident: string): Boolean;
+begin
+  Result := IntToIdent(Color, Ident, AlphaColors);
+  if not Result then
+  begin
+    Ident := 'x' + IntToHex(Color, 8);
+    Result := True;
+  end;
+end;
+
+{$ENDIF}
 
 {$IFNDEF ACL_BASE_NOVCL}
 procedure acDrawTransparentControlBackground(AControl: TWinControl; DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
@@ -3509,7 +3719,19 @@ begin
   DeleteObject(ARegion)
 end;
 
+{$IFDEF FPC}
+procedure RegisterAlphaColorIntegerConsts(ATypeInfo: Pointer);
+begin
+  if not Assigned(FindIntToIdent(ATypeInfo)) then
+    RegisterIntegerConsts(ATypeInfo, IdentToAlphaColor, AlphaColorToIdent);
+end;
+{$ENDIF}
+
 initialization
+{$IFDEF FPC}
+  RegisterAlphaColorIntegerConsts(TypeInfo(ACL.Graphics.TAlphaColor));
+  RegisterAlphaColorIntegerConsts(TypeInfo(System.UITypes.TAlphaColor));
+{$ENDIF}
 
 finalization
   FreeAndNil(FMeasureCanvas);

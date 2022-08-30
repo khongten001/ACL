@@ -17,16 +17,18 @@ unit ACL.UI.Resources;
 interface
 
 uses
-  Winapi.Windows,
+  // Winapi
+  Windows,
   // System
+  Classes,
+  Generics.Defaults,
+  Generics.Collections,
+  Types,
+  Rtti,
   System.UITypes,
-  System.Types,
-  System.Variants,
-  System.Classes,
-  System.Generics.Defaults,
-  System.Generics.Collections,
+  Variants,
   // VCL
-  Vcl.Graphics,
+  Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -437,7 +439,7 @@ type
       AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal; AStretchMode: TACLStretchMode = isStretch); reintroduce; overload;
     procedure ImportFromImage(const AImage: TBitmap; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageFile(const AFileName: string; DPI: Integer = acDefaultDPI);
-    procedure ImportFromImageResource(const AInstance: HINST; const AResName: string; AResType: PWideChar; DPI: Integer = acDefaultDPI);
+    procedure ImportFromImageResource(const AInstance: HINST; const AResName: string; AResType: PChar; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageStream(const AStream: TStream; DPI: Integer = acDefaultDPI);
     procedure MakeUnique;
     // IACLColorSchema
@@ -800,13 +802,12 @@ function acResourceCollectionFieldSet(var AField: TACLCustomResourceCollection; 
 implementation
 
 uses
-  System.TypInfo,
-  System.SysUtils,
-  System.Math,
+  Math,
+  SysUtils,
+  TypInfo,
   // VCL
-  Vcl.Forms,
+  Forms,
   // ACL
-  ACL.Math,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Forms,
   ACL.Utils.Strings;
@@ -839,7 +840,7 @@ begin
     for I := 0 to APropCount - 1 do
     begin
       APropInfo := APropList^[I];
-      if APropInfo^.PropType^^.Kind = tkClass then
+      if APropInfo^.PropType^.Kind = tkClass then
       begin
         APropObject := GetObjectProp(AObject, APropInfo);
         if (APropObject = nil) or (APropObject is TComponent) then
@@ -2091,7 +2092,7 @@ begin
 end;
 
 procedure TACLResourceTexture.ImportFromImageResource(const AInstance: HINST;
-  const AResName: string; AResType: PWideChar; DPI: Integer = acDefaultDPI);
+  const AResName: string; AResType: PChar; DPI: Integer = acDefaultDPI);
 var
   AStream: TStream;
 begin
@@ -3378,6 +3379,9 @@ class procedure TACLRootResourceCollection.InitializeCursors;
   end;
 
 begin
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+{$ELSE}
   DoSetCursor(crNo, LoadCursor(0, IDC_NO));
   DoSetCursor(crAppStart, LoadCursor(0, IDC_APPSTARTING));
   DoSetCursor(crHandPoint, LoadCursor(0, IDC_HAND));
@@ -3391,6 +3395,7 @@ begin
   DoSetCursor(crHSplit, LoadCursor(0, IDC_SIZEWE));
   DoSetCursor(crVSplit, LoadCursor(0, IDC_SIZENS));
   DoSetCursor(crDrag, LoadCursor(LoadLibrary('ole32.dll'), MakeIntResource(3)));
+{$ENDIF}
   DoSetCursor(crRemove, LoadCursor(HInstance, 'CR_REMOVE'));
   DoSetCursor(crDragLink, LoadCursor(HInstance, 'CR_DRAGLINK'));
 end;

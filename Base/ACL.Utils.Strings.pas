@@ -496,11 +496,7 @@ end;
 
 function acStringLength(const S: UnicodeString): Integer;
 begin
-{$IFDEF FPC}
-  Result := Length(S) div SizeOf(UnicodeChar);
-{$ELSE}
-  Result := Length(S);
-{$ENDIF}
+  Result := Length(S);// div SizeOf(UnicodeChar);
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------

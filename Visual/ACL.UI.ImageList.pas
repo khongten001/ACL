@@ -16,21 +16,22 @@ unit ACL.UI.ImageList;
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
+  // Winapi
+  Messages,
+  Windows,
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
-  System.TypInfo,
-  System.ZLib,
+  Classes,
+  Generics.Collections,
+  SysUtils,
+  Types,
+  TypInfo,
+  ZLib,
   // Vcl
-  Vcl.ActnList,
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.StdCtrls,
+  ActnList,
+  Controls,
+  Graphics,
+  ImgList,
+  StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -61,9 +62,12 @@ type
     procedure SetScalable(AValue: Boolean);
     procedure SetSourceDPI(AValue: Integer);
   protected
-    procedure DoDraw(Index: Integer; Canvas: TCanvas; X, Y: Integer; Style: Cardinal; Enabled: Boolean = True); override;
+  {$IFDEF FPC}{$MESSAGE 'TODO'}{$ELSE}
+    procedure DoDraw(Index: Integer; Canvas: TCanvas;
+      X, Y: Integer; Style: Cardinal; Enabled: Boolean = True);override;
     procedure ReadData(Stream: TStream); override;
     procedure WriteData(Stream: TStream); override;
+  {$ENDIF}
   public
     procedure AfterConstruction; override;
     procedure AddBitmap(ABitmap: TBitmap);
@@ -76,7 +80,9 @@ type
     procedure ReplaceBitmap(AIndex: Integer; ABitmap: TBitmap);
     procedure SetSize(AValue: Integer); overload;
   published
+  {$IFNDEF FPC}
     property ColorDepth default cd32Bit;
+  {$ENDIF}
     property Masked default False;
     property Scalable: Boolean read GetScalable write SetScalable stored False;
     property SourceDPI: Integer read FSourceDPI write SetSourceDPI default 96;
@@ -89,8 +95,8 @@ procedure acSetImageList(AValue: TCustomImageList; var AFieldValue: TCustomImage
 implementation
 
 uses
-  System.Math,
-  System.RTLConsts,
+  Math,
+  RTLConsts,
   // ACL
   ACL.Utils.DPIAware,
   ACL.Utils.RTTI,
@@ -163,7 +169,9 @@ procedure TACLImageList.AfterConstruction;
 begin
   inherited AfterConstruction;
   FSourceDPI := acDefaultDPI;
+{$IFNDEF FPC}
   ColorDepth := cd32Bit;
+{$ENDIF}
   Masked := False;
 end;
 
@@ -216,6 +224,7 @@ begin
   end;
 end;
 
+{$IFNDEF FPC}
 procedure TACLImageList.DoDraw(Index: Integer; Canvas: TCanvas; X, Y: Integer; Style: Cardinal; Enabled: Boolean = True);
 var
   ALayer: TACLBitmapLayer;
@@ -243,6 +252,7 @@ begin
     end;
   end;
 end;
+{$ENDIF}
 
 function TACLImageList.GetScalable: Boolean;
 begin
@@ -333,7 +343,12 @@ end;
 
 procedure TACLImageList.SetSize(AValue: Integer);
 begin
+{$IFDEF FPC}
+  Width := AValue;
+  Height := AValue;
+{$ELSE}
   SetSize(AValue, AValue);
+{$ENDIF}
 end;
 
 procedure TACLImageList.SetSourceDPI(AValue: Integer);
@@ -347,6 +362,9 @@ begin
   end;
 end;
 
+{$IFDEF FPC}
+{$MESSAGE 'TODO'}
+{$ELSE}
 procedure TACLImageList.ReadData(Stream: TStream);
 var
   AData: TMemoryStream;
@@ -408,5 +426,6 @@ begin
     AData.Free;
   end;
 end;
+{$ENDIF}
 
 end.

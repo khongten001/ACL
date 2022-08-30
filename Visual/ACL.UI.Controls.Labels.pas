@@ -16,31 +16,30 @@ unit ACL.UI.Controls.Labels;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  // Winapi
+  Windows,
+  Messages,
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
+  Classes,
+  SysUtils,
+  Types,
   System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.ImgList,
-  Vcl.Graphics,
-  Vcl.ActnList,
-  Vcl.ExtCtrls,
+  Controls,
+  ImgList,
+  Graphics,
+  ActnList,
+  ExtCtrls,
   // ACL
   ACL.FastCode,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Layers,
-  ACL.Graphics.SkinImage,
   ACL.Math,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
-  ACL.Utils.FileSystem,
   ACL.Utils.Shell;
 
 type
@@ -207,7 +206,7 @@ procedure acDrawLabelLine(ACanvas: TCanvas; const ALineRect, ATextRect: TRect; A
 implementation
 
 uses
-  System.Math;
+  Math;
 
 procedure acDrawLabelLine(ACanvas: TCanvas; const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
 var

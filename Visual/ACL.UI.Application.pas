@@ -16,14 +16,15 @@ unit ACL.UI.Application;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  // Winapi
+  Windows,
+  Messages,
   // System
+  SysUtils,
   System.UITypes,
-  System.SysUtils,
   // VCL
-  Vcl.Graphics,
-  Vcl.Controls,
+  Graphics,
+  Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -114,7 +115,7 @@ type
 implementation
 
 uses
-  Vcl.Forms,
+  Forms,
   // ACL
   ACL.UI.Controls.BaseControls,
   ACL.Utils.DPIAware,
@@ -158,7 +159,12 @@ end;
 
 class function TACLApplication.GetDefaultFont: TFont;
 begin
+{$IFDEF FPC}
+{$MESSAGE 'todo'}
+Result := nil;
+{$ELSE}
   Result := Application.DefaultFont;
+{$ENDIF}
 end;
 
 class function TACLApplication.GetActualColor(ALightColor, ADarkColor: TColor): TColor;
@@ -219,9 +225,14 @@ end;
 class procedure TACLApplication.SetDefaultFont(const AName: TFontName; AHeight: Integer);
 begin
   AHeight := MulDiv(AHeight, acSystemScaleFactor.TargetDPI, acDefaultDPI);
+{$IFDEF FPC}
+{$MESSAGE 'todo'}
+
+{$ELSE}
   Application.DefaultFont.Name := AName;
   Application.DefaultFont.Height := AHeight;
-  DefFontData.Height := AHeight;
+{$ENDIF}
+DefFontData.Height := AHeight;
 end;
 
 class procedure TACLApplication.UpdateColorSet;

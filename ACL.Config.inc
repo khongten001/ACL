@@ -17,10 +17,10 @@
 {$IFDEF FPC}
   {$Mode Delphi}
   {$H+}
+  {$Inline off}
   {$ModeSwitch FunctionReferences}
   {$ModeSwitch AnonymousFunctions}
   {$CodePage UTF8}
-  {$DEFINE ACL_BASE_NOVCL} // just for development stage
 {$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -28,7 +28,12 @@
 // ---------------------------------------------------------------------------------------------------------------------
 
 {$IFDEF FPC}
+  {$WARN 3018 off : Constructor should be public}
+  {$WARN 3123 off : "$1" not yet supported inside inline procedure/function}
+  {$WARN 3124 off : Inlining disabled}
   {$WARN 5024 off : Parameter "$1" not used}
+  {$WARN 5026 off : Value parameter "$1" is assigned but never used}
+  {$WARN 5028 off : Local $1 "$2" is not used}
   {$WARN 6058 off : Call to subroutine "$1" marked as inline is not inlined}
 {$ELSE}
   {$WARN DUPLICATE_CTOR_DTOR OFF} // We does not support for C++Builder
@@ -53,7 +58,7 @@
 {$DEFINE ACL_TEXTLAYOUT_USE_FONTCACHE}
 
 {$IFDEF ACL_TEXTLAYOUT_RTL_SUPPORT}
-  {$UNDEF ACL_TEXTLAYOUT_USE_FONTCACHE}
+  {.$UNDEF ACL_TEXTLAYOUT_USE_FONTCACHE}
 {$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------

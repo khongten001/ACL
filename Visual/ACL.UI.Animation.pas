@@ -16,24 +16,24 @@ unit ACL.UI.Animation;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  // Winapi
+  Windows,
   // System
+  Classes,
+  Generics.Collections,
+  Types,
+{$IFNDEF FPC}
   System.UITypes,
-  System.Types,
-  System.Classes,
-  System.Generics.Collections,
+{$ENDIF}
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
+  Controls,
+  Graphics,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Classes.Timer,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Layers,
-  ACL.UI.Forms,
   ACL.Utils.Common;
 
 type
@@ -228,11 +228,11 @@ function AnimationManager: TACLAnimationManager;
 implementation
 
 uses
-  System.SysUtils,
-  System.Math,
-  System.StrUtils,
+  Math,
+  SysUtils,
+  StrUtils,
   // VCL
-  Vcl.Forms;
+  Forms;
 
 var
   FAnimationManager: TACLAnimationManager;

@@ -112,8 +112,12 @@ begin
     ParentWnd := HWND_MESSAGE;
   Result := CreateWindowExW(WS_EX_TOOLWINDOW, UtilWindowClass.lpszClassName,
     PWideChar(Name), WS_POPUP {!0}, 0, 0, 0, 0, ParentWnd, 0, HInstance, nil);
+{$IFDEF FPC}
+  {$MESSAGE 'TODO-NotImplemented'}
+{$ELSE}
   if Assigned(Method) then
     SetWindowLong(Result, GWL_WNDPROC, PointerToLParam(Classes.MakeObjectInstance(Method)));
+{$ENDIF}
 end;
 
 procedure WndDefaultProc(W: HWND; var Message: TMessage);
@@ -125,6 +129,9 @@ procedure WndFree(W: HWND);
 var
   AInstance: Pointer;
 begin
+{$IFDEF FPC}
+  {$MESSAGE 'TODO-NotImplemented'}
+{$ELSE}
   if W <> 0 then
   begin
     AInstance := LParamToPointer(GetWindowLong(W, GWL_WNDPROC));
@@ -132,6 +139,7 @@ begin
     if AInstance <> @DefWindowProc then
       Classes.FreeObjectInstance(AInstance);
   end;
+{$ENDIF}
 end;
 
 { TMessagesHelper }

@@ -16,35 +16,39 @@ unit ACL.UI.Controls.BaseControls;
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.UxTheme,
-  Winapi.Windows,
+  // Winapi
+  Messages,
+  UxTheme,
+  Windows,
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  Classes,
+  Generics.Collections,
+  SysUtils,
+  Types,
+{$IFNDEF FPC}
   System.UITypes,
+{$ENDIF}
   // Vcl
-  Vcl.ActnList,
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.StdCtrls,
+  ActnList,
+  Controls,
+  Forms,
+  Graphics,
+  ImgList,
+  StdCtrls,
+{$IFDEF FPC}
+  LMessages,
+{$ENDIF}
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
   ACL.Classes.Timer,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Gdiplus,
   ACL.Graphics.Layers,
-  ACL.Graphics.SkinImage,
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.UI.Animation,
-  ACL.UI.Application,
   ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
@@ -301,7 +305,12 @@ type
   protected
     procedure AdjustSize; override;
     procedure DoGetHint(const P: TPoint; var AHint: string); virtual;
+  {$IFDEF FPC}
+    function CalcCursorPos: TPoint;
+    procedure ChangeScale(M, D: Integer); override;
+  {$ELSE}
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
+  {$ENDIF}
     function GetBackgroundStyle: TACLControlBackgroundStyle; virtual;
     procedure SetParent(AParent: TWinControl); override;
     procedure SetDefaultSize; virtual;
@@ -399,7 +408,6 @@ type
     function GetIsDestroying: Boolean;
     function GetIsLoading: Boolean;
     function GetLangSection: UnicodeString;
-    function GetScaleFactor: TACLScaleFactor;
     procedure DrawBackground(DC: HDC; const R: TRect);
     function IsMarginsStored: Boolean;
     function IsPaddingStored: Boolean;
@@ -428,7 +436,12 @@ type
     procedure AdjustSize; override;
     function AllowCompositionPainting: Boolean; virtual;
     procedure BoundsChanged; virtual;
+  {$IFDEF FPC}
+    function CalcCursorPos: TPoint;
+    procedure ChangeScale(M, D: Integer); override;
+  {$ELSE}
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
+  {$ENDIF}
     function CreatePadding: TACLPadding; virtual;
     function GetClientRect: TRect; override;
     function GetContentOffset: TRect; virtual;
@@ -468,6 +481,9 @@ type
     // IACLCursorProvider
     function GetCursor(const P: TPoint): TCursor; virtual;
 
+    // IACLScaleFactor
+    function GetScaleFactor: TACLScaleFactor;
+
     // Properties
     property FocusOnClick: Boolean read FFocusOnClick write FFocusOnClick default False;
     property IsHovered: Boolean read FIsHovered;
@@ -490,7 +506,9 @@ type
     // IACLLocalizableComponent
     procedure Localize; overload;
     procedure Localize(const ASection: UnicodeString); overload; virtual;
+  {$IFNDEF FPC}
     procedure ScaleForPPI(NewPPI: Integer); override;
+  {$ENDIF}
     property IsDesigning: Boolean read GetIsDesigning;
     property IsDestroying: Boolean read GetIsDestroying;
     property IsLoading: Boolean read GetIsLoading;
@@ -498,7 +516,6 @@ type
     property Align;
     property Anchors;
     property Constraints;
-    property Ctl3D;
     property DoubleBuffered default False;
     property DragCursor;
     property DragKind;
@@ -508,7 +525,6 @@ type
     property Margins: TACLMargins read FMargins write SetMargins stored IsMarginsStored;
     property ParentBiDiMode;
     property ParentColor;
-    property ParentCtl3D;
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
@@ -606,8 +622,10 @@ type
   strict private
     class var TouchControl: TControl;
   protected
+  {$IFNDEF FPC}
     class procedure WMGesture(ACaller: TWinControl; var Message: TMessage);
     class procedure WMGestureNotify(ACaller: TWinControl; var Message: TWMGestureNotify);
+  {$ENDIF}
     class function WMSetCursor(ACaller: TWinControl; var AMessage: TWMSetCursor): Boolean;
   public
     class function GetScaleFactor(AOwner: TComponent; out AIntf: IACLScaleFactor): Boolean; static;
@@ -706,23 +724,31 @@ function acIsAltKeyPressed: Boolean;
 function acIsCtrlKeyPressed: Boolean;
 
 function MouseTracker: TACLMouseTracking;
+{$IFDEF FPC}
+function PointToLParam(P: TPoint): LPARAM;
+{$ENDIF}
 implementation
 
 uses
-  Winapi.DwmApi,
+  DwmApi,
   // System
-  System.Math,
-  // Vcl
-  Vcl.Forms,
+  Math,
   // ACL
   ACL.Threading,
+{$IFNDEF FPC}
   ACL.UI.HintWindow,
+{$ENDIF}
   ACL.Utils.Desktop;
 
 type
   TPersistentAccess = class(TPersistent);
   TControlAccess = class(TControl);
   TWinControlAccess = class(TWinControl);
+
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+  TACLHintWindow = THintWindow;
+{$ENDIF}
 
 var
   FMouseTracker: TACLMouseTracking;
@@ -733,6 +759,13 @@ begin
     FMouseTracker := TACLMouseTracking.Create;
   Result := FMouseTracker;
 end;
+
+{$IFDEF FPC}
+function PointToLParam(P: TPoint): LPARAM;
+begin
+  Result := LPARAM((P.X and $0000ffff) or (P.Y shl 16));
+end;
+{$ENDIF}
 
 function acGetShiftState: TShiftState;
 begin
@@ -805,9 +838,13 @@ var
 begin
   if CanSetModified(AInvoker) then
   begin
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO'}
+  {$ELSE}
     ADesigner := FindRootDesigner(AInvoker);
     if ADesigner <> nil then
       ADesigner.Modified;
+  {$ENDIF}
   end;
 end;
 
@@ -1064,6 +1101,7 @@ begin
     Changed;
   end
   else
+  {$IFNDEF FPC}
     if Source is TMargins then
     begin
       Left := TMargins(Source).Left;
@@ -1071,6 +1109,7 @@ begin
       Right := TMargins(Source).Right;
       Bottom := TMargins(Source).Bottom;
     end;
+  {$ENDIF}
 end;
 
 function TACLPadding.GetScaledMargins(const AScaleFactor: TACLScaleFactor): TRect;
@@ -1210,14 +1249,18 @@ class function TACLControlsHelper.ProcessMessage(ACaller: TWinControl; var Messa
 begin
   Result := True;
   case Message.Msg of
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO'}
+  {$ELSE}
     WM_GESTURE:
       WMGesture(ACaller, Message);
     WM_GESTURENOTIFY:
       WMGestureNotify(ACaller, TWMGestureNotify(Message));
+  {$ENDIF}
     WM_SETCURSOR:
       Result := WMSetCursor(ACaller, TWMSetCursor(Message));
-    else
-      Result := False;
+  else
+    Result := False;
   end;
 end;
 
@@ -1228,11 +1271,15 @@ var
 begin
   AControl.DisableAlign;
   AState := TObject(TWinControlAccess(AControl).AutoSize);
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+{$ELSE}
   for I := 0 to AControl.ControlCount - 1 do
   begin
     AChildControl := TControlAccess(AControl.Controls[I]);
     AChildControl.FAnchorMove := True;
   end;
+{$ENDIF}
   TWinControlAccess(AControl).AutoSize := False;
 end;
 
@@ -1244,8 +1291,12 @@ begin
   for I := 0 to AControl.ControlCount - 1 do
   begin
     AChildControl := TControlAccess(AControl.Controls[I]);
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO'}
+  {$ELSE}
     AChildControl.FAnchorMove := False;
     AChildControl.UpdateBoundsRect(AChildControl.BoundsRect); // to invoke UpdateAnchorRules
+  {$ENDIF}
   end;
   TWinControlAccess(AControl).AutoSize := Boolean(AState);
   TWinControlAccess(AControl).EnableAlign;
@@ -1264,6 +1315,9 @@ begin
     acReduceFraction(M, D);
     if M <> D then
     begin
+    {$IFDEF FPC}
+      {$MESSAGE 'TODO'}
+    {$ELSE}
       if csLoading in AControl.ComponentState then
       begin
         TControlAccess(AControl).FCurrentPPI := AParent.Value.TargetDPI;
@@ -1271,10 +1325,12 @@ begin
       end
       else
         TControlAccess(AControl).ScaleForPPI(AParent.Value.TargetDPI);
+    {$ENDIF}
     end;
   end;
 end;
 
+{$IFNDEF FPC}
 class procedure TACLControlsHelper.WMGesture(ACaller: TWinControl; var Message: TMessage);
 const
   GestureMap: array[0..4] of TInteractiveGesture = (
@@ -1460,6 +1516,7 @@ begin
   TWinControlAccess(ACaller).UpdateTIPStatus;
   Message.Result := 1;
 end;
+{$ENDIF}
 
 class function TACLControlsHelper.WMSetCursor(ACaller: TWinControl; var AMessage: TWMSetCursor): Boolean;
 
@@ -1496,7 +1553,7 @@ begin
     end;
     if ACursor <> crDefault then
     begin
-      Winapi.Windows.SetCursor(Screen.Cursors[ACursor]);
+      Windows.SetCursor(Screen.Cursors[ACursor]);
       AMessage.Result := 1;
       Result := True;
     end;
@@ -1630,7 +1687,9 @@ end;
 procedure TACLGraphicControl.BeforeDestruction;
 begin
   inherited BeforeDestruction;
+{$IFNDEF FPC}
   RemoveFreeNotifications;
+{$ENDIF}
   ResourceCollection := nil;
   MouseTracker.Remove(Self);
   TACLObjectLinks.Release(Self);
@@ -1671,10 +1730,22 @@ begin
     OnGetHint(Self, P.X, P.Y, AHint);
 end;
 
+{$IFDEF FPC}
+function TACLGraphicControl.CalcCursorPos: TPoint;
+begin
+  GetCursorPos(Result);
+  Result := ScreenToClient(Result);
+end;
+{$ENDIF}
+
+{$IFDEF FPC}
+procedure TACLGraphicControl.ChangeScale(M, D: Integer);
+{$ELSE}
 procedure TACLGraphicControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+{$ENDIF}
 begin
   ScaleFactor.Change(M, D);
-  inherited ChangeScale(M, D, isDpiChange);
+  inherited;
   SetTargetDPI(ScaleFactor.TargetDPI);
   MarginsChangeHandler(nil);
 end;
@@ -1687,7 +1758,7 @@ end;
 procedure TACLGraphicControl.InvalidateRect(const R: TRect);
 begin
   if (Parent <> nil) and Parent.HandleAllocated then
-    Winapi.Windows.InvalidateRect(Parent.Handle, acRectOffset(R, Left, Top), True);
+    Windows.InvalidateRect(Parent.Handle, acRectOffset(R, Left, Top), True);
 end;
 
 function TACLGraphicControl.GetCursor(const P: TPoint): TCursor;
@@ -1850,7 +1921,9 @@ end;
 
 procedure TACLGraphicControl.MarginsChangeHandler(Sender: TObject);
 begin
+{$IFNDEF FPC}
   acRectToMargins(Margins.GetScaledMargins(ScaleFactor), inherited Margins);
+{$ENDIF}
 end;
 
 function TACLGraphicControl.GetIsDesigning: Boolean;
@@ -1905,7 +1978,9 @@ var
   AForm: TCustomForm;
 begin
   inherited BeforeDestruction;
+{$IFNDEF FPC}
   RemoveFreeNotifications;
+{$ENDIF}
   ResourceCollection := nil;
   if Parent <> nil then
   begin
@@ -1939,7 +2014,7 @@ end;
 procedure TACLCustomControl.InvalidateRect(const R: TRect);
 begin
   if HandleAllocated and not IsDestroying then
-    Winapi.Windows.InvalidateRect(Handle, R, True);
+    Windows.InvalidateRect(Handle, R, True);
 end;
 
 procedure TACLCustomControl.ApplyColorSchema(const ASchema: TACLColorSchema);
@@ -2181,19 +2256,21 @@ var
   APaintBuffer: HPAINTBUFFER;
 begin
   if (Message.DC <> 0) or not DoubleBuffered then
-    PaintHandler(Message)
+    PaintHandler({$IFDEF FPC}TLMPaint{$ELSE}TWMPaint{$ENDIF}(Message))
   else
     if DwmCompositionEnabled and AllowCompositionPainting then
     begin
       BeginPaint(Handle, APaintStruct);
       try
-        APaintBuffer := BeginBufferedPaint(APaintStruct.hdc, APaintStruct.rcPaint, BPBF_COMPOSITED, nil, AMemDC);
+        APaintBuffer := BeginBufferedPaint(APaintStruct.hdc, {$IFDEF FPC}@{$ENDIF}APaintStruct.rcPaint, BPBF_COMPOSITED, nil, AMemDC);
         if APaintBuffer <> 0 then
         try
           Perform(WM_ERASEBKGND, AMemDC, AMemDC);
           Perform(WM_PRINTCLIENT, AMemDC, PRF_CLIENT);
+        {$IFNDEF FPC}
           if not (csPaintBlackOpaqueOnGlass in ControlStyle) then
-            BufferedPaintMakeOpaque(APaintBuffer, APaintStruct.rcPaint);
+        {$ENDIF}
+            BufferedPaintMakeOpaque(APaintBuffer, {$IFDEF FPC}@{$ENDIF}APaintStruct.rcPaint);
         finally
           EndBufferedPaint(APaintBuffer, True);
         end;
@@ -2229,11 +2306,13 @@ end;
 
 procedure TACLCustomControl.WMSize(var Message: TWMSize);
 begin
+{$IFNDEF FPC}
   if not IsDestroying then
   begin
     UpdateBounds;
     BoundsChanged;
   end;
+{$ENDIF}
 
   inherited;
 
@@ -2314,6 +2393,7 @@ begin
   // do nothing
 end;
 
+{$IFNDEF FPC}
 procedure TACLCustomControl.ScaleForPPI(NewPPI: Integer);
 begin
   Perform(CM_SCALECHANGING, 0, 0);
@@ -2323,13 +2403,26 @@ begin
     Perform(CM_SCALECHANGED, 0, 0);
   end;
 end;
+{$ENDIF}
 
+{$IFDEF FPC}
+function TACLCustomControl.CalcCursorPos: TPoint;
+begin
+  GetCursorPos(Result);
+  Result := ScreenToClient(Result);
+end;
+{$ENDIF}
+
+{$IFDEF FPC}
+procedure TACLCustomControl.ChangeScale(M, D: Integer);
+{$ELSE}
 procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+{$ENDIF}
 begin
   Perform(CM_SCALECHANGING, 0, 0);
   try
     ScaleFactor.Change(M, D);
-    inherited ChangeScale(M, D, isDpiChange);
+    inherited;
     SetTargetDPI(ScaleFactor.TargetDPI);
     MarginsChangeHandler(nil);
   finally
@@ -2384,7 +2477,7 @@ end;
 
 function TACLCustomControl.GetScaleFactor: TACLScaleFactor;
 begin
-  Result := ScaleFactor;
+  Result := FScaleFactor;
 end;
 
 function TACLCustomControl.GetBackgroundStyle: TACLControlBackgroundStyle;
@@ -2422,12 +2515,16 @@ end;
 
 procedure TACLCustomControl.MarginsChangeHandler(Sender: TObject);
 begin
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+{$ELSE}
   DisableAlign;
   try
     acRectToMargins(Margins.GetScaledMargins(ScaleFactor), inherited Margins);
   finally
     EnableAlign;
   end;
+{$ENDIF}
 end;
 
 procedure TACLCustomControl.PaddingChangeHandler(Sender: TObject);
@@ -2542,7 +2639,7 @@ end;
 
 procedure TACLDeferPlacementUpdate.Add(AControl: TWinControl; ALeft, ATop, AWidth, AHeight: Integer);
 begin
-  Add(AControl, System.Classes.Bounds(ALeft, ATop, AWidth, AHeight));
+  Add(AControl, Classes.Bounds(ALeft, ATop, AWidth, AHeight));
 end;
 
 procedure TACLDeferPlacementUpdate.BeginUpdate;
@@ -2616,12 +2713,16 @@ var
 begin
   if Message.Msg = WM_WINDOWPOSCHANGED then
   begin
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO-IMPL'}
+  {$ELSE}
     AWindowPos := TWMWindowPosMsg(Message).WindowPos;
     if (AWindowPos = nil) or (AWindowPos^.flags and (SWP_NOMOVE or SWP_NOSIZE) <> (SWP_NOMOVE or SWP_NOSIZE)) then
     begin
       if not (csAligning in Control.ControlState) then
         TACLMainThread.RunPostponed(Changed, Self);
     end;
+  {$ENDIF}
   end;
   FPrevWndProc(Message);
 end;
@@ -2633,6 +2734,9 @@ begin
   if Validate then
   begin  
     ABounds := acRectOffset(AClientRect, FOwner.Left, FOwner.Top);
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO-IMPL'}
+  {$ELSE}
 
     case Position of
       mLeft:
@@ -2678,6 +2782,7 @@ begin
     finally
       Control.ControlState := Control.ControlState - [csAligning];
     end;
+  {$ENDIF}
   end;
 end;
 
@@ -2685,6 +2790,9 @@ procedure TACLSubControlOptions.AfterAutoSize(var AWidth, AHeight: Integer);
 begin
   if Validate then
   begin
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO-IMPL'}
+  {$ELSE}
     if Position in [mRight, mLeft] then
     begin
       AHeight := Max(AHeight, Control.ExplicitHeight);
@@ -2697,6 +2805,7 @@ begin
       Inc(AHeight, GetActualIndentBetweenElements);
       Inc(AHeight, Control.ExplicitHeight);
     end;
+  {$ENDIF}
   end;
 end;
 
@@ -2704,6 +2813,9 @@ procedure TACLSubControlOptions.BeforeAutoSize(var AWidth, AHeight: Integer);
 begin
   if Validate then
   begin
+  {$IFDEF FPC}
+    {$MESSAGE 'TODO-IMPL'}
+  {$ELSE}
     if Position in [mRight, mLeft] then
     begin
       Dec(AWidth, GetActualIndentBetweenElements);
@@ -2714,6 +2826,7 @@ begin
       Dec(AHeight, GetActualIndentBetweenElements);
       Dec(AHeight, Control.ExplicitHeight);
     end;
+  {$ENDIF}
   end;
 end;
 
@@ -2741,8 +2854,12 @@ begin
     Control := nil;
   if (Control <> nil) and (Control.Align <> alCustom) then
     Control.Align := alCustom;
+{$IFDEF FPC}
+  {$MESSAGE 'TODO'}
+{$ELSE}
   if (Control <> nil) and (Control.AlignWithMargins) then
     Control.AlignWithMargins := False;
+{$ENDIF}
   Result := Control <> nil;
 end;
 
