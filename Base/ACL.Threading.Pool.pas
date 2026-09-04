@@ -169,6 +169,7 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure BeforeDestruction; override;
+    class function CurrentTask: TACLTask;
 
     function Run(AProc: TACLTaskProc): TObjHandle; overload;
     function Run(AProc: TThreadMethod; ACompleteEvent: TThreadMethod;
@@ -183,7 +184,6 @@ type
     function Cancel(ATaskHandle: TObjHandle; AWaitFor: Boolean = False): Boolean; overload;
     function Cancel(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult; overload;
     procedure CancelAll(AWaitFor: Boolean);
-    function CurrentTask: TACLTask;
     function ToString: string; override;
 
     function WaitFor(ATaskHandle: TObjHandle): Boolean; overload;
@@ -235,6 +235,8 @@ type
     constructor Create(AProc: TThreadMethod); overload;
   end;
 
+threadvar
+  FCurrentThreadTask: TACLTask;
 var
   FTaskDispatcher: TACLTaskDispatcher = nil;
 
@@ -639,24 +641,25 @@ begin
     CheckSynchronize;
 end;
 
-function TACLTaskDispatcher.CurrentTask: TACLTask;
-var
-  LThreadId: TThreadId;
-  LIndex: Integer;
+class function TACLTaskDispatcher.CurrentTask: TACLTask;
+//var
+//  LIndex: Integer;
+//  LThreadId: TThreadId;
 begin
-  FLock.Enter;
-  try
-    LThreadId := GetCurrentThreadId;
-    for LIndex := 0 to FActiveTasks.Count - 1 do
-    begin
-      Result := FActiveTasks.List[LIndex];
-      if Result.FThreadID = LThreadId then
-        Exit;
-    end;
-    Result := nil;
-  finally
-    FLock.Leave;
-  end;
+  Result := FCurrentThreadTask;
+//  FLock.Enter;
+//  try
+//    LThreadId := GetCurrentThreadId;
+//    for LIndex := 0 to FActiveTasks.Count - 1 do
+//    begin
+//      Result := FActiveTasks.List[LIndex];
+//      if Result.FThreadID = LThreadId then
+//        Exit;
+//    end;
+//    Result := nil;
+//  finally
+//    FLock.Leave;
+//  end;
 end;
 
 function TACLTaskDispatcher.WaitFor(ATaskHandle: TObjHandle): Boolean;
@@ -765,6 +768,7 @@ begin
   {$IFDEF MSWINDOWS}
     SetThreadPriority(GetCurrentThread, PriorityMap[ATask.GetPriority]);
   {$ENDIF}
+    FCurrentThreadTask := ATask;
     try
       try
         ATask.Execute;
@@ -778,6 +782,7 @@ begin
 
     FLock.Enter;
     try
+      FCurrentThreadTask := nil;
       FActiveTasks.Remove(ATask);
       CheckActiveTasks;
     finally
