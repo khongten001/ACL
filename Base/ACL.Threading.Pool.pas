@@ -76,6 +76,7 @@ type
   public
     procedure Cancel;
     function IsCanceled: Boolean;
+    procedure RunInCurrentThread;
     //# Properties
     property Caption: string read GetCaption;
     property Handle: TObjHandle read GetHandle;
@@ -179,7 +180,6 @@ type
     function Run(ATask: TACLTask): TObjHandle; overload;
     function Run(ATask: TACLTask; ACompleteEvent: TThreadMethod;
       ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle; overload;
-    class function RunInCurrentThread(ATask: TACLTask): TObjHandle;
 
     function Cancel(ATaskHandle: TObjHandle; AWaitFor: Boolean = False): Boolean; overload;
     function Cancel(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult; overload;
@@ -279,6 +279,19 @@ begin
   Result := (FCanceled <> 0) or (FOwnerTask <> nil) and FOwnerTask.IsCanceled;
 end;
 
+procedure TACLTask.RunInCurrentThread;
+begin
+  try
+    FOwnerTask := TACLTaskDispatcher.CurrentTask;
+    try
+      Execute;
+    finally
+      Complete;
+    end;
+  finally
+    Free;
+  end;
+end;
 { TACLTaskGroup }
 
 constructor TACLTaskGroup.Create;
@@ -420,7 +433,7 @@ begin
     end;
 
     if FCurrentTask <> nil then
-      TaskDispatcher.RunInCurrentThread(FCurrentTask)
+      FCurrentTask.RunInCurrentThread
     else
       Break;
   end;
@@ -561,21 +574,6 @@ function TACLTaskDispatcher.Run(AProc, ACompleteEvent: TThreadMethod;
   ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle;
 begin
   Result := Run(TACLSimpleTask.Create(AProc), ACompleteEvent, ACompleteEventCallMode);
-end;
-
-class function TACLTaskDispatcher.RunInCurrentThread(ATask: TACLTask): TObjHandle;
-begin
-  Result := 0;
-  try
-    ATask.FOwnerTask := TaskDispatcher.CurrentTask;
-    try
-      ATask.Execute;
-    finally
-      ATask.Complete;
-    end;
-  finally
-    ATask.Free;
-  end;
 end;
 
 procedure TACLTaskDispatcher.BeforeDestruction;

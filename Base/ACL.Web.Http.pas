@@ -904,7 +904,7 @@ end;
 
 function TACLHttp.RunNoThread: TACLWebErrorInfo;
 begin
-  TACLTaskDispatcher.RunInCurrentThread(TACLHttpRequestTask.Create(Self));
+  TACLHttpRequestTask.Create(Self).RunInCurrentThread;
   Result := FResult;
 end;
 
