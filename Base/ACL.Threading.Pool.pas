@@ -102,7 +102,9 @@ type
   TACLTaskGroup = class
   strict private
     FActiveTasks: Integer;
+    FCanceled: Boolean;
     FEvent: TACLEvent;
+    FPendingTasks: TACLTaskList;
     FTasks: TACLListOf<TObjHandle>;
 
     FOnAsyncFinished: TNotifyEvent;
@@ -115,6 +117,7 @@ type
     procedure Cancel(AWaitFor: Boolean = True);
     procedure Initialize;
     function IsActive: Boolean;
+    function IsCanceled: Boolean;
     procedure Run(AWaitFor: Boolean);
     procedure WaitFor;
     //# Properties
@@ -326,11 +329,13 @@ constructor TACLTaskGroup.Create;
 begin
   FEvent := TACLEvent.Create(True, True);
   FTasks := TACLListOf<TObjHandle>.Create;
+  FPendingTasks := TACLTaskList.Create;
 end;
 
 destructor TACLTaskGroup.Destroy;
 begin
   Cancel;
+  FreeAndNil(FPendingTasks);
   FreeAndNil(FTasks);
   FreeAndNil(FEvent);
   inherited;
@@ -338,8 +343,7 @@ end;
 
 procedure TACLTaskGroup.Add(ATask: TACLTask);
 begin
-  InterlockedIncrement(FActiveTasks); // first
-  FTasks.Add(TaskDispatcher.Run(ATask, AsyncFinished, tmcmAsync));
+  FPendingTasks.Add(ATask);
 end;
 
 procedure TACLTaskGroup.AsyncFinished;
@@ -357,6 +361,7 @@ procedure TACLTaskGroup.Cancel(AWaitFor: Boolean = True);
 var
   I: Integer;
 begin
+  FCanceled := True;
   for I := FTasks.Count - 1 downto 0 do
     TaskDispatcher.Cancel(FTasks.List[I], False);
   if AWaitFor then
@@ -368,7 +373,9 @@ begin
   Cancel;
   FEvent.Reset;
   FTasks.Clear;
-  FActiveTasks := 1; // to prevent from OnAsyncFinished fired before call the Run
+  FPendingTasks.Clear;
+  FCanceled := False;
+  FActiveTasks := 0;
 end;
 
 function TACLTaskGroup.IsActive: Boolean;
@@ -376,8 +383,19 @@ begin
   Result := FActiveTasks > 0;
 end;
 
+function TACLTaskGroup.IsCanceled: Boolean;
+begin
+  Result := FCanceled;
+end;
+
 procedure TACLTaskGroup.Run(AWaitFor: Boolean);
 begin
+  FActiveTasks := 1; // to prevent from OnAsyncFinished fired before push all tasks to a dispatcher
+  while FPendingTasks.Count > 0 do
+  begin
+    InterlockedIncrement(FActiveTasks);
+    FTasks.Add(TaskDispatcher.Run(TACLTask(FPendingTasks.ExtractAt(0)), AsyncFinished, tmcmAsync));
+  end;
   AsyncFinished;
   if AWaitFor then WaitFor;
 end;
