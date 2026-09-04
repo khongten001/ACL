@@ -179,6 +179,7 @@ type
   public
     function ChangePlace(AOldIndex, ANewIndex: Integer): Boolean;
     procedure Exchange(Index1, Index2: Integer);
+    function ExtractAt(AIndex: Integer): Pointer;
     //# Events
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   end;
@@ -394,13 +395,13 @@ type
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   public
     constructor Create(AOwnsObjects: Boolean = True);
-    function Add(AObject: TObject): Integer;
-    function Extract(AItem: TObject): TObject;
-    function ExtractAt(AIndex: Integer): TObject;
-    function First: TObject;
-    function Last: TObject;
-    function Remove(AObject: TObject): Integer;
-    procedure Insert(Index: Integer; AObject: TObject);
+    function Add(AObject: TObject): Integer; inline;
+    function Extract(AItem: TObject): TObject; inline;
+    function ExtractAt(AIndex: Integer): TObject; inline;
+    function First: TObject; inline;
+    function Last: TObject; inline;
+    function Remove(AObject: TObject): Integer; inline;
+    procedure Insert(Index: Integer; AObject: TObject); inline;
     // Properties
     property Items[Index: Integer]: TObject read GetItem write SetItem; default;
     property OwnsObjects: Boolean read FOwnsObjects write FOwnsObjects;
@@ -1167,6 +1168,18 @@ procedure TACLList.Exchange(Index1, Index2: Integer);
 begin
   inherited Exchange(Index1, Index2);
   if Assigned(OnChanged) then OnChanged(Self);
+end;
+
+function TACLList.ExtractAt(AIndex: Integer): Pointer;
+begin
+  Result := nil;
+  if IsValid(AIndex) then
+  begin
+    Result := List[AIndex];
+    List[AIndex] := nil;
+    Delete(AIndex);
+    Notify(Result, lnExtracted);
+  end;
 end;
 
 procedure TACLList.Notify(Ptr: Pointer; Action: TListNotification);
@@ -2719,14 +2732,7 @@ end;
 
 function TACLObjectList.ExtractAt(AIndex: Integer): TObject;
 begin
-  Result := nil;
-  if IsValid(AIndex) then
-  begin
-    Result := Items[AIndex];
-    List[AIndex] := nil;
-    Delete(AIndex);
-    Notify(Result, lnExtracted);
-  end;
+  Result := TObject(inherited ExtractAt(AIndex));
 end;
 
 function TACLObjectList.First: TObject;

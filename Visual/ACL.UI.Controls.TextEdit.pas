@@ -39,6 +39,7 @@ uses
   System.UITypes,
   // ACL
   ACL.Classes,
+  ACL.Classes.Collections,
   ACL.Geometry,
   ACL.Graphics,
   ACL.MUI,

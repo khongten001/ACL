@@ -449,8 +449,10 @@ end;
 function TACLProgressBox.GetTextArea: TRect;
 begin
   Result := BoxRect;
-  Result.Inflate(-8, 0);
-  Result := Bounds(Result.Left, Result.Top + 12, Result.Width, 55);
+  Result.Inflate(-dpiApply(8, FCurrentPPI), 0);
+  Result := Bounds(Result.Left,
+    Result.Top + dpiApply(12, FCurrentPPI),
+    Result.Width, dpiApply(55, FCurrentPPI));
 end;
 
 function TACLProgressBox.GetTextStored(Index: Integer): Boolean;

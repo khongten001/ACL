@@ -543,6 +543,7 @@ type
   class function TACLAppIndicatorImpl.HandlerClick(
     Icon: PAppIndicator; X, Y: Integer; Self: TACLAppIndicatorImpl): gboolean; cdecl;
   begin
+    Result := gTRUE;
     try
     {$IFDEF ACL_TRAYICON_DEBUGLOG}
       LogEntry(acGeneralLogFileName, 'Tray', 'Activate(%d,%d)', [X, Y]);
@@ -558,6 +559,7 @@ type
   class function TACLAppIndicatorImpl.HandlerScroll(Icon: PAppIndicator;
     Steps: Integer; Direction: TGdkScrollDirection; Self: TACLAppIndicatorImpl): gboolean; cdecl;
   begin
+    Result := gTRUE;
     try
     {$IFDEF ACL_TRAYICON_DEBUGLOG}
       LogEntry(acGeneralLogFileName, 'Tray', 'Scroll(%d)', [Integer(Direction)]);
