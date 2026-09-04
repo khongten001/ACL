@@ -123,26 +123,19 @@ type
 
   { TACLTaskQueue }
 
-  TACLTaskQueue = class
+  TACLTaskQueue = class(TACLTask)
   strict private
+    FAutoStart: Boolean;
     FCurrentTask: TACLTask;
     FLock: TACLCriticalSection;
-    FTaskHandle: TObjHandle;
-
-    FOnAsyncFinished: TNotifyEvent;
-
-    procedure AsyncFinished;
-    procedure AsyncRun;
     FPendingTasks: TACLTaskList;
+  protected
+    procedure Execute; override;
   public
-    constructor Create;
+    constructor Create(AAutoStart: Boolean = True);
     destructor Destroy; override;
     procedure Add(ATask: TACLTask);
-    procedure BeforeDestruction; override;
-    procedure Cancel;
     function IsActive: Boolean;
-    //# Properties
-    property OnAsyncFinished: TNotifyEvent read FOnAsyncFinished write FOnAsyncFinished;
   end;
 
   { TACLTaskDispatcher }
@@ -396,14 +389,18 @@ end;
 
 { TACLTaskQueue }
 
-constructor TACLTaskQueue.Create;
+constructor TACLTaskQueue.Create(AAutoStart: Boolean);
 begin
+  inherited Create;
+  FAutoStart := AAutoStart;
   FLock := TACLCriticalSection.Create;
   FPendingTasks := TACLTaskList.Create;
+  FreeOnTerminate := not FAutoStart; // to keep original behavior
 end;
 
 destructor TACLTaskQueue.Destroy;
 begin
+  Cancel;
   FreeAndNil(FPendingTasks);
   FreeAndNil(FLock);
   inherited;
@@ -414,51 +411,16 @@ begin
   FLock.Enter;
   try
     FPendingTasks.Add(ATask);
-    if FTaskHandle = 0 then
-      FTaskHandle := TaskDispatcher.Run(AsyncRun, AsyncFinished, tmcmAsync);
+    if FAutoStart and not IsActive then
+      TaskDispatcher.Run(Self);
   finally
     FLock.Leave;
   end;
 end;
 
-procedure TACLTaskQueue.BeforeDestruction;
+procedure TACLTaskQueue.Execute;
 begin
-  inherited;
-  Cancel;
-end;
-
-procedure TACLTaskQueue.Cancel;
-begin
-  FLock.Enter;
-  try
-    FPendingTasks.Clear;
-    if FCurrentTask <> nil then
-      FCurrentTask.Cancel;
-  finally
-    FLock.Leave;
-  end;
-  TaskDispatcher.Cancel(FTaskHandle, True);
-end;
-
-function TACLTaskQueue.IsActive: Boolean;
-begin
-  Result := FTaskHandle <> 0;
-end;
-
-procedure TACLTaskQueue.AsyncFinished;
-begin
-  FLock.Enter;
-  try
-    FTaskHandle := 0;
-  finally
-    FLock.Leave;
-  end;
-  CallNotifyEvent(Self, OnAsyncFinished);
-end;
-
-procedure TACLTaskQueue.AsyncRun;
-begin
-  while True do
+  while not IsCanceled do
   begin
     FLock.Enter;
     try
@@ -472,6 +434,11 @@ begin
     else
       Break;
   end;
+end;
+
+function TACLTaskQueue.IsActive: Boolean;
+begin
+  Result := TaskDispatcher.Contains(Self);
 end;
 
 { TACLSimpleTask }
