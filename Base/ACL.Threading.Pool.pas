@@ -60,6 +60,7 @@ type
   private
     FCanceled: Integer;
     FEvent: IACLTaskEvent;
+    FKeepOnTerminate: Boolean;
     FOwner: TACLTaskDispatcher;
     FOwnerTask: TACLTask;
     FThreadId: TThreadId;
@@ -67,7 +68,10 @@ type
     FOnComplete: TThreadMethod;
     FOnCompleteMode: TACLThreadMethodCallMode;
 
+    procedure FreeIfNecessary;
     function GetHandle: TObjHandle;
+    function GetFreeOnTerminate: Boolean;
+    procedure SetFreeOnTerminate(AValue: Boolean);
   protected
     procedure Complete; virtual;
     procedure Execute; virtual; abstract;
@@ -80,9 +84,17 @@ type
     //# Properties
     property Caption: string read GetCaption;
     property Handle: TObjHandle read GetHandle;
+    property FreeOnTerminate: Boolean read GetFreeOnTerminate write SetFreeOnTerminate;
     //# Events
     property OnComplete: TThreadMethod read FOnComplete write FOnComplete;
     property OnCompleteMode: TACLThreadMethodCallMode read FOnCompleteMode write FOnCompleteMode;
+  end;
+
+  { TACLTaskList }
+
+  TACLTaskList = class(TACLList)
+  protected
+    procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   end;
 
   { TACLTaskGroup }
@@ -115,13 +127,13 @@ type
   strict private
     FCurrentTask: TACLTask;
     FLock: TACLCriticalSection;
-    FPendingTasks: TACLObjectList;
     FTaskHandle: TObjHandle;
 
     FOnAsyncFinished: TNotifyEvent;
 
     procedure AsyncFinished;
     procedure AsyncRun;
+    FPendingTasks: TACLTaskList;
   public
     constructor Create;
     destructor Destroy; override;
@@ -144,7 +156,7 @@ type
     CpuUsageMonitorUpdateInterval = 1000;
     SuccessfulWaitResults = [wrSignaled, wrAbandoned];
   strict private
-    FActiveTasks: TACLListOf<TACLTask>;
+    FActiveTasks: TList;
     FActualMaxActiveTasks: Integer;
     FCpuUsageLog: array [0..CpuUsageMonitorLogSize - 1] of Integer;
     FCpuUsageMonitor: TObject;
@@ -152,7 +164,7 @@ type
     FLock: TACLCriticalSection;
     FMaxActiveTasks: Integer;
     FPrevSystemTimes: TThread.TSystemTimes;
-    FTasks: TACLObjectListOf<TACLTask>;
+    FTasks: TACLTaskList;
 
     procedure AsyncRun(ATask: TACLTask);
     procedure CheckActiveTasks;
@@ -161,8 +173,10 @@ type
     procedure SetMaxActiveTasks(AValue: Integer);
     procedure SetUseCpuUsageMonitor(AValue: Boolean);
   protected
-    class function ThreadProc(ATask: TACLTask): Integer; stdcall; static;
+    function Contains(ATask: TACLTask): Boolean;
     procedure Start(ATask: TACLTask);
+    class function TaskCompare(ALeft, ARight: TACLTask): Integer; static;
+    class function ThreadProc(ATask: TACLTask): Integer; stdcall; static;
 
     // Properties
     property ActualMaxActiveTasks: Integer read FActualMaxActiveTasks;
@@ -198,13 +212,6 @@ function TaskDispatcher: TACLTaskDispatcher;
 implementation
 
 type
-
-  { TACLTaskComparer }
-
-  TACLTaskComparer = class(TComparer<TACLTask>)
-  public
-    function Compare(const Left, Right: TACLTask): Integer; override;
-  end;
 
   { TACLTaskEvent }
 
@@ -259,6 +266,11 @@ begin
   CallThreadMethod(FOnComplete, FOnCompleteMode);
 end;
 
+procedure TACLTask.FreeIfNecessary;
+begin
+  if FreeOnTerminate then Free;
+end;
+
 function TACLTask.GetPriority: TACLTaskPriority;
 begin
   Result := atpNormal;
@@ -267,6 +279,11 @@ end;
 function TACLTask.GetCaption: string;
 begin
   Result := '';
+end;
+
+function TACLTask.GetFreeOnTerminate: Boolean;
+begin
+  Result := not FKeepOnTerminate;
 end;
 
 function TACLTask.GetHandle: TObjHandle;
@@ -289,9 +306,27 @@ begin
       Complete;
     end;
   finally
-    Free;
+    FreeIfNecessary;
   end;
 end;
+
+procedure TACLTask.SetFreeOnTerminate(AValue: Boolean);
+begin
+  // Previously the class did not have a constructor and therefore many
+  // inheritors do not call inherited. So we cannot initialize the FreeOnTerminate
+  // variable in the constructor by the TRUE value to keep original behavior.
+  FKeepOnTerminate := not AValue;
+end;
+
+{ TACLTaskList }
+
+procedure TACLTaskList.Notify(Ptr: Pointer; Action: TListNotification);
+begin
+  if (Action = lnDeleted) and (Ptr <> nil) then
+    TACLTask(Ptr).FreeIfNecessary;
+  inherited;
+end;
+
 { TACLTaskGroup }
 
 constructor TACLTaskGroup.Create;
@@ -364,7 +399,7 @@ end;
 constructor TACLTaskQueue.Create;
 begin
   FLock := TACLCriticalSection.Create;
-  FPendingTasks := TACLObjectList.Create;
+  FPendingTasks := TACLTaskList.Create;
 end;
 
 destructor TACLTaskQueue.Destroy;
@@ -427,7 +462,7 @@ begin
   begin
     FLock.Enter;
     try
-      FCurrentTask := FPendingTasks.ExtractAt(0) as TACLTask
+      FCurrentTask := FPendingTasks.ExtractAt(0);
     finally
       FLock.Leave;
     end;
@@ -437,13 +472,6 @@ begin
     else
       Break;
   end;
-end;
-
-{ TACLTaskComparer }
-
-function TACLTaskComparer.Compare(const Left, Right: TACLTask): Integer;
-begin
-  Result := Ord(Right.GetPriority) - Ord(Left.GetPriority);
 end;
 
 { TACLSimpleTask }
@@ -521,8 +549,8 @@ constructor TACLTaskDispatcher.Create;
 begin
   inherited Create;
   IsMultiThread := True;
-  FTasks := TACLObjectListOf<TACLTask>.Create;
-  FActiveTasks := TACLListOf<TACLTask>.Create;
+  FTasks := TACLTaskList.Create;
+  FActiveTasks := TList.Create;
   FLock := TACLCriticalSection.Create(Self, 'TaskLock');
   MaxActiveTasks := 4 * CPUCount;
   UseCpuUsageMonitor := True;
@@ -553,8 +581,12 @@ begin
   FLock.Enter;
   try
     Result := ATask.Handle;
-    FTasks.Add(ATask);
-    FTasks.Sort(TACLTaskComparer.Default);
+    if not Contains(ATask) then
+    begin
+      ATask.FCanceled := 0;
+      FTasks.Add(ATask);
+      FTasks.Sort(@TaskCompare);
+    end;
   finally
     FLock.Leave;
   end;
@@ -592,8 +624,7 @@ end;
 
 function TACLTaskDispatcher.Cancel(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult;
 var
-  LIndex: Integer;
-  LTask: TACLTask;
+  LTask: TACLTask absolute ATaskHandle;
   LWaitEvent: IACLTaskEvent;
   LWaitThreadId: TThreadId;
 begin
@@ -605,26 +636,23 @@ begin
   FLock.Enter;
   try
     // Cancel pending item
-    LIndex := FTasks.IndexOf(TACLTask(ATaskHandle));
-    if LIndex >= 0 then
+    if FTasks.Extract(LTask) <> nil then
     begin
-      TACLTask(ATaskHandle).FCanceled := 1;
-      TACLTask(ATaskHandle).Complete;
-      FTasks.Delete(LIndex);
+      try
+        LTask.Cancel;
+        LTask.Complete;
+      finally
+        LTask.FreeIfNecessary
+      end;
       Exit(wrSignaled);
     end;
 
     // Cancel active item
-    for LIndex := 0 to FActiveTasks.Count - 1 do
+    if FActiveTasks.Contains(LTask) then
     begin
-      LTask := FActiveTasks.List[LIndex];
-      if ATaskHandle = LTask.Handle then
-      begin
-        LTask.Cancel;
-        LWaitEvent := LTask.FEvent;
-        LWaitThreadId := LTask.FThreadId;
-        Break;
-      end;
+      LTask.Cancel;
+      LWaitEvent := LTask.FEvent;
+      LWaitThreadId := LTask.FThreadId;
     end;
   finally
     FLock.Leave;
@@ -667,40 +695,38 @@ end;
 
 function TACLTaskDispatcher.WaitFor(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult;
 var
-  AIndex: Integer;
-  ATask: TACLTask;
-  AWaitEvent: IACLTaskEvent;
-  AWaitThreadId: TThreadId;
+  LTask: TACLTask absolute ATaskHandle;
+  LWaitEvent: IACLTaskEvent;
+  LWaitThreadId: TThreadId;
 begin
-  AWaitEvent := nil;
-  AWaitThreadId := 0;
+  LWaitEvent := nil;
+  LWaitThreadId := 0;
 
   FLock.Enter;
   try
     // if task is pending - activate it now
-    AIndex := FTasks.IndexOf(TACLTask(ATaskHandle));
-    if AIndex >= 0 then
-      Start(FTasks[AIndex]);
+    if FTasks.Contains(LTask) then
+      Start(LTask);
 
     // find task in active work item list
-    for AIndex := 0 to FActiveTasks.Count - 1 do
+    if FActiveTasks.Contains(LTask) then
     begin
-      ATask := FActiveTasks.List[AIndex];
-      if ATaskHandle = ATask.Handle then
-      begin
-        AWaitEvent := ATask.FEvent;
-        AWaitThreadId := ATask.FThreadId;
-        Break;
-      end;
+      LWaitEvent := LTask.FEvent;
+      LWaitThreadId := LTask.FThreadId;
     end;
   finally
     FLock.Leave;
   end;
 
-  if AWaitEvent <> nil then
-    Result := AWaitEvent.WaitFor(AWaitTimeOut, AWaitThreadId)
+  if LWaitEvent <> nil then
+    Result := LWaitEvent.WaitFor(AWaitTimeOut, LWaitThreadId)
   else
     Result := wrAbandoned;
+end;
+
+class function TACLTaskDispatcher.TaskCompare(ALeft, ARight: TACLTask): Integer;
+begin
+  Result := Ord(ARight.GetPriority) - Ord(ALeft.GetPriority);
 end;
 
 class function TACLTaskDispatcher.ThreadProc(ATask: TACLTask): Integer;
@@ -746,6 +772,7 @@ begin
   FLock.Enter;
   try
     ATask.FOwner := Self;
+    ATask.FOwnerTask := nil;
     ATask.FEvent := TACLTaskEvent.Create;
     FActiveTasks.Add(FTasks.Extract(ATask));
     RunInThread(@ThreadProc, ATask);
@@ -789,22 +816,22 @@ begin
 
     ATask.FEvent.Signal;
   finally
-    ATask.Free;
+    ATask.FreeIfNecessary;
   end;
 end;
 
 procedure TACLTaskDispatcher.CancelAll(AWaitFor: Boolean);
 var
-  ATaskHandle: TObjHandle;
+  LTaskHandle: TObjHandle;
   I: Integer;
 begin
   // Mark all as canceled
   FLock.Enter;
   try
     for I := FTasks.Count - 1 downto 0 do
-      Cancel(FTasks[I].Handle, False);
+      Cancel(TACLTask(FTasks.List[I]).Handle, False);
     for I := FActiveTasks.Count - 1 downto 0 do
-      Cancel(FActiveTasks[I].Handle, False);
+      Cancel(TACLTask(FActiveTasks.List[I]).Handle, False);
   finally
     FLock.Leave;
   end;
@@ -816,13 +843,13 @@ begin
       FLock.Enter;
       try
         if FActiveTasks.Count > 0 then
-          ATaskHandle := FActiveTasks.First.Handle
+          LTaskHandle := TACLTask(FActiveTasks.First).Handle
         else
-          ATaskHandle := 0;
+          LTaskHandle := 0;
       finally
         FLock.Leave;
       end;
-      Cancel(ATaskHandle, True);
+      Cancel(LTaskHandle, True);
     end;
 end;
 
@@ -835,6 +862,16 @@ begin
       if FTasks.Count > 0 then
         Start(FTasks.First);
     end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TACLTaskDispatcher.Contains(ATask: TACLTask): Boolean;
+begin
+  FLock.Enter;
+  try
+    Result := FTasks.Contains(ATask) or FActiveTasks.Contains(ATask);
   finally
     FLock.Leave;
   end;
