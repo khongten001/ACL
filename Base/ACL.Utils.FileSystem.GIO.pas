@@ -277,6 +277,8 @@ procedure g_bus_unown_name(owner_id: guint); cdecl; external libGio2;
 function g_dbus_connection_emit_signal(connection: PGDBusConnection;
   destination_bus_name, object_path, interface_name, signal_name: Pgchar;
   parameters: PGVariant; error: PPGError): gboolean; cdecl; external libGio2;
+function g_bus_get_sync(bus_type: gint32; cancellable: PGCancellable;
+  error: PPGError): PGDBusConnection; cdecl; external libGio2;
 function g_dbus_connection_register_object(connection: PGDBusConnection;
   object_path: Pgchar; interface_info: PGDBusInterfaceInfo; vtable: PGDBusInterfaceVTable;
   user_data: gpointer; user_data_free_func: TGDestroyNotify; error: PPGError): guint; cdecl; external libGio2;

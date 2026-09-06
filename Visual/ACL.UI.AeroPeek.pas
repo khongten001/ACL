@@ -3,10 +3,12 @@
 //  Project:   Artem's Controls Library aka ACL
 //             v7.0
 //
-//  Purpose:   Windows 7 Aero Peek support
+//  Purpose:   Integration with the
+//             + Unity Lauch Entry (KDE, Gnome)
+//             + Windows 7 Aero Peek
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -32,6 +34,7 @@ uses
 {$ENDIF}
   // System
   {System.}Classes,
+  {System.}Math,
   {System.}SysUtils,
   {System.}Types,
   // Vcl
@@ -46,9 +49,11 @@ uses
   ACL.Graphics,
   ACL.Graphics.Images,
   ACL.Timers,
+  ACL.UI.Application,
   ACL.UI.Controls.Base,
   ACL.UI.ImageList,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.Shell;
 
 {$IFDEF FPC}
 type
@@ -109,7 +114,6 @@ type
     FButtons: TACLAeroPeekButtons;
     FForceCustomPreview: Boolean;
     FImageList: TACLImageList;
-    FInitialized: Boolean;
     FLivePreviewTimer: TACLTimer;
     FOwnerWindow: TWinControl;
     FPrevWndProc: TWndMethod;
@@ -124,23 +128,22 @@ type
 
     FOnButtonClick: TACLAeroPeekButtonClickEvent;
     FOnDrawPreview: TACLAeroPeekDrawPreviewEvent;
-    FOnInitialize: TNotifyEvent;
 
-    function GetAvailable: Boolean;
-    function GetProgressPresents: Boolean;
     procedure ImageListChanged(Sender: TObject);
     procedure LivePreviewTimerHandler(Sender: TObject);
     procedure OwnerWindowWndProc(var AMessage: TMessage);
-    procedure SetForceCustomPreview(const Value: Boolean);
+    procedure SetForceCustomPreview(AValue: Boolean);
     procedure SetOnDrawPreview(AValue: TACLAeroPeekDrawPreviewEvent);
     procedure SetProgressState(AValue: TACLAeroPeekProgressState);
     procedure SetShowProgress(AValue: Boolean);
     procedure SetShowProgressCanBeIndeterminate(AValue: Boolean);
     procedure SetShowStatusAsColor(AValue: Boolean);
+    procedure SetWindowAttribute(AAttr: Cardinal; AValue: LongBool);
   private
+  {$IFDEF MSWINDOWS}
     FTaskBarButtons: array [0..6] of TThumbButton;
     FTaskBarButtonsInitialized: Boolean;
-
+  {$ENDIF}
     procedure StartLivePreviewTimer;
     procedure StopLivePreviewTimer;
     procedure SyncButtons;
@@ -150,22 +153,13 @@ type
     procedure UpdateLivePreviews;
   protected
     function CreatePeekPreview(out AHasFrame: Boolean): TACLBitmap;
-    procedure DoButtonClick(AIndex: Integer); virtual;
     procedure DoInitialize; virtual;
-    procedure SetWindowAttribute(AAttr: Cardinal; AValue: LongBool);
     //# Properties
-    property Available: Boolean read GetAvailable;
-    property Initialized: Boolean read FInitialized;
     property OwnerWindow: TWinControl read FOwnerWindow;
-    property Progress: Int64 read FProgress;
-    property ProgressPresents: Boolean read GetProgressPresents;
-    property ProgressTotal: Int64 read FProgressTotal;
     property TaskBarList: ITaskbarList3 read FTaskBarList;
   public
     constructor Create(AOwnerWindow: TWinControl);
     destructor Destroy; override;
-    procedure ConfigLoad(AConfig: TACLIniFile; const ASection: string); virtual;
-    procedure ConfigSave(AConfig: TACLIniFile; const ASection: string); virtual;
     procedure UpdateOverlay(AIcon: HICON; const AHint: string);
     procedure UpdatePreview;
     procedure UpdateProgress(const AProgress, AProgressTotal: Int64);
@@ -180,26 +174,25 @@ type
     //# Events
     property OnButtonClick: TACLAeroPeekButtonClickEvent read FOnButtonClick write FOnButtonClick;
     property OnDrawPreview: TACLAeroPeekDrawPreviewEvent read FOnDrawPreview write SetOnDrawPreview;
-    property OnInitialize: TNotifyEvent read FOnInitialize write FOnInitialize;
+  public
+    class function IsAvailable: Boolean;
   end;
 
 implementation
 
 uses
-{$IFNDEF FPC}
-  Math,
+{$IFDEF LINUX}
+  GLib2,
+  ACL.Utils.FileSystem.GIO,
 {$ENDIF}
-  ACL.Utils.Strings,
-  ACL.Utils.Desktop;
+  ACL.Utils.Desktop,
+  ACL.Utils.Strings;
 
+{$IFDEF FPC}
 const
-  sThumbButtonsAlreadyCreated = 'You cannot add or remove thumb buttons after aero peek initialization';
-
-{$IFNDEF FPC}
-const
-  CLSID_CustomDestinationList: TGUID = '{77f10cf0-3db5-4966-b520-b7c54fd35ed6}';
-  CLSID_TaskbarList: TGUID = '{56fdf344-fd6d-11d0-958a-006097c9a090}';
-
+  DWMWA_FORCE_ICONIC_REPRESENTATION = 0;
+  DWMWA_HAS_ICONIC_BITMAP           = 0;
+{$ELSE}
 var
   WM_TASKBARBUTTONCREATED: Cardinal = 0;
 {$ENDIF}
@@ -249,8 +242,10 @@ end;
 
 procedure TACLAeroPeekButtons.CheckForInitialization;
 begin
+{$IFDEF MSWINDOWS}
   if FOwner.FTaskBarButtonsInitialized then
-    raise Exception.Create(sThumbButtonsAlreadyCreated);
+    raise Exception.Create('You cannot add or remove thumb buttons after aero peek initialization');
+{$ENDIF}
 end;
 
 procedure TACLAeroPeekButtons.Clear;
@@ -302,12 +297,16 @@ begin
   FImageList := TACLImageList.Create(nil);
   FImageList.OnChange := ImageListChanged;
   FButtons := TACLAeroPeekButtons.Create(Self);
+  FThumbnailSize := TSize.Create(0, 0);
 {$IFDEF MSWINDOWS}
-  if not IsWine then
+  if IsAvailable then
   begin
-    FPrevWndProc := FOwnerWindow.WindowProc;
-    FOwnerWindow.WindowProc := OwnerWindowWndProc;
-    if Failed(CoCreateInstance(CLSID_TaskbarList, nil, CLSCTX_INPROC_SERVER, IID_ITaskbarList3, FTaskBarList)) then
+    if Succeeded(CoCreateInstance(CLSID_TaskbarList, nil, CLSCTX_INPROC_SERVER, IID_ITaskbarList3, FTaskBarList)) then
+    begin
+      FPrevWndProc := FOwnerWindow.WindowProc;
+      FOwnerWindow.WindowProc := OwnerWindowWndProc;
+    end
+    else
       FTaskBarList := nil;
   end;
 {$ENDIF}
@@ -317,13 +316,11 @@ end;
 
 destructor TACLAeroPeek.Destroy;
 begin
-{$IFDEF MSWINDOWS}
-  if not IsWine then
+  if Assigned(FPrevWndProc) then
   begin
     SetWindowAttribute(DWMWA_HAS_ICONIC_BITMAP, False);
     FOwnerWindow.WindowProc := FPrevWndProc;
   end;
-{$ENDIF}
   StopLivePreviewTimer;
   FImageList.OnChange := nil;
   FTaskBarList := nil;
@@ -332,37 +329,34 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLAeroPeek.ConfigLoad(AConfig: TACLIniFile; const ASection: string);
+class function TACLAeroPeek.IsAvailable: Boolean;
 begin
-  ShowProgress := AConfig.ReadBool(ASection, 'ShowPlayingProgress', True);
-  ShowStatusAsColor := AConfig.ReadBool(ASection, 'ShowStatusAsColor', True);
-end;
-
-procedure TACLAeroPeek.ConfigSave(AConfig: TACLIniFile; const ASection: string);
-begin
-  AConfig.WriteBool(ASection, 'ShowStatusAsColor', ShowStatusAsColor);
-  AConfig.WriteBool(ASection, 'ShowPlayingProgress', ShowProgress);
+{$IFDEF MSWINDOWS}
+  Result := acOSCheckVersion(6, 1) and not IsWine;
+{$ELSE}
+  Result := ShellDesktopEnv = sdeKDE; // +Ubuntu, but not Gnome
+{$ENDIF}
 end;
 
 procedure TACLAeroPeek.UpdateOverlay(AIcon: HICON; const AHint: string);
 begin
-  if Available then
-  {$IFDEF MSWINDOWS}
+{$IFDEF MSWINDOWS}
+  if TaskBarList <> nil then
     TaskBarList.SetOverlayIcon(OwnerWindow.Handle, AIcon, PWideChar(AHint));
-  {$ENDIF}
+{$ENDIF}
 end;
 
 procedure TACLAeroPeek.UpdatePreview;
 begin
-  if Available then
+{$IFDEF MSWINDOWS}
+  if TaskBarList <> nil then
   begin
-  {$IFDEF MSWINDOWS}
     if FLivePreviewTimer <> nil then
       UpdateLivePreviews
     else
       DwmInvalidateIconicBitmaps(OwnerWindow.Handle);
-  {$ENDIF}
   end;
+{$ENDIF}
 end;
 
 procedure TACLAeroPeek.UpdateProgress(const AProgress, AProgressTotal: Int64);
@@ -444,48 +438,21 @@ begin
 {$ENDIF}
 end;
 
-procedure TACLAeroPeek.DoButtonClick(AIndex: Integer);
-begin
-  if Assigned(OnButtonClick) then
-    OnButtonClick(Self, AIndex);
-end;
-
 procedure TACLAeroPeek.DoInitialize;
 begin
-  FInitialized := False;
-  FTaskBarButtonsInitialized := False;
-  CallNotifyEvent(Self, OnInitialize); //# before FInitialize :=, to prevent to multiple call
-  FInitialized := Available;
-  if Initialized then
-  begin
-    SyncProgress;
-    SyncButtons;
-    SyncState;
-    UpdatePreview;
-    UpdateForceIconicRepresentation;
-  end;
+  SyncProgress;
+  SyncButtons;
+  SyncState;
+  UpdatePreview;
+  UpdateForceIconicRepresentation;
 end;
 
 procedure TACLAeroPeek.SetWindowAttribute(AAttr: Cardinal; AValue: LongBool);
 begin
-  if Available and OwnerWindow.HandleAllocated then
-  {$IFDEF MSWINDOWS}
-    DwmSetWindowAttribute(OwnerWindow.Handle, AAttr, @AValue, SizeOf(AValue));
-  {$ENDIF}
-end;
-
-function TACLAeroPeek.GetAvailable: Boolean;
-begin
 {$IFDEF MSWINDOWS}
-  Result := (FTaskBarList <> nil) and acOSCheckVersion(6, 1);
-{$ELSE}
-  Result := False;
+  if (TaskBarList <> nil) and OwnerWindow.HandleAllocated then
+    DwmSetWindowAttribute(OwnerWindow.Handle, AAttr, @AValue, SizeOf(AValue));
 {$ENDIF}
-end;
-
-function TACLAeroPeek.GetProgressPresents: Boolean;
-begin
-  Result := (Progress > 0) or (ProgressTotal > 0);
 end;
 
 procedure TACLAeroPeek.ImageListChanged(Sender: TObject);
@@ -501,7 +468,8 @@ begin
     WM_COMMAND:
       if HiWord(AMessage.WParam) = THBN_CLICKED then
       begin
-        DoButtonClick(Loword(AMessage.WParam));
+        if Assigned(OnButtonClick) then
+          OnButtonClick(Self, LoWord(AMessage.WParam));
         Exit;
       end;
 
@@ -513,16 +481,22 @@ begin
 
     WM_DWMSENDICONICTHUMBNAIL:
       begin
-        FThumbnailSize := TSize.Create(HiWord(AMessage.LParam), LoWord(AMessage.LParam));
+        FThumbnailSize.cx := HiWord(AMessage.LParam);
+        FThumbnailSize.cy := LoWord(AMessage.LParam);
         StartLivePreviewTimer;
         Exit;
       end;
   end;
   FPrevWndProc(AMessage);
-  if AMessage.Msg = WM_TASKBARBUTTONCREATED then
-    DoInitialize;
   if AMessage.Msg = WM_CREATE then
-    SyncState;
+    DoInitialize;
+  if AMessage.Msg = WM_TASKBARBUTTONCREATED then
+  begin
+    FTaskBarButtonsInitialized := False;
+    for var I := Low(FTaskBarButtons) to High(FTaskBarButtons) do
+      FTaskBarButtons[I] := Default(TThumbButton);
+    DoInitialize;
+  end;
 {$ENDIF}
 end;
 
@@ -534,11 +508,11 @@ begin
     StopLivePreviewTimer;
 end;
 
-procedure TACLAeroPeek.SetForceCustomPreview(const Value: Boolean);
+procedure TACLAeroPeek.SetForceCustomPreview(AValue: Boolean);
 begin
-  if FForceCustomPreview <> Value then
+  if FForceCustomPreview <> AValue then
   begin
-    FForceCustomPreview := Value;
+    FForceCustomPreview := AValue;
     UpdateForceIconicRepresentation;
   end;
 end;
@@ -591,7 +565,7 @@ procedure TACLAeroPeek.SyncButtons;
 
   procedure PrepareButton(var B: TThumbButton; AItem: TACLAeroPeekButton; AIndex: Integer);
   begin
-    ZeroMemory(@B, SizeOf(B));
+    B := Default(TThumbButton);
     B.dwMask := THB_BITMAP or THB_FLAGS or THB_TOOLTIP;
     acStrLCopy(@B.szTip[0], AItem.Hint, Length(B.szTip));
     B.dwFlags := IfThen(AItem.Enabled, THBF_ENABLED, THBF_DISABLED);
@@ -601,14 +575,13 @@ procedure TACLAeroPeek.SyncButtons;
 
 var
   LButtonCount: Integer;
-  I: Integer;
 begin
   if FTaskBarButtonsInitialized or (Buttons.Count <> 0) then
   begin
     LButtonCount := Min(Buttons.Count, Length(FTaskBarButtons));
-    for I := 0 to LButtonCount - 1 do
+    for var I := 0 to LButtonCount - 1 do
       PrepareButton(FTaskBarButtons[I], Buttons[I], I);
-    if Initialized then
+    if TaskBarList <> nil then
     try
       if ImageList <> nil then
         TaskBarList.ThumbBarSetImageList(OwnerWindow.Handle, ImageList.Handle);
@@ -632,40 +605,77 @@ procedure TACLAeroPeek.SyncProgress;
 {$IFDEF MSWINDOWS}
 const
   StateMap: array[TACLAeroPeekProgressState] of Integer = (TBPF_NORMAL, TBPF_PAUSED, TBPF_ERROR);
+var
+  LState: Cardinal;
+begin
+  if TaskBarList = nil then
+    Exit;
 
-  function CalculateState: Cardinal;
+  if (FProgress > 0) or (FProgressTotal > 0) then
   begin
-    if (ProgressTotal = 0) and ShowProgressCanBeIndeterminate then
-      Result := TBPF_INDETERMINATE
-    else if ShowStatusAsColor then
-      Result := StateMap[ProgressState]
-    else if ProgressTotal = 0 then
-      Result := TBPF_NOPROGRESS
-    else
-      Result := TBPF_NORMAL;
+    if ShowProgress then
+    begin
+      if (FProgressTotal = 0) and ShowProgressCanBeIndeterminate then
+        LState := TBPF_INDETERMINATE
+      else if ShowStatusAsColor then
+        LState := StateMap[ProgressState]
+      else if FProgressTotal = 0 then
+        LState := TBPF_NOPROGRESS
+      else
+        LState := TBPF_NORMAL;
+
+      TaskBarList.SetProgressState(OwnerWindow.Handle, LState);
+      if (LState <> TBPF_NOPROGRESS) and (LState <> TBPF_INDETERMINATE) then
+        TaskBarList.SetProgressValue(OwnerWindow.Handle, FProgress, FProgressTotal);
+      Exit;
+    end;
+
+    if ShowStatusAsColor then
+    begin
+      TaskBarList.SetProgressState(OwnerWindow.Handle, StateMap[ProgressState]);
+      TaskBarList.SetProgressValue(OwnerWindow.Handle, 100, 100);
+      Exit;
+    end;
   end;
 
+  TaskBarList.SetProgressState(OwnerWindow.Handle, TBPF_NOPROGRESS);
+{$ELSEIF DEFINED(LINUX)}
 var
-  AState: Cardinal;
+  LAppDesktop: string;
+  LAppObjPath: string;
+  LBuilder: PGVariantBuilder;
+  LError: PGError;
+  LHandle: PGDBusConnection;
 begin
-  if Initialized then
-  begin
-    if ShowProgress and ProgressPresents then
+  if (TACLApplication.DesktopId = '') or not IsAvailable then Exit;
+  LError := nil;
+  LHandle := g_bus_get_sync(G_BUS_TYPE_SESSION, nil, @LError);
+  if LHandle <> nil then
+  try
+    LAppObjPath := '/app/' + acReplaceChars(TACLApplication.DesktopId, ' -_.', '/');
+    LAppDesktop := 'application://' + TACLApplication.DesktopId + '.desktop';
+    LBuilder := g_variant_builder_new(g_variant_type_new('a{sv}'));
+    // https://wiki.ubuntu.com/Unity/LauncherAPI#Low_level_DBus_API:_com.canonical.Unity.LauncherEntry
+    if ShowProgress and (FProgressTotal > 0) then
     begin
-      AState := CalculateState;
-      TaskBarList.SetProgressState(OwnerWindow.Handle, AState);
-      if (AState <> TBPF_NOPROGRESS) and (AState <> TBPF_INDETERMINATE) then
-        TaskBarList.SetProgressValue(OwnerWindow.Handle, Progress, ProgressTotal);
+      g_variant_builder_add_pair(LBuilder, 'progress', g_variant_new_double(FProgress / FProgressTotal));
+      g_variant_builder_add_pair(LBuilder, 'progress-visible', g_variant_new_boolean(True));
     end
     else
-      if ShowStatusAsColor and ProgressPresents then
-      begin
-        TaskBarList.SetProgressState(OwnerWindow.Handle, StateMap[ProgressState]);
-        TaskBarList.SetProgressValue(OwnerWindow.Handle, 100, 100);
-      end
-      else
-        TaskBarList.SetProgressState(OwnerWindow.Handle, TBPF_NOPROGRESS);
+    begin
+      g_variant_builder_add_pair(LBuilder, 'progress', g_variant_new_double(0));
+      g_variant_builder_add_pair(LBuilder, 'progress-visible', g_variant_new_boolean(False));
+    end;
+    g_variant_builder_add_pair(LBuilder, 'urgent',
+      g_variant_new_boolean(ShowStatusAsColor and (ProgressState <> appsNormal)));
+    g_dbus_connection_emit_signal(LHandle, nil, Pgchar(LAppObjPath),
+      'com.canonical.Unity.LauncherEntry', 'Update',
+      g_variant_new('(sa{sv})', [Pgchar(LAppDesktop), LBuilder]), @LError);
+  finally
+    g_object_unref(LHandle);
   end;
+  if LError <> nil then
+    g_error_free(LError);
 {$ELSE}
 begin
 {$ENDIF}
@@ -673,16 +683,12 @@ end;
 
 procedure TACLAeroPeek.SyncState;
 begin
-{$IFDEF MSWINDOWS}
   SetWindowAttribute(DWMWA_HAS_ICONIC_BITMAP, True);
-{$ENDIF}
 end;
 
 procedure TACLAeroPeek.UpdateForceIconicRepresentation;
 begin
-{$IFDEF MSWINDOWS}
   SetWindowAttribute(DWMWA_FORCE_ICONIC_REPRESENTATION, Assigned(OnDrawPreview) or ForceCustomPreview);
-{$ENDIF}
 end;
 
 procedure TACLAeroPeek.UpdateLivePreviews;

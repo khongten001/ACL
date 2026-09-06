@@ -39,7 +39,9 @@ uses
   ACL.Graphics.Fonts,
   ACL.Timers,
   ACL.Utils.Common,
-  ACL.Utils.DPIAware;
+  ACL.Utils.DPIAware,
+  ACL.Utils.FileSystem,
+  ACL.Utils.Strings;
 
 type
   TACLApplicationChange = (acDarkMode, acDarkModeForSystem,
@@ -71,6 +73,7 @@ type
     class var FColorSchemaUseNative: Boolean;
     class var FDarkMode: TACLBoolean;
     class var FDefaultFont: TFont;
+    class var FDesktopId :string;
     class var FGlobalSettings: TObject;
     class var FListeners: TACLListenerList;
     class var FMouseWheelHook: TACLMouseWheelHookProc;
@@ -125,6 +128,8 @@ type
     class property DefaultFont: TFont read GetDefaultFont;
     class property TargetDPI: Integer read FTargetDPI write SetTargetDPI;
     class property Version: string read FVersion write FVersion;
+    // Linux only: application://<desktop-id>.desktop
+    class property DesktopId: string read FDesktopId write FDesktopId;
   end;
 
   { TACLApplicationController }
@@ -164,6 +169,7 @@ begin
   CatchExceptions := DefaultCatchExceptions;
   FChangeAggregator := TACLTimer.CreateEx(DelayedChangeHandler, 100);
   FGlobalSettings := TGlobalSettings.Create(FChangeAggregator.Restart);
+  FDesktopId := acLowerCase(acExtractFileNameWithoutExt(acSelfExeName));
   UpdateColorSet;
 end;
 
