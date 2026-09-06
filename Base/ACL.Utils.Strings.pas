@@ -1873,37 +1873,31 @@ begin
       while (SL2 < P2Len) and acIsDigit((P2 + SL2)^) do
         Inc(SL2);
       Result := Sign(acPCharToIntDef(P1, SL1, 0) - acPCharToIntDef(P2, SL2, 0));
+      if Result <> 0 then Exit;
       Dec(P1Len, SL1);
       Dec(P2Len, SL2);
       Inc(P1, SL1);
       Inc(P2, SL2);
     end
     else
-      if LIsDigit1 or LIsDigit2 then
-      begin
-        Result := acCompareStrings(P1, P2, 1, 1, AIgnoreCase);
-        Dec(P1Len);
-        Dec(P2Len);
-        Inc(P1);
-        Inc(P2);
-      end
-      else
-      begin
-        SL1 := 0;
-        SL2 := 0;
-        while (SL1 < P1Len) and not acIsDigit((P1 + SL1)^) do
-          Inc(SL1);
-        while (SL2 < P2Len) and not acIsDigit((P2 + SL2)^) do
-          Inc(SL2);
-        Result := acCompareStrings(P1, P2, SL1, SL2, AIgnoreCase);
-        Dec(P1Len, SL1);
-        Dec(P2Len, SL2);
-        Inc(P1, SL1);
-        Inc(P2, SL2);
-      end;
-
-    if Result <> 0 then
-      Exit;
+    begin
+      if LIsDigit1 then Exit( 1);
+      if LIsDigit2 then Exit(-1);
+      SL1 := 0;
+      SL2 := 0;
+      while (SL1 < P1Len) and not acIsDigit((P1 + SL1)^) do
+        Inc(SL1);
+      while (SL2 < P2Len) and not acIsDigit((P2 + SL2)^) do
+        Inc(SL2);
+      SL1 := Min(SL1, SL2);
+      SL2 := SL1;
+      Result := acCompareStrings(P1, P2, SL1, SL2, AIgnoreCase);
+      if Result <> 0 then Exit;
+      Dec(P1Len, SL1);
+      Dec(P2Len, SL2);
+      Inc(P1, SL1);
+      Inc(P2, SL2);
+    end;
   end;
   if P2Len > 0 then
     Result := -1;
